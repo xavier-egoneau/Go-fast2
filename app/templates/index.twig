@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Go-fast — Showcase</title>
+  <link rel="stylesheet" href="/app/styles/showcase.scss">
+</head>
+<body class="gf-body">
+
+  <header class="gf-header">
+    <div class="gf-header__inner">
+      <a href="/" class="gf-header__logo">
+        <span class="gf-header__logo-mark">⚡</span>
+        <span class="gf-header__logo-name">Go-fast</span>
+        <span class="gf-header__logo-version">v2</span>
+      </a>
+      <nav class="gf-header__nav" aria-label="Niveaux Atomic Design">
+        <button class="gf-filter-btn gf-filter-btn--active" data-filter="all">Tous</button>
+        <button class="gf-filter-btn" data-filter="atom">Atoms</button>
+        <button class="gf-filter-btn" data-filter="molecule">Molecules</button>
+        <button class="gf-filter-btn" data-filter="organism">Organisms</button>
+        <button class="gf-filter-btn" data-filter="template">Templates</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="gf-main">
+    <aside class="gf-sidebar" aria-label="Liste des composants">
+      <div class="gf-sidebar__search">
+        <input
+          type="search"
+          class="gf-search"
+          placeholder="Rechercher..."
+          aria-label="Rechercher un composant"
+          id="gf-search"
+        >
+      </div>
+      <nav class="gf-nav" id="gf-nav" aria-label="Composants">
+        <p class="gf-nav__loading">Chargement...</p>
+      </nav>
+      <section class="gf-pages-section" id="gf-pages-section" aria-label="Pages" hidden>
+        <h2 class="gf-section-title">Pages</h2>
+        <nav class="gf-nav" id="gf-pages-nav"></nav>
+      </section>
+    </aside>
+
+    <section class="gf-content" id="gf-content" aria-label="Aperçu du composant">
+      <div class="gf-welcome">
+        <h1 class="gf-welcome__title">Bienvenue dans Go-fast</h1>
+        <p class="gf-welcome__subtitle">Sélectionnez un composant dans la liste pour commencer.</p>
+        <div class="gf-welcome__stats" id="gf-stats"></div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/app/scripts/showcase.js"></script>
+</body>
+</html>

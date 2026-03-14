@@ -1,0 +1,15 @@
+{% set type        = type|default('text') %}
+{% set id          = id|default('field') %}
+{% set placeholder = placeholder|default('') %}
+{% set disabled    = disabled|default(false) %}
+{% set hasError    = hasError|default(false) %}
+
+<input
+  class="input{% if hasError %} input--error{% endif %}"
+  type="{{ type }}"
+  id="{{ id }}"
+  name="{{ id }}"
+  placeholder="{{ placeholder }}"
+  {% if disabled %}disabled aria-disabled="true"{% endif %}
+  {% if hasError %}aria-invalid="true"{% endif %}
+>

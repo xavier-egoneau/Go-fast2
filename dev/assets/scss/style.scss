@@ -1,0 +1,21 @@
+// =============================================================================
+// Style.scss — Point d'entrée SCSS
+// Ajoutez vos imports ici dans l'ordre souhaité
+// =============================================================================
+
+// Base
+@use 'base/variables';
+@use 'base/reset';
+@use 'base/typography';
+@use 'base/mixins';
+
+// Layout
+// @use 'layout/grid';
+// @use 'layout/containers';
+
+// Components — décommentez au fur et à mesure
+@use 'components/button';
+@use 'components/card';
+@use 'components/label';
+@use 'components/input';
+@use 'components/form-field';

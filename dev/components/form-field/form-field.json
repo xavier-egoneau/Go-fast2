@@ -1,0 +1,51 @@
+{
+  "name": "Form Field",
+  "level": "molecule",
+  "category": "Forms",
+  "description": "Champ de formulaire complet : label + input + message d'erreur optionnel. Composition de atoms.",
+  "variants": {
+    "type": {
+      "label": "Type de champ",
+      "type": "select",
+      "default": "text",
+      "options": ["text", "email", "password", "number", "search"]
+    },
+    "required": {
+      "label": "Obligatoire",
+      "type": "checkbox",
+      "default": false
+    },
+    "disabled": {
+      "label": "Désactivé",
+      "type": "checkbox",
+      "default": false
+    },
+    "hasError": {
+      "label": "Avec erreur",
+      "type": "checkbox",
+      "default": false
+    }
+  },
+  "content": {
+    "label": {
+      "label": "Label",
+      "type": "text",
+      "default": "Adresse e-mail"
+    },
+    "placeholder": {
+      "label": "Placeholder",
+      "type": "text",
+      "default": "exemple@domaine.fr"
+    },
+    "errorMessage": {
+      "label": "Message d'erreur",
+      "type": "text",
+      "default": "Ce champ est invalide."
+    },
+    "id": {
+      "label": "ID",
+      "type": "text",
+      "default": "email"
+    }
+  }
+}

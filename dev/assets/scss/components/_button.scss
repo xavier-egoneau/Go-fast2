@@ -1,0 +1,123 @@
+// =============================================================================
+// Button — Atom
+// =============================================================================
+
+@use '../base/variables' as *;
+@use '../base/mixins' as *;
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-sm;
+  padding: $spacing-sm $spacing-md;
+  border: 2px solid transparent;
+  border-radius: $radius-md;
+  font-family: $font-family-base;
+  font-weight: $font-weight-medium;
+  font-size: $font-size-base;
+  line-height: $line-height-tight;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color $transition-fast, border-color $transition-fast, color $transition-fast, box-shadow $transition-fast;
+  white-space: nowrap;
+  user-select: none;
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &:disabled,
+  &[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  // ─── Variantes ──────────────────────────────────────────────────────────────
+
+  &--primary {
+    background-color: $color-primary;
+    color: $color-white;
+
+    &:hover:not(:disabled) {
+      background-color: $color-primary-dark;
+    }
+  }
+
+  &--secondary {
+    background-color: $color-secondary;
+    color: $color-white;
+
+    &:hover:not(:disabled) {
+      background-color: $color-secondary-dark;
+    }
+  }
+
+  &--success {
+    background-color: $color-success;
+    color: $color-white;
+
+    &:hover:not(:disabled) {
+      background-color: $color-success-dark;
+    }
+  }
+
+  &--danger {
+    background-color: $color-danger;
+    color: $color-white;
+
+    &:hover:not(:disabled) {
+      background-color: $color-danger-dark;
+    }
+  }
+
+  &--warning {
+    background-color: $color-warning;
+    color: $color-white;
+
+    &:hover:not(:disabled) {
+      background-color: $color-warning-dark;
+    }
+  }
+
+  &--outline {
+    background-color: transparent;
+    border-color: $color-primary;
+    color: $color-primary;
+
+    &:hover:not(:disabled) {
+      background-color: $color-primary;
+      color: $color-white;
+    }
+  }
+
+  // ─── Tailles ────────────────────────────────────────────────────────────────
+
+  &--sm {
+    padding: $spacing-xs $spacing-sm;
+    font-size: $font-size-sm;
+    border-radius: $radius-sm;
+  }
+
+  &--md {
+    padding: $spacing-sm $spacing-md;
+    font-size: $font-size-base;
+  }
+
+  &--lg {
+    padding: $spacing-md $spacing-lg;
+    font-size: $font-size-lg;
+  }
+
+  &--xl {
+    padding: $spacing-md $spacing-xl;
+    font-size: $font-size-xl;
+  }
+
+  // ─── Pleine largeur ─────────────────────────────────────────────────────────
+
+  &--full {
+    width: 100%;
+  }
+}

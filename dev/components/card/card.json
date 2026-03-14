@@ -1,0 +1,41 @@
+{
+  "name": "Card",
+  "level": "molecule",
+  "category": "Layout",
+  "description": "Conteneur de contenu structuré avec image, titre, description et action optionnels.",
+  "variants": {
+    "shadow": {
+      "label": "Ombre",
+      "type": "select",
+      "default": "md",
+      "options": ["none", "sm", "md", "lg"]
+    },
+    "hasImage": {
+      "label": "Avec image",
+      "type": "checkbox",
+      "default": true
+    },
+    "hasAction": {
+      "label": "Avec bouton",
+      "type": "checkbox",
+      "default": true
+    }
+  },
+  "content": {
+    "title": {
+      "label": "Titre",
+      "type": "text",
+      "default": "Titre de la carte"
+    },
+    "description": {
+      "label": "Description",
+      "type": "text",
+      "default": "Description courte du contenu de la carte."
+    },
+    "actionLabel": {
+      "label": "Texte du bouton",
+      "type": "text",
+      "default": "En savoir plus"
+    }
+  }
+}

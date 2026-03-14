@@ -1,0 +1,25 @@
+{
+  "name": "Label",
+  "level": "atom",
+  "category": "Forms",
+  "description": "Étiquette accessible associée à un champ de formulaire.",
+  "variants": {
+    "required": {
+      "label": "Obligatoire",
+      "type": "checkbox",
+      "default": false
+    }
+  },
+  "content": {
+    "text": {
+      "label": "Texte",
+      "type": "text",
+      "default": "Étiquette"
+    },
+    "for": {
+      "label": "for (id du champ)",
+      "type": "text",
+      "default": "field"
+    }
+  }
+}

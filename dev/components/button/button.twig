@@ -1,0 +1,13 @@
+{% set variant  = variant|default('primary') %}
+{% set size     = size|default('md') %}
+{% set disabled = disabled|default(false) %}
+{% set fullWidth = fullWidth|default(false) %}
+{% set text     = text|default('Cliquez ici') %}
+
+<button
+  class="btn btn--{{ variant }} btn--{{ size }}{% if fullWidth %} btn--full{% endif %}"
+  {% if disabled %}disabled aria-disabled="true"{% endif %}
+  type="button"
+>
+  {{ text }}
+</button>

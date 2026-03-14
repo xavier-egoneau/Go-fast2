@@ -1,0 +1,10 @@
+{% set text     = text|default('Étiquette') %}
+{% set for      = for|default('field') %}
+{% set required = required|default(false) %}
+
+<label class="label" for="{{ for }}">
+  {{ text }}
+  {% if required %}
+    <span class="label__required" aria-label="obligatoire">*</span>
+  {% endif %}
+</label>

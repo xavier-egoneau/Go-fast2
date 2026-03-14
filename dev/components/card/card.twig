@@ -1,0 +1,29 @@
+{% set shadow      = shadow|default('md') %}
+{% set hasImage    = hasImage|default(true) %}
+{% set hasAction   = hasAction|default(true) %}
+{% set title       = title|default('Titre de la carte') %}
+{% set description = description|default('Description courte du contenu de la carte.') %}
+{% set actionLabel = actionLabel|default('En savoir plus') %}
+
+<article class="card card--shadow-{{ shadow }}">
+  {% if hasImage %}
+    <div class="card__image" aria-hidden="true">
+      <div class="card__image-placeholder"></div>
+    </div>
+  {% endif %}
+
+  <div class="card__body">
+    <h3 class="card__title">{{ title }}</h3>
+    <p class="card__description">{{ description }}</p>
+
+    {% if hasAction %}
+      <div class="card__footer">
+        {% include '../button/button.twig' with {
+          text: actionLabel,
+          variant: 'primary',
+          size: 'sm'
+        } %}
+      </div>
+    {% endif %}
+  </div>
+</article>

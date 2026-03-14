@@ -1,0 +1,72 @@
+{% extends '../layouts/base.twig' %}
+
+{% block title %}Page démo — Go-fast{% endblock %}
+
+{% block body %}
+<main style="max-width: 800px; margin: 0 auto; padding: 3rem 1.5rem; font-family: Inter, sans-serif;">
+
+  <h1>Page démo</h1>
+  <p>Cette page valide que les composants s'assemblent correctement.</p>
+
+  <section style="margin-top: 3rem;">
+    <h2>Boutons</h2>
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1rem;">
+      {% include '../components/button/button.twig' with { variant: 'primary', text: 'Primary' } %}
+      {% include '../components/button/button.twig' with { variant: 'secondary', text: 'Secondary' } %}
+      {% include '../components/button/button.twig' with { variant: 'outline', text: 'Outline' } %}
+      {% include '../components/button/button.twig' with { variant: 'danger', text: 'Danger' } %}
+      {% include '../components/button/button.twig' with { variant: 'primary', text: 'Désactivé', disabled: true } %}
+    </div>
+  </section>
+
+  <section style="margin-top: 3rem;">
+    <h2>Formulaire</h2>
+    <form style="display: flex; flex-direction: column; gap: 1.25rem; margin-top: 1rem; max-width: 400px;">
+      {% include '../components/form-field/form-field.twig' with {
+        label: 'Prénom',
+        id: 'firstname',
+        placeholder: 'Jean'
+      } %}
+      {% include '../components/form-field/form-field.twig' with {
+        label: 'Email',
+        id: 'email',
+        type: 'email',
+        placeholder: 'jean@exemple.fr',
+        required: true
+      } %}
+      {% include '../components/form-field/form-field.twig' with {
+        label: 'Champ en erreur',
+        id: 'error-field',
+        placeholder: '...',
+        hasError: true,
+        errorMessage: 'Ce champ est invalide.'
+      } %}
+      {% include '../components/button/button.twig' with { variant: 'primary', text: 'Envoyer', fullWidth: true } %}
+    </form>
+  </section>
+
+  <section style="margin-top: 3rem;">
+    <h2>Cartes</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
+      {% include '../components/card/card.twig' with {
+        title: 'Carte standard',
+        description: 'Un exemple de carte avec image et action.',
+        actionLabel: 'En savoir plus'
+      } %}
+      {% include '../components/card/card.twig' with {
+        title: 'Sans image',
+        description: 'Une carte sans image, juste du texte et une action.',
+        hasImage: false,
+        shadow: 'lg'
+      } %}
+      {% include '../components/card/card.twig' with {
+        title: 'Sans bouton',
+        description: 'Une carte informative sans action.',
+        hasAction: false,
+        shadow: 'sm'
+      } %}
+    </div>
+  </section>
+
+</main>
+{% endblock %}

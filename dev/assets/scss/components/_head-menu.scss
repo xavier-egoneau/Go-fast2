@@ -1,0 +1,376 @@
+@use '../base/variables' as *;
+@use '../base/mixins' as *;
+
+// =============================================================================
+// Head Menu — Organism
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// Tokens locaux (light par défaut)
+// -----------------------------------------------------------------------------
+.head-menu {
+  width: 100%;
+
+  --hm-bg:              #{$color-white};
+  --hm-border:          #{$color-gray-200};
+  --hm-text:            #{$color-gray-700};
+  --hm-text-hover:      #{$color-primary};
+  --hm-text-active:     #{$color-primary};
+  --hm-logo-color:      #{$color-gray-900};
+  --hm-dropdown-bg:     #{$color-white};
+  --hm-dropdown-shadow: #{$shadow-lg};
+  --hm-dropdown-hover:  #{$color-gray-50};
+  --hm-burger-color:    #{$color-gray-700};
+}
+
+.head-menu--dark {
+  --hm-bg:              #{$color-gray-900};
+  --hm-border:          #{$color-gray-700};
+  --hm-text:            #{$color-gray-300};
+  --hm-text-hover:      #{$color-white};
+  --hm-text-active:     #{$color-white};
+  --hm-logo-color:      #{$color-white};
+  --hm-dropdown-bg:     #{$color-gray-800};
+  --hm-dropdown-shadow: #{$shadow-xl};
+  --hm-dropdown-hover:  #{$color-gray-700};
+  --hm-burger-color:    #{$color-gray-300};
+}
+
+// -----------------------------------------------------------------------------
+// Header
+// -----------------------------------------------------------------------------
+.head-menu {
+  background-color: var(--hm-bg);
+  border-bottom: 1px solid var(--hm-border);
+  transition:
+    background-color $transition-base,
+    border-color $transition-base,
+    box-shadow $transition-base;
+
+  &--sticky {
+    position: sticky;
+    top: 0;
+    z-index: $z-sticky;
+  }
+
+  &--shadow {
+    border-bottom-color: transparent;
+    box-shadow: $shadow-md;
+  }
+
+  &--transparent {
+    background-color: transparent;
+    border-bottom-color: transparent;
+  }
+
+  // -----------------------------------------------------------------------------
+  // Container
+  // -----------------------------------------------------------------------------
+  &__container {
+    display: flex;
+    align-items: center;
+    gap: $spacing-lg;
+    padding-inline: $spacing-xl;
+    padding-block: $spacing-md;
+
+    // Par défaut : largeur contrainte + centré
+    .head-menu:not(.head-menu--full-width) & {
+      max-width: 1280px;
+      margin-inline: auto;
+    }
+  }
+
+  // -----------------------------------------------------------------------------
+  // Logo
+  // -----------------------------------------------------------------------------
+  &__logo {
+    flex-shrink: 0;
+    text-decoration: none;
+
+    &:focus-visible {
+      @include focus-ring;
+      border-radius: $radius-sm;
+    }
+  }
+
+  &__logo-text {
+    font-size: $font-size-xl;
+    font-weight: $font-weight-bold;
+    color: var(--hm-logo-color);
+    transition: opacity $transition-fast;
+
+    .head-menu__logo:hover & {
+      opacity: 0.8;
+    }
+  }
+
+  &__logo-img {
+    display: block;
+    height: 2rem;
+    width: auto;
+    transition: opacity $transition-fast;
+
+    .head-menu__logo:hover & {
+      opacity: 0.8;
+    }
+  }
+
+  // -----------------------------------------------------------------------------
+  // Nav
+  // -----------------------------------------------------------------------------
+  &__nav {
+    flex: 1;
+    display: flex;
+
+    &--right  { justify-content: flex-end; }
+    &--center { justify-content: center; }
+  }
+
+  &__list {
+    display: flex;
+    align-items: center;
+    gap: $spacing-xs;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  &__item {
+    position: relative;
+  }
+
+  // -----------------------------------------------------------------------------
+  // Lien simple
+  // -----------------------------------------------------------------------------
+  &__link {
+    display: block;
+    padding: $spacing-sm $spacing-md;
+    font-size: $font-size-base;
+    font-weight: $font-weight-medium;
+    color: var(--hm-text);
+    text-decoration: none;
+    border-radius: $radius-md;
+    transition: color $transition-fast, background-color $transition-fast;
+
+    &:hover {
+      color: var(--hm-text-hover);
+      background-color: var(--hm-dropdown-hover);
+    }
+
+    &--active {
+      color: var(--hm-text-active);
+      font-weight: $font-weight-semibold;
+    }
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+
+  // -----------------------------------------------------------------------------
+  // Trigger dropdown
+  // -----------------------------------------------------------------------------
+  &__trigger {
+    display: flex;
+    align-items: center;
+    gap: $spacing-xs;
+    padding: $spacing-sm $spacing-md;
+    font-size: $font-size-base;
+    font-weight: $font-weight-medium;
+    color: var(--hm-text);
+    background: none;
+    border: none;
+    border-radius: $radius-md;
+    cursor: pointer;
+    transition: color $transition-fast, background-color $transition-fast;
+
+    &:hover {
+      color: var(--hm-text-hover);
+      background-color: var(--hm-dropdown-hover);
+    }
+
+    &--active {
+      color: var(--hm-text-active);
+      font-weight: $font-weight-semibold;
+    }
+
+    &[aria-expanded='true'] {
+      color: var(--hm-text-hover);
+
+      .head-menu__chevron::after {
+        transform: rotate(180deg);
+      }
+    }
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+
+  &__chevron {
+    display: inline-flex;
+    align-items: center;
+
+    &::after {
+      content: '';
+      display: block;
+      width: 0.4em;
+      height: 0.4em;
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: rotate(45deg) translateY(-2px);
+      transition: transform $transition-fast;
+    }
+  }
+
+  // -----------------------------------------------------------------------------
+  // Dropdown
+  // -----------------------------------------------------------------------------
+  &__dropdown {
+    position: absolute;
+    top: calc(100% + #{$spacing-sm});
+    right: 0;
+    min-width: 220px;
+    padding: $spacing-sm 0;
+    list-style: none;
+    margin: 0;
+    background-color: var(--hm-dropdown-bg);
+    border: 1px solid var(--hm-border);
+    border-radius: $radius-lg;
+    box-shadow: var(--hm-dropdown-shadow);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-#{$spacing-sm});
+    transition:
+      opacity $transition-fast,
+      visibility $transition-fast,
+      transform $transition-fast;
+    z-index: $z-dropdown;
+  }
+
+  // Ouverture CSS pur via focus-within + classe JS .is-open
+  &__item--has-dropdown:focus-within &__dropdown,
+  &__item--has-dropdown.is-open &__dropdown {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+  }
+
+  &__dropdown-link {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    padding: $spacing-sm $spacing-lg;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-normal;
+    color: var(--hm-text);
+    text-decoration: none;
+    transition: color $transition-fast, background-color $transition-fast;
+
+    &:hover {
+      color: var(--hm-text-hover);
+      background-color: var(--hm-dropdown-hover);
+    }
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+
+  &__dropdown-icon {
+    flex-shrink: 0;
+    font-size: $font-size-base;
+  }
+
+  // -----------------------------------------------------------------------------
+  // CTA
+  // -----------------------------------------------------------------------------
+  &__cta {
+    flex-shrink: 0;
+  }
+
+  // -----------------------------------------------------------------------------
+  // Burger mobile
+  // -----------------------------------------------------------------------------
+  &__burger {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: $spacing-sm;
+    background: none;
+    border: none;
+    border-radius: $radius-md;
+    cursor: pointer;
+    margin-left: auto;
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+
+  &__burger-bar {
+    display: block;
+    width: 100%;
+    height: 2px;
+    background-color: var(--hm-burger-color);
+    border-radius: $radius-full;
+    transition: transform $transition-fast, opacity $transition-fast;
+  }
+
+  // Animation burger → croix quand ouvert
+  &--burger-open &__burger-bar {
+    &:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    &:nth-child(2) { opacity: 0; }
+    &:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+  }
+
+  // -----------------------------------------------------------------------------
+  // Responsive
+  // -----------------------------------------------------------------------------
+  @media (max-width: #{$breakpoint-md}) {
+    &__burger {
+      display: flex;
+    }
+
+    &__nav {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background-color: var(--hm-bg);
+      border-bottom: 1px solid var(--hm-border);
+      padding: $spacing-md;
+      z-index: $z-dropdown;
+    }
+
+    &--burger-open &__nav {
+      display: block;
+    }
+
+    &__list {
+      flex-direction: column;
+      align-items: stretch;
+      gap: $spacing-xs;
+    }
+
+    &__dropdown {
+      position: static;
+      opacity: 1;
+      visibility: visible;
+      transform: none;
+      box-shadow: none;
+      border: none;
+      border-radius: 0;
+      padding-left: $spacing-lg;
+      background: transparent;
+    }
+
+    &__cta {
+      display: none;
+    }
+  }
+}

@@ -1,5 +1,5 @@
 ---
-mode: agent
+agent: agent
 description: Créer un nouveau composant Go-fast (atom / molecule / organism / template / page)
 ---
 

@@ -26,6 +26,19 @@
 {% block title %}{{ page_title }} — Go-fast{% endblock %}
 
 {% block body %}
+<div class="page-wrapper" style="width: 100%; min-width: 0;">
+
+{% include '../components/head-menu/head-menu.twig' with {
+  theme: 'light',
+  sticky: true,
+  fullWidth: true,
+  showButton: true,
+  buttonText: 'Commencer',
+  logoText: 'Go-fast',
+  logoHref: '#',
+  activeItem: 'Accueil'
+} %}
+
 <main style="max-width: 800px; margin: 0 auto; padding: 3rem 1.5rem; font-family: Inter, sans-serif;">
 
   <h1>{{ page_title }}</h1>
@@ -92,4 +105,5 @@
   </section>
 
 </main>
+</div>
 {% endblock %}

@@ -11,7 +11,7 @@ let state = {
   components: [],
   pages: [],
   activeFilter: 'all',
-  activeComponent: null,
+  activeItem: null,
   controlValues: {}
 }
 
@@ -19,7 +19,7 @@ let state = {
 
 async function init() {
   const isIndexPage = document.getElementById('gf-nav') !== null
-  const isComponentPage = document.getElementById('gf-controls-form') !== null
+  const isPreviewPage = document.getElementById('gf-controls-form') !== null
 
   try {
     const res = await fetch(SHOWCASE_JSON)
@@ -35,8 +35,8 @@ async function init() {
 
   if (isIndexPage) {
     initIndex()
-  } else if (isComponentPage) {
-    initComponentPage()
+  } else if (isPreviewPage) {
+    initPreviewPage()
   }
 }
 
@@ -119,7 +119,7 @@ function renderPagesNav() {
     <ul class="gf-nav__list">
       ${state.pages.map(p => `
         <li class="gf-nav__item">
-          <a href="/${p.path}.html" class="gf-nav__link gf-nav__link--page">
+          <a href="/app/templates/page-showcase.html?type=page&id=${p.id}" class="gf-nav__link gf-nav__link--page">
             <span class="gf-nav__name">${p.name}</span>
           </a>
         </li>
@@ -140,23 +140,28 @@ function renderStats() {
   ).join('')
 }
 
-// ─── Page composant isolé ─────────────────────────────────────────────────────
+// ─── Page preview isolée ──────────────────────────────────────────────────────
 
-function initComponentPage() {
+function initPreviewPage() {
   const params = new URLSearchParams(window.location.search)
   const id = params.get('id')
+  const type = params.get('type') || 'component'
   if (!id) return
 
-  const component = state.components.find(c => c.id === id)
-  if (!component) {
-    showError(`Composant "${id}" introuvable dans showcase.json`)
+  const item = type === 'page'
+    ? state.pages.find(p => p.id === id)
+    : state.components.find(c => c.id === id)
+
+  if (!item) {
+    showError(`${type === 'page' ? 'Page' : 'Composant'} "${id}" introuvable dans showcase.json`)
     return
   }
 
-  state.activeComponent = component
-  state.controlValues = getDefaultValues(component)
+  state.activeItem = item
+  state.controlValues = getDefaultValues(item)
 
-  renderControls(component)
+  syncPreviewShell(item, type)
+  renderControls(item)
   renderPreview()
 
   // Toggle panneau de contrôles
@@ -171,32 +176,61 @@ function initComponentPage() {
   }
 }
 
-function getDefaultValues(component) {
+function getDefaultValues(item) {
   const values = {}
-  if (component.variants) {
-    Object.entries(component.variants).forEach(([key, ctrl]) => {
+  if (item.variants) {
+    Object.entries(item.variants).forEach(([key, ctrl]) => {
       values[key] = ctrl.default
     })
   }
-  if (component.content) {
-    Object.entries(component.content).forEach(([key, ctrl]) => {
+  if (item.content) {
+    Object.entries(item.content).forEach(([key, ctrl]) => {
       values[key] = ctrl.default
     })
   }
   return values
 }
 
-function renderControls(component) {
+function syncPreviewShell(item, type) {
+  document.title = `${item.name} — Go-fast`
+
+  const badge = document.getElementById('gf-item-badge')
+  const title = document.getElementById('gf-item-title')
+  const category = document.getElementById('gf-item-category')
+  const controlsLabel = document.getElementById('gf-controls-label')
+  const previewLabel = document.getElementById('gf-preview-label')
+
+  if (badge) {
+    badge.textContent = type === 'page' ? 'page' : (item.level || 'atom')
+    badge.className = `gf-badge gf-badge--${type === 'page' ? 'template' : (item.level || 'atom')}`
+  }
+  if (title) title.textContent = item.name || (type === 'page' ? 'Page' : 'Composant')
+  if (category) category.textContent = item.category || ''
+  if (controlsLabel) {
+    controlsLabel.textContent = type === 'page' ? 'Contrôles de la page' : 'Contrôles du composant'
+  }
+  if (previewLabel) {
+    previewLabel.setAttribute('aria-label', type === 'page' ? 'Aperçu de la page' : 'Aperçu du composant')
+  }
+}
+
+function renderControls(item) {
   const form = document.getElementById('gf-controls-form')
+  const description = document.getElementById('gf-controls-description')
   if (!form) return
 
   const allControls = {
-    ...(component.variants || {}),
-    ...(component.content || {})
+    ...(item.variants || {}),
+    ...(item.content || {})
+  }
+
+  if (description) {
+    description.textContent = item.description || ''
+    description.hidden = !item.description
   }
 
   if (Object.keys(allControls).length === 0) {
-    form.innerHTML = '<p class="gf-controls__empty">Ce composant n\'a pas de contrôles.</p>'
+    form.innerHTML = '<p class="gf-controls__empty">Aucun contrôle disponible pour cet élément.</p>'
     return
   }
 
@@ -269,9 +303,9 @@ function handleControlChange(e) {
 
 async function renderPreview() {
   const preview = document.getElementById('gf-preview')
-  if (!preview || !state.activeComponent) return
+  if (!preview || !state.activeItem) return
 
-  const component = state.activeComponent
+  const item = state.activeItem
   const params = new URLSearchParams()
 
   Object.entries(state.controlValues).forEach(([key, val]) => {
@@ -280,7 +314,7 @@ async function renderPreview() {
 
   try {
     // Fetch le template Twig compilé avec les paramètres en query string
-    const url = `/${component.path}.html?${params.toString()}`
+    const url = `/${item.path}.html?${params.toString()}`
     const res = await fetch(url)
     if (!res.ok) throw new Error(`Template introuvable : ${url}`)
     const html = await res.text()

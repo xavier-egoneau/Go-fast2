@@ -42,7 +42,10 @@ function goFastPlugin() {
 
       // Watch : regénère showcase.json si un composant change
       server.watcher.on('change', async (file) => {
-        if (file.includes('dev/components') && file.endsWith('.json')) {
+        if (
+          (file.includes('dev/components') && file.endsWith('.json')) ||
+          (file.includes('dev/pages') && (file.endsWith('.json') || file.endsWith('.twig')))
+        ) {
           const { generateShowcase } = await import('./scripts/generate-showcase.js')
           await generateShowcase()
           server.ws.send({ type: 'full-reload' })

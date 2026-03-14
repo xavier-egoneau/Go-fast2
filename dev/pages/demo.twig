@@ -1,21 +1,44 @@
 {% extends '../layouts/base.twig' %}
 
-{% block title %}Page démo — Go-fast{% endblock %}
+{% set page_title = page_title|default('Page démo') %}
+{% set intro = intro|default('Cette page valide que les composants s\'assemblent correctement.') %}
+{% set primaryButtonLabel = primaryButtonLabel|default('Primary') %}
+{% set secondaryButtonLabel = secondaryButtonLabel|default('Secondary') %}
+{% set outlineButtonLabel = outlineButtonLabel|default('Outline') %}
+{% set dangerButtonLabel = dangerButtonLabel|default('Danger') %}
+{% set disabledButtonLabel = disabledButtonLabel|default('Désactivé') %}
+{% set firstnameLabel = firstnameLabel|default('Prénom') %}
+{% set firstnamePlaceholder = firstnamePlaceholder|default('Jean') %}
+{% set emailLabel = emailLabel|default('Email') %}
+{% set emailPlaceholder = emailPlaceholder|default('jean@exemple.fr') %}
+{% set errorFieldLabel = errorFieldLabel|default('Champ en erreur') %}
+{% set errorFieldPlaceholder = errorFieldPlaceholder|default('...') %}
+{% set errorMessage = errorMessage|default('Ce champ est invalide.') %}
+{% set submitLabel = submitLabel|default('Envoyer') %}
+{% set cardOneTitle = cardOneTitle|default('Carte standard') %}
+{% set cardOneDescription = cardOneDescription|default('Un exemple de carte avec image et action.') %}
+{% set cardOneActionLabel = cardOneActionLabel|default('En savoir plus') %}
+{% set cardTwoTitle = cardTwoTitle|default('Sans image') %}
+{% set cardTwoDescription = cardTwoDescription|default('Une carte sans image, juste du texte et une action.') %}
+{% set cardThreeTitle = cardThreeTitle|default('Sans bouton') %}
+{% set cardThreeDescription = cardThreeDescription|default('Une carte informative sans action.') %}
+
+{% block title %}{{ page_title }} — Go-fast{% endblock %}
 
 {% block body %}
 <main style="max-width: 800px; margin: 0 auto; padding: 3rem 1.5rem; font-family: Inter, sans-serif;">
 
-  <h1>Page démo</h1>
-  <p>Cette page valide que les composants s'assemblent correctement.</p>
+  <h1>{{ page_title }}</h1>
+  <p>{{ intro }}</p>
 
   <section style="margin-top: 3rem;">
     <h2>Boutons</h2>
     <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1rem;">
-      {% include '../components/button/button.twig' with { variant: 'primary', text: 'Primary' } %}
-      {% include '../components/button/button.twig' with { variant: 'secondary', text: 'Secondary' } %}
-      {% include '../components/button/button.twig' with { variant: 'outline', text: 'Outline' } %}
-      {% include '../components/button/button.twig' with { variant: 'danger', text: 'Danger' } %}
-      {% include '../components/button/button.twig' with { variant: 'primary', text: 'Désactivé', disabled: true } %}
+      {% include '../components/button/button.twig' with { variant: 'primary', text: primaryButtonLabel } %}
+      {% include '../components/button/button.twig' with { variant: 'secondary', text: secondaryButtonLabel } %}
+      {% include '../components/button/button.twig' with { variant: 'outline', text: outlineButtonLabel } %}
+      {% include '../components/button/button.twig' with { variant: 'danger', text: dangerButtonLabel } %}
+      {% include '../components/button/button.twig' with { variant: 'primary', text: disabledButtonLabel, disabled: true } %}
     </div>
   </section>
 
@@ -23,25 +46,25 @@
     <h2>Formulaire</h2>
     <form style="display: flex; flex-direction: column; gap: 1.25rem; margin-top: 1rem; max-width: 400px;">
       {% include '../components/form-field/form-field.twig' with {
-        label: 'Prénom',
+        label: firstnameLabel,
         id: 'firstname',
-        placeholder: 'Jean'
+        placeholder: firstnamePlaceholder
       } %}
       {% include '../components/form-field/form-field.twig' with {
-        label: 'Email',
+        label: emailLabel,
         id: 'email',
         type: 'email',
-        placeholder: 'jean@exemple.fr',
+        placeholder: emailPlaceholder,
         required: true
       } %}
       {% include '../components/form-field/form-field.twig' with {
-        label: 'Champ en erreur',
+        label: errorFieldLabel,
         id: 'error-field',
-        placeholder: '...',
+        placeholder: errorFieldPlaceholder,
         hasError: true,
-        errorMessage: 'Ce champ est invalide.'
+        errorMessage: errorMessage
       } %}
-      {% include '../components/button/button.twig' with { variant: 'primary', text: 'Envoyer', fullWidth: true } %}
+      {% include '../components/button/button.twig' with { variant: 'primary', text: submitLabel, fullWidth: true } %}
     </form>
   </section>
 
@@ -49,19 +72,19 @@
     <h2>Cartes</h2>
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
       {% include '../components/card/card.twig' with {
-        title: 'Carte standard',
-        description: 'Un exemple de carte avec image et action.',
-        actionLabel: 'En savoir plus'
+        title: cardOneTitle,
+        description: cardOneDescription,
+        actionLabel: cardOneActionLabel
       } %}
       {% include '../components/card/card.twig' with {
-        title: 'Sans image',
-        description: 'Une carte sans image, juste du texte et une action.',
+        title: cardTwoTitle,
+        description: cardTwoDescription,
         hasImage: false,
         shadow: 'lg'
       } %}
       {% include '../components/card/card.twig' with {
-        title: 'Sans bouton',
-        description: 'Une carte informative sans action.',
+        title: cardThreeTitle,
+        description: cardThreeDescription,
         hasAction: false,
         shadow: 'sm'
       } %}

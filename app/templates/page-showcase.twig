@@ -12,9 +12,9 @@
   <header class="gf-topbar">
     <a href="/" class="gf-topbar__back" aria-label="Retour au showcase">← Showcase</a>
     <div class="gf-topbar__info">
-      <span class="gf-badge gf-badge--{{ component.level|default('atom') }}">{{ component.level|default('atom') }}</span>
-      <h1 class="gf-topbar__title">{{ component.name|default('Composant') }}</h1>
-      <span class="gf-topbar__category">{{ component.category|default('') }}</span>
+      <span class="gf-badge gf-badge--atom" id="gf-item-badge">item</span>
+      <h1 class="gf-topbar__title" id="gf-item-title">Aperçu</h1>
+      <span class="gf-topbar__category" id="gf-item-category"></span>
     </div>
     <div class="gf-topbar__actions">
       <button class="gf-btn-icon" id="gf-toggle-controls" aria-label="Afficher/masquer les contrôles" aria-expanded="true">⚙</button>
@@ -24,28 +24,18 @@
 
   <div class="gf-isolated-layout">
 
-    <aside class="gf-controls" id="gf-controls" aria-label="Contrôles du composant">
-      {% if component.description %}
-        <p class="gf-controls__description">{{ component.description }}</p>
-      {% endif %}
+    <aside class="gf-controls" id="gf-controls" aria-label="Contrôles du preview">
+      <p class="gf-controls__description" id="gf-controls-description" hidden></p>
 
       <form class="gf-controls__form" id="gf-controls-form" novalidate>
-        {% if component.variants %}
-          <fieldset class="gf-fieldset">
-            <legend class="gf-fieldset__legend">Variantes</legend>
-            {# Les contrôles sont générés dynamiquement par showcase.js #}
-          </fieldset>
-        {% endif %}
-        {% if component.content %}
-          <fieldset class="gf-fieldset">
-            <legend class="gf-fieldset__legend">Contenu</legend>
-          </fieldset>
-        {% endif %}
+        <fieldset class="gf-fieldset">
+          <legend class="gf-fieldset__legend" id="gf-controls-label">Contrôles</legend>
+        </fieldset>
       </form>
     </aside>
 
     <main class="gf-preview-area" id="gf-preview-area">
-      <div class="gf-preview" id="gf-preview" aria-label="Aperçu du composant">
+      <div class="gf-preview" id="gf-preview" aria-label="Aperçu" data-preview-kind="item">
         {# Rendu dynamique par showcase.js via fetch du template Twig compilé #}
       </div>
       <div class="gf-a11y-panel" id="gf-a11y-panel" hidden aria-label="Résultats accessibilité" aria-live="polite"></div>

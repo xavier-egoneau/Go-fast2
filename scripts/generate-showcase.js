@@ -56,10 +56,26 @@ export async function generateShowcase() {
 
     for (const file of files) {
       const id = path.basename(file, '.twig')
+      const jsonPath = path.join(pagesDir, `${id}.json`)
+      let meta = {}
+
+      if (fs.existsSync(jsonPath)) {
+        try {
+          meta = JSON.parse(fs.readFileSync(jsonPath, 'utf8'))
+        } catch (e) {
+          console.warn(`[go-fast] Page "${id}" : JSON invalide, ignoré.`, e.message)
+        }
+      }
+
       pages.push({
         id,
         path: `dev/pages/${id}`,
-        name: id
+        name: meta.name || id,
+        level: 'page',
+        category: meta.category || 'Pages',
+        description: meta.description || '',
+        variants: meta.variants || {},
+        content: meta.content || {}
       })
     }
   }

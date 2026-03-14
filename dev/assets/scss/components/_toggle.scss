@@ -1,0 +1,86 @@
+@use '../base/variables' as *;
+@use '../base/mixins' as *;
+
+// =============================================================================
+// Toggle (Switch) — Atom
+// =============================================================================
+
+.toggle {
+  // Offsets du thumb par taille (custom properties pour un calcul propre)
+  --toggle-offset: 1.25rem;
+
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-sm;
+  cursor: pointer;
+  user-select: none;
+
+  &--sm { --toggle-offset: 0.85rem; }
+  &--lg { --toggle-offset: 1.6rem;  }
+
+  &--disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  // ─── Input natif masqué mais accessible ────────────────────────────────────
+  &__input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  // ─── Track ─────────────────────────────────────────────────────────────────
+  &__track {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    background-color: $color-gray-300;
+    border-radius: $radius-full;
+    transition: background-color $transition-fast;
+
+    .toggle--sm & { width: 2rem;    height: 1.1rem; }
+    .toggle--md & { width: 2.75rem; height: 1.5rem; }
+    .toggle--lg & { width: 3.5rem;  height: 1.9rem; }
+  }
+
+  // ─── Thumb ─────────────────────────────────────────────────────────────────
+  &__thumb {
+    position: absolute;
+    background-color: $color-white;
+    border-radius: $radius-full;
+    box-shadow: $shadow-sm;
+    transition: transform $transition-fast;
+
+    .toggle--sm & { width: 0.8rem;  height: 0.8rem;  left: 0.15rem;  }
+    .toggle--md & { width: 1.15rem; height: 1.15rem; left: 0.175rem; }
+    .toggle--lg & { width: 1.5rem;  height: 1.5rem;  left: 0.2rem;   }
+  }
+
+  &__label {
+    font-size: $font-size-sm;
+    color: $color-gray-700;
+    line-height: $line-height-normal;
+  }
+
+  // ─── État checked ──────────────────────────────────────────────────────────
+  &__input:checked {
+    ~ .toggle__track {
+      background-color: $color-primary;
+
+      .toggle__thumb {
+        transform: translateX(var(--toggle-offset));
+      }
+    }
+  }
+
+  // ─── Focus visible ─────────────────────────────────────────────────────────
+  &__input:focus-visible ~ .toggle__track {
+    @include focus-ring;
+    border-radius: $radius-full;
+  }
+}

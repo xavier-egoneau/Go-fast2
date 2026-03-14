@@ -1,0 +1,10 @@
+{% set variant = variant|default('primary') %}
+{% set size    = size|default('md') %}
+{% set rounded = rounded|default(false) %}
+{% set dot     = dot|default(false) %}
+{% set text    = text|default('Badge') %}
+
+<span class="badge badge--{{ variant }} badge--{{ size }}{% if rounded %} badge--rounded{% endif %}">
+  {% if dot %}<span class="badge__dot" aria-hidden="true"></span>{% endif %}
+  {{ text }}
+</span>

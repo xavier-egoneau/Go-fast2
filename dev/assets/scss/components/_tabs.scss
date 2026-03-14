@@ -1,0 +1,172 @@
+@use '../base/variables' as *;
+@use '../base/mixins' as *;
+
+// =============================================================================
+// Tabs — Molecule
+// =============================================================================
+
+.tabs {
+  display: flex;
+  flex-direction: column;
+
+  // ─── Liste d'onglets ───────────────────────────────────────────────────────
+  &__list {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    flex-shrink: 0;
+  }
+
+  .tabs--full &__list {
+    width: 100%;
+  }
+
+  // ─── Trigger (bouton onglet) ───────────────────────────────────────────────
+  &__trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all $transition-fast;
+    color: $color-gray-500;
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+
+    .tabs--full & {
+      flex: 1;
+    }
+  }
+
+  // ─── Panneau de contenu ───────────────────────────────────────────────────
+  &__panel {
+    padding: $spacing-lg;
+    color: $color-gray-700;
+    line-height: $line-height-relaxed;
+
+    p { margin: 0; }
+
+    &[hidden] { display: none; }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Variante LINE (défaut)
+  // ═══════════════════════════════════════════════════════════════════════════
+  &--line &__list {
+    border-bottom: 2px solid $color-gray-200;
+    gap: $spacing-xs;
+  }
+
+  &--line &__trigger {
+    padding: $spacing-sm $spacing-md;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    border-radius: $radius-md $radius-md 0 0;
+    font-weight: $font-weight-medium;
+
+    &:hover {
+      color: $color-gray-800;
+      background-color: $color-gray-50;
+    }
+
+    &--active,
+    &[aria-selected="true"] {
+      color: $color-primary;
+      border-bottom-color: $color-primary;
+    }
+  }
+
+  &--line &__panel {
+    padding: $spacing-lg 0;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Variante PILL
+  // ═══════════════════════════════════════════════════════════════════════════
+  &--pill &__list {
+    background-color: $color-gray-100;
+    border-radius: $radius-xl;
+    padding: $spacing-xs;
+    gap: $spacing-xs;
+  }
+
+  &--pill &__trigger {
+    border-radius: $radius-lg;
+    font-weight: $font-weight-medium;
+
+    &:hover {
+      background-color: $color-gray-200;
+      color: $color-gray-700;
+    }
+
+    &--active,
+    &[aria-selected="true"] {
+      background-color: $color-white;
+      color: $color-primary;
+      box-shadow: $shadow-sm;
+    }
+  }
+
+  &--pill &__panel {
+    padding: $spacing-lg 0;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Variante CARD
+  // ═══════════════════════════════════════════════════════════════════════════
+  &--card &__list {
+    gap: $spacing-sm;
+    flex-wrap: wrap;
+  }
+
+  &--card &__trigger {
+    border: 1px solid $color-gray-200;
+    border-radius: $radius-lg;
+    background-color: $color-white;
+    font-weight: $font-weight-medium;
+    box-shadow: $shadow-sm;
+
+    &:hover {
+      background-color: $color-gray-50;
+      border-color: $color-gray-300;
+    }
+
+    &--active,
+    &[aria-selected="true"] {
+      background-color: $color-primary;
+      border-color: $color-primary;
+      color: $color-white;
+      box-shadow: none;
+    }
+  }
+
+  &--card &__panel {
+    border: 1px solid $color-gray-200;
+    border-radius: $radius-lg;
+    margin-top: $spacing-sm;
+    background-color: $color-white;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Tailles
+  // ═══════════════════════════════════════════════════════════════════════════
+  &--sm &__trigger {
+    padding: $spacing-xs $spacing-sm;
+    font-size: $font-size-sm;
+  }
+
+  &--md &__trigger {
+    padding: $spacing-sm $spacing-md;
+    font-size: $font-size-base;
+  }
+
+  &--lg &__trigger {
+    padding: $spacing-md $spacing-lg;
+    font-size: $font-size-lg;
+  }
+}

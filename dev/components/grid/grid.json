@@ -1,0 +1,27 @@
+{
+  "name": "Grid",
+  "level": "atom",
+  "category": "Layout",
+  "description": "Conteneur CSS Grid responsive. Définit le nombre de colonnes, l'espacement et l'alignement.",
+  "variants": {
+    "cols": {
+      "label": "Colonnes",
+      "type": "select",
+      "default": "3",
+      "options": ["1", "2", "3", "4", "6"]
+    },
+    "gap": {
+      "label": "Espacement",
+      "type": "select",
+      "default": "md",
+      "options": ["none", "sm", "md", "lg", "xl"]
+    },
+    "align": {
+      "label": "Alignement vertical",
+      "type": "select",
+      "default": "stretch",
+      "options": ["stretch", "start", "center", "end"]
+    }
+  },
+  "content": {}
+}

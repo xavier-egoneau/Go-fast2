@@ -15,8 +15,15 @@
 
 // Components — décommentez au fur et à mesure
 @use 'components/button';
-@use 'components/card';
 @use 'components/label';
 @use 'components/input';
+@use 'components/badge';
+@use 'components/spinner';
+@use 'components/avatar';
+@use 'components/toggle';
+@use 'components/grid';
+@use 'components/card';
 @use 'components/form-field';
+@use 'components/modal';
+@use 'components/tabs';
 @use 'components/head-menu';

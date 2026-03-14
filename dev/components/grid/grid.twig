@@ -1,0 +1,12 @@
+{% set cols  = cols|default('3') %}
+{% set gap   = gap|default('md') %}
+{% set align = align|default('stretch') %}
+
+<div class="grid grid--cols-{{ cols }} grid--gap-{{ gap }} grid--align-{{ align }}">
+  <div class="grid__item grid__item--demo">Élément 1</div>
+  <div class="grid__item grid__item--demo">Élément 2</div>
+  <div class="grid__item grid__item--demo">Élément 3</div>
+  <div class="grid__item grid__item--demo">Élément 4</div>
+  <div class="grid__item grid__item--demo">Élément 5</div>
+  <div class="grid__item grid__item--demo">Élément 6</div>
+</div>

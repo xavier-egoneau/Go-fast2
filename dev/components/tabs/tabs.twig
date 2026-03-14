@@ -1,0 +1,87 @@
+{% set variant   = variant|default('line') %}
+{% set size      = size|default('md') %}
+{% set fullWidth = fullWidth|default(false) %}
+{% set tab1Label = tab1Label|default('Aperçu') %}
+{% set tab2Label = tab2Label|default('Détails') %}
+{% set tab3Label = tab3Label|default('Paramètres') %}
+{% set id        = id|default('tabs-1') %}
+
+<div class="tabs tabs--{{ variant }} tabs--{{ size }}{% if fullWidth %} tabs--full{% endif %}" id="{{ id }}">
+
+  <div class="tabs__list" role="tablist" aria-label="Onglets">
+    <button
+      class="tabs__trigger tabs__trigger--active"
+      role="tab"
+      id="{{ id }}-tab-1"
+      aria-controls="{{ id }}-panel-1"
+      aria-selected="true"
+      data-tab="1"
+    >{{ tab1Label }}</button>
+    <button
+      class="tabs__trigger"
+      role="tab"
+      id="{{ id }}-tab-2"
+      aria-controls="{{ id }}-panel-2"
+      aria-selected="false"
+      tabindex="-1"
+      data-tab="2"
+    >{{ tab2Label }}</button>
+    <button
+      class="tabs__trigger"
+      role="tab"
+      id="{{ id }}-tab-3"
+      aria-controls="{{ id }}-panel-3"
+      aria-selected="false"
+      tabindex="-1"
+      data-tab="3"
+    >{{ tab3Label }}</button>
+  </div>
+
+  <div class="tabs__panel" role="tabpanel" id="{{ id }}-panel-1" aria-labelledby="{{ id }}-tab-1">
+    <p>Contenu du panneau <strong>{{ tab1Label }}</strong>. Ajoutez ici vos composants ou votre contenu.</p>
+  </div>
+  <div class="tabs__panel" role="tabpanel" id="{{ id }}-panel-2" aria-labelledby="{{ id }}-tab-2" hidden>
+    <p>Contenu du panneau <strong>{{ tab2Label }}</strong>. Informations complémentaires.</p>
+  </div>
+  <div class="tabs__panel" role="tabpanel" id="{{ id }}-panel-3" aria-labelledby="{{ id }}-tab-3" hidden>
+    <p>Contenu du panneau <strong>{{ tab3Label }}</strong>. Options de configuration.</p>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  var container = document.getElementById('{{ id }}')
+  if (!container) return
+
+  var triggers = Array.from(container.querySelectorAll('.tabs__trigger'))
+  var panels   = Array.from(container.querySelectorAll('.tabs__panel'))
+
+  triggers.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var tabIndex = btn.dataset.tab
+
+      triggers.forEach(function (b) {
+        b.setAttribute('aria-selected', 'false')
+        b.setAttribute('tabindex', '-1')
+        b.classList.remove('tabs__trigger--active')
+      })
+      panels.forEach(function (p) { p.hidden = true })
+
+      btn.setAttribute('aria-selected', 'true')
+      btn.removeAttribute('tabindex')
+      btn.classList.add('tabs__trigger--active')
+
+      var panel = container.querySelector('#{{ id }}-panel-' + tabIndex)
+      if (panel) panel.hidden = false
+    })
+
+    // Navigation clavier : flèches gauche/droite
+    btn.addEventListener('keydown', function (e) {
+      var idx = triggers.indexOf(btn)
+      if (e.key === 'ArrowRight') triggers[(idx + 1) % triggers.length].focus()
+      if (e.key === 'ArrowLeft')  triggers[(idx - 1 + triggers.length) % triggers.length].focus()
+    })
+  })
+})()
+</script>

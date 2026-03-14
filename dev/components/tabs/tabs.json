@@ -1,0 +1,42 @@
+{
+  "name": "Tabs",
+  "level": "molecule",
+  "category": "Navigation",
+  "description": "Système d'onglets avec panneau de contenu associé. Supporte plusieurs styles visuels.",
+  "variants": {
+    "variant": {
+      "label": "Style",
+      "type": "select",
+      "default": "line",
+      "options": ["line", "pill", "card"]
+    },
+    "size": {
+      "label": "Taille",
+      "type": "select",
+      "default": "md",
+      "options": ["sm", "md", "lg"]
+    },
+    "fullWidth": {
+      "label": "Pleine largeur",
+      "type": "checkbox",
+      "default": false
+    }
+  },
+  "content": {
+    "tab1Label": {
+      "label": "Onglet 1",
+      "type": "text",
+      "default": "Aperçu"
+    },
+    "tab2Label": {
+      "label": "Onglet 2",
+      "type": "text",
+      "default": "Détails"
+    },
+    "tab3Label": {
+      "label": "Onglet 3",
+      "type": "text",
+      "default": "Paramètres"
+    }
+  }
+}

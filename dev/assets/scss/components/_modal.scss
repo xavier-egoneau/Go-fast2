@@ -1,0 +1,127 @@
+@use '../base/variables' as *;
+@use '../base/mixins' as *;
+
+// =============================================================================
+// Modal — Molecule
+// =============================================================================
+
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: $z-modal-backdrop;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-md;
+
+  &--open {
+    display: flex;
+  }
+
+  // ─── Overlay ───────────────────────────────────────────────────────────────
+  &__overlay {
+    position: absolute;
+    inset: 0;
+    background-color: rgba($color-black, 0.5);
+    backdrop-filter: blur(2px);
+  }
+
+  // ─── Boîte de dialogue ─────────────────────────────────────────────────────
+  &__dialog {
+    position: relative;
+    z-index: $z-modal;
+    background-color: $color-white;
+    border-radius: $radius-xl;
+    box-shadow: $shadow-xl;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - #{$spacing-xl});
+    width: 100%;
+    animation: modal-in $transition-base both;
+  }
+
+  // ─── Tailles ───────────────────────────────────────────────────────────────
+  &--sm  &__dialog { max-width: 24rem; }
+  &--md  &__dialog { max-width: 32rem; }
+  &--lg  &__dialog { max-width: 48rem; }
+  &--xl  &__dialog { max-width: 64rem; }
+
+  // ─── Header ────────────────────────────────────────────────────────────────
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $spacing-md;
+    padding: $spacing-lg $spacing-xl;
+    border-bottom: 1px solid $color-gray-200;
+    flex-shrink: 0;
+  }
+
+  &__title {
+    font-size: $font-size-lg;
+    font-weight: $font-weight-semibold;
+    color: $color-gray-900;
+    margin: 0;
+  }
+
+  &__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: $radius-md;
+    color: $color-gray-500;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all $transition-fast;
+
+    &:hover {
+      background-color: $color-gray-100;
+      color: $color-gray-800;
+    }
+
+    &:focus-visible {
+      @include focus-ring;
+    }
+  }
+
+  // ─── Body ──────────────────────────────────────────────────────────────────
+  &__body {
+    padding: $spacing-xl;
+    overflow-y: auto;
+    flex: 1;
+    color: $color-gray-700;
+    font-size: $font-size-base;
+    line-height: $line-height-relaxed;
+
+    p { margin: 0; }
+  }
+
+  // ─── Footer ────────────────────────────────────────────────────────────────
+  &__footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: $spacing-sm;
+    padding: $spacing-md $spacing-xl;
+    border-top: 1px solid $color-gray-200;
+    flex-shrink: 0;
+  }
+}
+
+// ─── Animation d'ouverture ─────────────────────────────────────────────────
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(-$spacing-md) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

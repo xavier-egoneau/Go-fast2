@@ -1,0 +1,8 @@
+{% set size    = size|default('md') %}
+{% set variant = variant|default('primary') %}
+{% set label   = label|default('Chargement en cours…') %}
+
+<span class="spinner spinner--{{ size }} spinner--{{ variant }}" role="status" aria-live="polite">
+  <span class="spinner__ring" aria-hidden="true"></span>
+  <span class="spinner__label">{{ label }}</span>
+</span>

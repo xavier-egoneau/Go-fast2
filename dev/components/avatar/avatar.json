@@ -1,0 +1,43 @@
+{
+  "name": "Avatar",
+  "level": "atom",
+  "category": "Media",
+  "description": "Image de profil ou initiales d'un utilisateur, avec taille et forme configurables.",
+  "variants": {
+    "size": {
+      "label": "Taille",
+      "type": "select",
+      "default": "md",
+      "options": ["xs", "sm", "md", "lg", "xl"]
+    },
+    "shape": {
+      "label": "Forme",
+      "type": "select",
+      "default": "circle",
+      "options": ["circle", "square"]
+    },
+    "variant": {
+      "label": "Couleur fond (initiales)",
+      "type": "select",
+      "default": "primary",
+      "options": ["primary", "secondary", "success", "danger", "warning", "neutral"]
+    }
+  },
+  "content": {
+    "initials": {
+      "label": "Initiales",
+      "type": "text",
+      "default": "JD"
+    },
+    "src": {
+      "label": "URL image (vide = initiales)",
+      "type": "text",
+      "default": ""
+    },
+    "alt": {
+      "label": "Texte alternatif",
+      "type": "text",
+      "default": "Jean Dupont"
+    }
+  }
+}

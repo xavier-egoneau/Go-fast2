@@ -1,3 +1,5 @@
+@use 'sass:color';
+
 // =============================================================================
 // Showcase.scss — Styles du framework Go-fast
 // ISOLATION TOTALE : ces styles ne doivent jamais affecter le projet utilisateur
@@ -18,7 +20,7 @@ $gf-accent-hover: #60a5fa;
 $gf-sidebar-w:    280px;
 $gf-controls-w:   260px;
 $gf-topbar-h:     56px;
-$gf-font:         Inter, system-ui, sans-serif;
+$gf-font:         'Roboto', Inter, system-ui, sans-serif;
 $gf-mono:         ui-monospace, monospace;
 $gf-radius:       6px;
 $gf-transition:   150ms ease;
@@ -71,7 +73,10 @@ $gf-transition:   150ms ease;
     flex-shrink: 0;
   }
 
-  &__logo-mark { font-size: 1.25rem; }
+  &__logo-mark {
+    font-size: 1.4rem;
+    color: $gf-accent;
+  }
 
   &__logo-version {
     font-size: 0.7rem;
@@ -273,11 +278,17 @@ $gf-transition:   150ms ease;
   z-index: 100;
 
   &__back {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
     color: $gf-text-muted;
     text-decoration: none;
     font-size: 0.85rem;
+    font-weight: 500;
     flex-shrink: 0;
     transition: color $gf-transition;
+
+    .material-icons { font-size: 1.1rem; }
 
     &:hover { color: $gf-text; }
   }
@@ -374,6 +385,10 @@ $gf-transition:   150ms ease;
     gap: 0.5rem;
   }
 
+  &__select {
+    padding: 0.35rem 2rem 0.35rem 0.5rem;
+  }
+
   &__select,
   &__input {
     padding: 0.35rem 0.5rem;
@@ -412,27 +427,36 @@ $gf-transition:   150ms ease;
 
 .gf-preview-area {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
-.gf-preview {
+.gf-preview-container {
   flex: 1;
-  padding: 3rem;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
+  overflow: hidden;
+  height: 100%;
+  position: relative;
+}
 
-  &__error {
-    color: #f87171;
-    font-size: 0.85rem;
-    font-family: $gf-mono;
-    background: rgba(#f87171, 0.05);
-    padding: 1rem;
-    border-radius: $gf-radius;
-    border: 1px solid rgba(#f87171, 0.2);
-  }
+.gf-preview-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.gf-preview-error {
+  padding: 1rem 1.5rem;
+  color: #f87171;
+  font-size: 0.85rem;
+  font-family: $gf-mono;
+  background: rgba(#f87171, 0.05);
+  border-radius: $gf-radius;
+  border: 1px solid rgba(#f87171, 0.2);
+  margin: 1.5rem;
+
+  &[hidden] { display: none; }
 }
 
 // ─── Panneau accessibilité ────────────────────────────────────────────────────
@@ -467,8 +491,8 @@ $gf-transition:   150ms ease;
 // ─── Boutons icône ────────────────────────────────────────────────────────────
 
 .gf-btn-icon {
-  width: 2rem;
-  height: 2rem;
+  width: 2.25rem;
+  height: 2.25rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -477,12 +501,14 @@ $gf-transition:   150ms ease;
   border-radius: $gf-radius;
   color: $gf-text-muted;
   cursor: pointer;
-  font-size: 1rem;
   transition: all $gf-transition;
+
+  .material-icons { font-size: 1.2rem; }
 
   &:hover {
     color: $gf-text;
-    border-color: $gf-text-muted;
+    background: color.adjust($gf-bg-elevated, $lightness: 5%);
+    border-color: $gf-accent;
   }
 }
 

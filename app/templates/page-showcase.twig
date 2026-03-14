@@ -4,21 +4,31 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ component.name|default('Composant') }} — Go-fast</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
   <link rel="stylesheet" href="/app/styles/showcase.scss">
-  <link rel="stylesheet" href="/dev/assets/scss/style.scss">
 </head>
 <body class="gf-body gf-body--isolated">
 
   <header class="gf-topbar">
-    <a href="/" class="gf-topbar__back" aria-label="Retour au showcase">← Showcase</a>
+    <a href="/" class="gf-topbar__back" aria-label="Retour au showcase">
+      <span class="material-icons" aria-hidden="true">arrow_back</span>
+      Showcase
+    </a>
     <div class="gf-topbar__info">
       <span class="gf-badge gf-badge--atom" id="gf-item-badge">item</span>
       <h1 class="gf-topbar__title" id="gf-item-title">Aperçu</h1>
       <span class="gf-topbar__category" id="gf-item-category"></span>
     </div>
     <div class="gf-topbar__actions">
-      <button class="gf-btn-icon" id="gf-toggle-controls" aria-label="Afficher/masquer les contrôles" aria-expanded="true">⚙</button>
-      <button class="gf-btn-icon" id="gf-toggle-a11y" aria-label="Lancer le test accessibilité" title="Tester l'accessibilité (axe-core)">♿</button>
+      <button class="gf-btn-icon" id="gf-toggle-controls" aria-label="Afficher/masquer les contrôles" aria-expanded="true">
+        <span class="material-icons" aria-hidden="true">tune</span>
+      </button>
+      <button class="gf-btn-icon" id="gf-toggle-a11y" aria-label="Lancer le test accessibilité" title="Tester l'accessibilité (axe-core)">
+        <span class="material-icons" aria-hidden="true">accessibility</span>
+      </button>
     </div>
   </header>
 
@@ -35,8 +45,14 @@
     </aside>
 
     <main class="gf-preview-area" id="gf-preview-area">
-      <div class="gf-preview" id="gf-preview" aria-label="Aperçu" data-preview-kind="item">
-        {# Rendu dynamique par showcase.js via fetch du template Twig compilé #}
+      <div class="gf-preview-container" id="gf-preview-container">
+        <iframe
+          id="gf-preview-frame"
+          class="gf-preview-frame"
+          title="Aperçu du composant"
+          aria-label="Aperçu"
+        ></iframe>
+        <div class="gf-preview-error" id="gf-preview-error" hidden></div>
       </div>
       <div class="gf-a11y-panel" id="gf-a11y-panel" hidden aria-label="Résultats accessibilité" aria-live="polite"></div>
     </main>

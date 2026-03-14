@@ -92,6 +92,45 @@ function goFastPlugin() {
 
         try {
           let html = await renderTwig(path.join(ROOT, twigRelPath), data)
+          // Fragments (composants) : envelopper dans un document complet avec les styles dev
+          if (!html.includes('<html')) {
+            const layout = urlObj.searchParams.get('_layout') || 'centered'
+            html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/dev/assets/scss/style.scss">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background-color: #f1f5f9;
+    }
+    body.gf-layout--centered {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 3rem 2rem;
+    }
+    body.gf-layout--full {
+      padding: 2rem 0;
+    }
+  </style>
+</head>
+<body class="gf-layout--${layout}">
+${html}
+<script>
+  function reportHeight() {
+    window.parent.postMessage({ type: 'gf-resize', height: document.documentElement.scrollHeight }, '*')
+  }
+  window.addEventListener('load', reportHeight)
+  window.addEventListener('load', () => setTimeout(reportHeight, 100))
+</script>
+</body>
+</html>`
+          }
           // Injection du client HMR Vite
           html = html.includes('</head>')
             ? html.replace('</head>', '  <script type="module" src="/@vite/client"></script>\n</head>')

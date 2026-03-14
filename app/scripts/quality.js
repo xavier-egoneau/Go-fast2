@@ -1,23 +1,29 @@
 /**
  * quality.js — Tests accessibilité avec axe-core
  * Déclenché sur la page composant isolé via le bouton ♿
+ * Exécute axe dans le document de l'iframe pour une analyse fidèle au rendu réel
  */
 
-let axeLoaded = false
+async function injectAxeInFrame(frame) {
+  const iframeWin = frame.contentWindow
+  if (iframeWin?.axe) return // déjà injecté
 
-async function loadAxe() {
-  if (axeLoaded) return
-  // Import dynamique d'axe-core
-  await import('axe-core')
-  axeLoaded = true
+  return new Promise((resolve, reject) => {
+    const doc = frame.contentDocument
+    if (!doc) return reject(new Error('iframe inaccessible'))
+    const script = doc.createElement('script')
+    script.src = '/node_modules/axe-core/axe.min.js'
+    script.onload = resolve
+    script.onerror = () => reject(new Error('Impossible de charger axe-core'))
+    doc.head.appendChild(script)
+  })
 }
 
 async function runA11yTest() {
   const panel = document.getElementById('gf-a11y-panel')
-  const preview = document.getElementById('gf-preview')
-  const toggleBtn = document.getElementById('gf-toggle-a11y')
+  const frame = document.getElementById('gf-preview-frame')
 
-  if (!panel || !preview) return
+  if (!panel || !frame) return
 
   // Toggle visibilité du panneau
   if (!panel.hidden) {
@@ -29,9 +35,12 @@ async function runA11yTest() {
   panel.innerHTML = '<p style="color:#94a3b8;font-size:0.8rem">Analyse en cours...</p>'
 
   try {
-    await loadAxe()
+    await injectAxeInFrame(frame)
 
-    const results = await window.axe.run(preview, {
+    const iframeWin = frame.contentWindow
+    const iframeDoc = frame.contentDocument
+
+    const results = await iframeWin.axe.run(iframeDoc.body, {
       runOnly: {
         type: 'tag',
         values: ['wcag2a', 'wcag2aa', 'wcag21aa']

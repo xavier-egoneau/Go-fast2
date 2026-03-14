@@ -162,6 +162,7 @@ function initPreviewPage() {
 
   syncPreviewShell(item, type)
   renderControls(item)
+  setupFrameResize()
   renderPreview()
 
   // Toggle panneau de contrôles
@@ -301,9 +302,17 @@ function handleControlChange(e) {
   renderPreview()
 }
 
-async function renderPreview() {
-  const preview = document.getElementById('gf-preview')
-  if (!preview || !state.activeItem) return
+// ─── iframe preview ───────────────────────────────────────────────────────────
+
+function setupFrameResize() {
+  // Hauteur gérée par CSS (height: 100% sur container + iframe)
+  // postMessage conservé pour extensions futures éventuelles
+}
+
+function renderPreview() {
+  const frame = document.getElementById('gf-preview-frame')
+  const errorEl = document.getElementById('gf-preview-error')
+  if (!frame || !state.activeItem) return
 
   const item = state.activeItem
   const params = new URLSearchParams()
@@ -312,16 +321,13 @@ async function renderPreview() {
     params.set(key, String(val))
   })
 
-  try {
-    // Fetch le template Twig compilé avec les paramètres en query string
-    const url = `/${item.path}.html?${params.toString()}`
-    const res = await fetch(url)
-    if (!res.ok) throw new Error(`Template introuvable : ${url}`)
-    const html = await res.text()
-    preview.innerHTML = html
-  } catch (e) {
-    preview.innerHTML = `<p class="gf-preview__error">Erreur de rendu : ${e.message}</p>`
-  }
+  if (errorEl) errorEl.hidden = true
+
+  // _layout : indique au middleware quel style de centrage appliquer au body wrapper
+  const layout = (item.level === 'organism' || item.level === 'template') ? 'full' : 'centered'
+  params.set('_layout', layout)
+
+  frame.src = `/${item.path}.html?${params.toString()}`
 }
 
 // ─── Utilitaires ──────────────────────────────────────────────────────────────

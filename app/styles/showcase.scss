@@ -317,6 +317,7 @@ $gf-transition:   150ms ease;
 
   &__actions {
     display: flex;
+    align-items: center;
     gap: 0.5rem;
     flex-shrink: 0;
   }
@@ -358,6 +359,9 @@ $gf-transition:   150ms ease;
   border: 1px solid $gf-border;
   border-radius: $gf-radius;
   padding: 0.75rem;
+  margin: 0;
+
+  & + & { margin-top: 0.75rem; }
 
   &__legend {
     font-size: 0.7rem;
@@ -366,6 +370,13 @@ $gf-transition:   150ms ease;
     letter-spacing: 0.08em;
     color: $gf-text-muted;
     padding: 0 0.35rem;
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
   }
 }
 
@@ -486,6 +497,21 @@ $gf-transition:   150ms ease;
   &--molecule { background: rgba(#8b5cf6, 0.15); color: #a78bfa; }
   &--organism { background: rgba(#10b981, 0.15); color: #34d399; }
   &--template { background: rgba(#f59e0b, 0.15); color: #fbbf24; }
+}
+
+// ─── Indicateur viewport ─────────────────────────────────────────────────────
+
+.gf-viewport-size {
+  font-size: 0.75rem;
+  font-family: $gf-mono;
+  color: $gf-text-muted;
+  padding: 0.2rem 0.5rem;
+  background: $gf-bg;
+  border: 1px solid $gf-border;
+  border-radius: $gf-radius;
+  white-space: nowrap;
+
+  &:empty { display: none; }
 }
 
 // ─── Boutons icône ────────────────────────────────────────────────────────────

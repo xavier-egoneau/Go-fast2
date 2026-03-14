@@ -10,12 +10,5 @@
 <body>
   {% block body %}{% endblock %}
   {% block scripts %}{% endblock %}
-  <script>
-    function reportHeight() {
-      window.parent.postMessage({ type: 'gf-resize', height: document.documentElement.scrollHeight }, '*')
-    }
-    window.addEventListener('load', reportHeight)
-    window.addEventListener('load', () => setTimeout(reportHeight, 100))
-  </script>
 </body>
 </html>

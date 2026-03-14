@@ -121,13 +121,6 @@ function goFastPlugin() {
 </head>
 <body class="gf-layout--${layout}">
 ${html}
-<script>
-  function reportHeight() {
-    window.parent.postMessage({ type: 'gf-resize', height: document.documentElement.scrollHeight }, '*')
-  }
-  window.addEventListener('load', reportHeight)
-  window.addEventListener('load', () => setTimeout(reportHeight, 100))
-</script>
 </body>
 </html>`
           }
@@ -141,7 +134,7 @@ ${html}
         } catch (e) {
           res.setHeader('Content-Type', 'text/html; charset=utf-8')
           res.statusCode = 500
-          res.end(`<!DOCTYPE html><html><body><pre style="color:red">Twig Error in ${twigRelPath}:\n${e.message}</pre></body></html>`)
+          res.end(`<!DOCTYPE html><html><head><meta name="gf-status" content="error"></head><body><pre style="color:red">Twig Error in ${twigRelPath}:\n${e.message}</pre></body></html>`)
         }
       })
     },

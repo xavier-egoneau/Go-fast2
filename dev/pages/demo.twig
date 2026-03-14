@@ -26,6 +26,9 @@
 {% block title %}{{ page_title }} — Go-fast{% endblock %}
 
 {% block body %}
+{# page-wrapper : enveloppe tous les éléments de la page dans un seul bloc.
+   Nécessaire pour que header + main soient des enfants d'un même conteneur
+   quelle que soit la façon dont la page est rendue (showcase, navigateur direct). #}
 <div class="page-wrapper">
 
 {% include '../components/head-menu/head-menu.twig' with {

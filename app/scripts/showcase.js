@@ -59,7 +59,7 @@ function initIndex() {
   // Recherche
   const search = document.getElementById('gf-search')
   if (search) {
-    search.addEventListener('input', renderNav)
+    search.addEventListener('input', debounce(renderNav, 150))
   }
 
   // Pages
@@ -162,7 +162,6 @@ function initPreviewPage() {
 
   syncPreviewShell(item, type)
   renderControls(item)
-  setupFrameResize()
   renderPreview()
 
   // Toggle panneau de contrôles
@@ -220,26 +219,35 @@ function renderControls(item) {
   const description = document.getElementById('gf-controls-description')
   if (!form) return
 
-  const allControls = {
-    ...(item.variants || {}),
-    ...(item.content || {})
-  }
-
   if (description) {
     description.textContent = item.description || ''
     description.hidden = !item.description
   }
 
-  if (Object.keys(allControls).length === 0) {
+  const variants = item.variants || {}
+  const content = item.content || {}
+  const hasVariants = Object.keys(variants).length > 0
+  const hasContent = Object.keys(content).length > 0
+
+  if (!hasVariants && !hasContent) {
     form.innerHTML = '<p class="gf-controls__empty">Aucun contrôle disponible pour cet élément.</p>'
     return
   }
 
-  form.innerHTML = Object.entries(allControls).map(([key, ctrl]) =>
-    renderControl(key, ctrl)
-  ).join('')
+  const renderFieldset = (label, controls) => `
+    <fieldset class="gf-fieldset">
+      <legend class="gf-fieldset__legend">${label}</legend>
+      <div class="gf-fieldset__body">
+        ${Object.entries(controls).map(([key, ctrl]) => renderControl(key, ctrl)).join('')}
+      </div>
+    </fieldset>
+  `
 
-  // Écoute les changements
+  form.innerHTML = [
+    hasVariants ? renderFieldset('Variantes', variants) : '',
+    hasContent  ? renderFieldset('Contenu',   content)  : ''
+  ].join('')
+
   form.addEventListener('change', handleControlChange)
   form.addEventListener('input', handleControlChange)
 }
@@ -304,10 +312,6 @@ function handleControlChange(e) {
 
 // ─── iframe preview ───────────────────────────────────────────────────────────
 
-function setupFrameResize() {
-  // Hauteur gérée par CSS (height: 100% sur container + iframe)
-  // postMessage conservé pour extensions futures éventuelles
-}
 
 function renderPreview() {
   const frame = document.getElementById('gf-preview-frame')
@@ -327,7 +331,45 @@ function renderPreview() {
   const layout = (item.level === 'organism' || item.level === 'template') ? 'full' : 'centered'
   params.set('_layout', layout)
 
-  frame.src = `/${item.path}.html?${params.toString()}`
+  const url = `/${item.path}.html?${params.toString()}`
+  frame.src = url
+
+  // Lien "ouvrir dans un nouvel onglet"
+  const newTabBtn = document.getElementById('gf-open-new-tab')
+  if (newTabBtn) newTabBtn.href = url
+
+  // Indicateur viewport + gestion d'erreur au chargement
+  frame.onload = () => {
+    updateViewportSize(frame)
+    checkFrameError(frame)
+  }
+}
+
+// ─── Viewport + erreur iframe ─────────────────────────────────────────────────
+
+function updateViewportSize(frame) {
+  const el = document.getElementById('gf-viewport-size')
+  if (!el) return
+  const w = frame.offsetWidth
+  const h = frame.offsetHeight
+  el.textContent = `${w} × ${h}`
+}
+
+function checkFrameError(frame) {
+  const errorEl = document.getElementById('gf-preview-error')
+  if (!errorEl) return
+  try {
+    const meta = frame.contentDocument?.querySelector('meta[name="gf-status"]')
+    if (meta?.content === 'error') {
+      const pre = frame.contentDocument.querySelector('pre')
+      errorEl.textContent = pre?.textContent || 'Erreur de rendu'
+      errorEl.hidden = false
+      frame.style.display = 'none'
+    } else {
+      errorEl.hidden = true
+      frame.style.display = ''
+    }
+  } catch (e) {}
 }
 
 // ─── Utilitaires ──────────────────────────────────────────────────────────────
@@ -338,6 +380,14 @@ function showError(message) {
   el.className = 'gf-error'
   el.innerHTML = `<strong>Erreur Go-fast</strong><br>${message}`
   content.prepend(el)
+}
+
+function debounce(fn, delay) {
+  let timer
+  return (...args) => {
+    clearTimeout(timer)
+    timer = setTimeout(() => fn(...args), delay)
+  }
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────

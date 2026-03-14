@@ -12,7 +12,7 @@
 | **Molecule** | `"molecule"` | `dev/components/[nom]/` | Composition d'atoms — champ de formulaire, carte, tag group |
 | **Organism** | `"organism"` | `dev/components/[nom]/` | Composition de molecules — header, formulaire complet, nav |
 | **Template** | `"template"` | `dev/components/[nom]/` | Structure de page avec zones de contenu, sans contenu réel |
-| **Page** | *(pas de level)* | `dev/pages/` | Instance d'un template avec contenu réel |
+| **Page** | *(pas de level)* | `dev/pages/` | Instance d'un template avec contenu réel. JSON optionnel pour exposer des contrôles dans le showcase. |
 
 **Règle fondamentale** : la composition est toujours **descendante**. Un atom n'inclut jamais une molecule. Un organism n'inclut jamais un template.
 
@@ -168,6 +168,7 @@ dev/assets/scss/components/_[nom].scss
 - Pas de sélecteurs d'éléments HTML nus dans les composants (`.btn` oui, `button` non)
 - Mobile first (`min-width` dans les media queries)
 - Importer manuellement dans `style.scss` — pas d'auto-import
+- **Organisms et templates** : ajouter `width: 100%` sur le bloc racine — ces composants occupent toute la largeur disponible par nature
 
 ---
 

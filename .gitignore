@@ -26,3 +26,7 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# ia files
+task.md
+SPEC_V2.md

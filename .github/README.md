@@ -21,6 +21,17 @@ Les prompts sont dans `.github/prompts/` et s'invoquent avec `/nom` dans le chat
 
 Les deux versions s'invoquent de la même façon : `/spec`, `/plan`, `/dev`, `/resume`, `/add`.
 
+## Meta-outil
+
+### `/add-tool` — Créer une commande IA sur les 3 stacks
+
+Lance cette commande quand tu veux ajouter un nouvel outil IA au projet sans le recréer à la main trois fois.
+
+Elle doit toujours produire le trio :
+- `.claude/commands/...`
+- `.github/prompts/...`
+- `.codex/prompts/...`
+
 ### `/spec` — Spécification
 
 Lance en début de projet ou avant une nouvelle feature significative.
@@ -130,4 +141,3 @@ projet/
 ├── context.md                         ← US en cours (écrasé à chaque /add)
 └── tasks.md                           ← tâches [ ] / [x] (écrasé à chaque /plan)
 ```
-

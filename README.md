@@ -2,6 +2,8 @@
 
 Starter kit d'intégration HTML — Atomic Design + Showcase interactif + Multi-AI
 
+![alt text](image.png)
+![alt text](image-1.png)
 ---
 
 ## Démarrage rapide

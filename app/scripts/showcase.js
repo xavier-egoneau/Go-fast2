@@ -163,6 +163,10 @@ function initPreviewPage() {
   syncPreviewShell(item, type)
   renderControls(item)
   renderPreview()
+  initCopyCode()
+
+  document.getElementById('gf-toggle-code')
+    ?.addEventListener('click', toggleCodeView)
 
   // Toggle panneau de contrôles
   const toggleControls = document.getElementById('gf-toggle-controls')
@@ -307,6 +311,16 @@ function handleControlChange(e) {
   if (!input.name) return
   const value = input.type === 'checkbox' ? input.checked : input.value
   state.controlValues[input.name] = value
+  // Ferme le code panel si ouvert — le rendu va changer
+  const panel = document.getElementById('gf-code-panel')
+  const btn   = document.getElementById('gf-toggle-code')
+  const frame = document.getElementById('gf-preview-frame')
+  if (panel && !panel.hidden) {
+    panel.hidden = true
+    if (frame) frame.style.display = ''
+    btn?.setAttribute('aria-expanded', 'false')
+    btn?.classList.remove('gf-btn-icon--active')
+  }
   renderPreview()
 }
 
@@ -343,6 +357,86 @@ function renderPreview() {
     updateViewportSize(frame)
     checkFrameError(frame)
   }
+}
+
+// ─── Code source ──────────────────────────────────────────────────────────────
+
+function formatHTML(html) {
+  const INDENT = '  '
+  const voidTags = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr'])
+  let depth = 0
+  let result = ''
+
+  // Sépare les tokens sur des lignes distinctes
+  const lines = html
+    .trim()
+    .replace(/></g, '>\n<')
+    .replace(/(<[^/!][^>]*[^/]>)([^\n<])/g, '$1\n$2')
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean)
+
+  for (const line of lines) {
+    const isClose  = /^<\//.test(line)
+    const isOpen   = /^<[^/!]/.test(line)
+    const isSelf   = /\/>$/.test(line)
+    const tagMatch = line.match(/^<([a-zA-Z][a-zA-Z0-9-]*)/)
+    const tag      = tagMatch?.[1]?.toLowerCase()
+    const isVoid   = tag && voidTags.has(tag)
+    const selfClose = isSelf || isVoid
+
+    if (isClose) depth = Math.max(0, depth - 1)
+
+    result += INDENT.repeat(depth) + line + '\n'
+
+    if (isOpen && !selfClose) {
+      // Ne pas indenter si la balise se ferme sur la même ligne
+      const closeTag = tag ? `</${tag}` : null
+      const closesOnSameLine = closeTag && line.includes(closeTag)
+      if (!closesOnSameLine) depth++
+    }
+  }
+  return result.trim()
+}
+
+async function toggleCodeView() {
+  const frame    = document.getElementById('gf-preview-frame')
+  const panel    = document.getElementById('gf-code-panel')
+  const codeEl   = document.getElementById('gf-code-content')
+  const btn      = document.getElementById('gf-toggle-code')
+  if (!frame || !panel || !codeEl) return
+
+  const isOpen = !panel.hidden
+
+  if (isOpen) {
+    panel.hidden = true
+    frame.style.display = ''
+    btn?.setAttribute('aria-expanded', 'false')
+    btn?.classList.remove('gf-btn-icon--active')
+    return
+  }
+
+  const raw = frame.contentDocument?.body?.innerHTML || ''
+  const formatted = formatHTML(raw)
+
+  codeEl.textContent = formatted
+  window.Prism?.highlightElement(codeEl)
+
+  frame.style.display = 'none'
+  panel.hidden = false
+  btn?.setAttribute('aria-expanded', 'true')
+  btn?.classList.add('gf-btn-icon--active')
+}
+
+function initCopyCode() {
+  const btn = document.getElementById('gf-copy-code')
+  if (!btn) return
+  btn.addEventListener('click', async () => {
+    const code = document.getElementById('gf-code-content')?.textContent || ''
+    await navigator.clipboard.writeText(code)
+    btn.classList.add('gf-code-panel__copy--copied')
+    setTimeout(() => btn.classList.remove('gf-code-panel__copy--copied'), 1500)
+  })
 }
 
 // ─── Viewport + erreur iframe ─────────────────────────────────────────────────

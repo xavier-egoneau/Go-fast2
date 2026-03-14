@@ -27,6 +27,9 @@
       <a class="gf-btn-icon" id="gf-open-new-tab" target="_blank" rel="noopener" aria-label="Ouvrir dans un nouvel onglet">
         <span class="material-icons" aria-hidden="true">open_in_new</span>
       </a>
+      <button class="gf-btn-icon" id="gf-toggle-code" aria-label="Afficher le code source" aria-expanded="false">
+        <span class="material-icons" aria-hidden="true">code</span>
+      </button>
       <button class="gf-btn-icon" id="gf-toggle-controls" aria-label="Afficher/masquer les contrôles" aria-expanded="true">
         <span class="material-icons" aria-hidden="true">tune</span>
       </button>
@@ -56,6 +59,16 @@
           title="Aperçu du composant"
           aria-label="Aperçu"
         ></iframe>
+        <div class="gf-code-panel" id="gf-code-panel" hidden aria-label="Code source" role="region">
+          <div class="gf-code-panel__toolbar">
+            <span class="gf-code-panel__lang">HTML</span>
+            <button class="gf-code-panel__copy" id="gf-copy-code" type="button">
+              <span class="material-icons" aria-hidden="true">content_copy</span>
+              Copier
+            </button>
+          </div>
+          <pre class="gf-code-panel__pre language-html"><code class="language-html" id="gf-code-content"></code></pre>
+        </div>
         <div class="gf-preview-error" id="gf-preview-error" hidden></div>
       </div>
       <div class="gf-a11y-panel" id="gf-a11y-panel" hidden aria-label="Résultats accessibilité" aria-live="polite"></div>
@@ -63,6 +76,8 @@
 
   </div>
 
+  <script src="/node_modules/prismjs/prism.js"></script>
+  <script src="/node_modules/prismjs/components/prism-markup.min.js"></script>
   <script type="module" src="/app/scripts/showcase.js"></script>
   <script type="module" src="/app/scripts/quality.js"></script>
 </body>

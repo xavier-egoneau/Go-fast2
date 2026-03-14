@@ -168,7 +168,6 @@ dev/assets/scss/components/_[nom].scss
 - Pas de sélecteurs d'éléments HTML nus dans les composants (`.btn` oui, `button` non)
 - Mobile first (`min-width` dans les media queries)
 - Importer manuellement dans `style.scss` — pas d'auto-import
-- **Organisms et templates** : ajouter `width: 100%` sur le bloc racine — ces composants occupent toute la largeur disponible par nature
 
 ---
 

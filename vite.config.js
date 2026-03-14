@@ -48,14 +48,14 @@ function goFastPlugin() {
         ) {
           const { generateShowcase } = await import('./scripts/generate-showcase.js')
           await generateShowcase()
-          server.ws.send({ type: 'full-reload' })
+          server.ws.send({ type: 'custom', event: 'gofast:update' })
         }
       })
       server.watcher.on('add', async (file) => {
         if (file.includes('dev/components') || file.includes('dev/pages')) {
           const { generateShowcase } = await import('./scripts/generate-showcase.js')
           await generateShowcase()
-          server.ws.send({ type: 'full-reload' })
+          server.ws.send({ type: 'custom', event: 'gofast:update' })
         }
       })
 
@@ -84,6 +84,7 @@ function goFastPlugin() {
           try { Object.assign(data, JSON.parse(fs.readFileSync(showcasePath, 'utf8'))) } catch (_) {}
         }
         urlObj.searchParams.forEach((val, key) => {
+          if (key === '_layout') return  // param interne, ne pas passer à Twig
           if (val === 'true') data[key] = true
           else if (val === 'false') data[key] = false
           else if (val !== '' && !isNaN(val)) data[key] = Number(val)
@@ -117,6 +118,9 @@ function goFastPlugin() {
     body.gf-layout--full {
       padding: 2rem 0;
     }
+    body.gf-layout--full > * {
+      width: 100%;
+    }
   </style>
 </head>
 <body class="gf-layout--${layout}">
@@ -139,10 +143,10 @@ ${html}
       })
     },
 
-    // ─── HMR : reload sur tout changement Twig ou JSON ─────────────────────
+    // ─── HMR : update sur tout changement Twig ou JSON ─────────────────────
     handleHotUpdate({ file, server }) {
       if (file.endsWith('.twig') || (file.endsWith('.json') && !file.includes('node_modules'))) {
-        server.ws.send({ type: 'full-reload' })
+        server.ws.send({ type: 'custom', event: 'gofast:update' })
         return []
       }
     }

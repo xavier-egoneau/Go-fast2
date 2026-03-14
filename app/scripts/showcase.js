@@ -357,6 +357,15 @@ function renderPreview() {
     updateViewportSize(frame)
     checkFrameError(frame)
   }
+
+  // ResizeObserver : met à jour la taille affichée quand la fenêtre change
+  if (!renderPreview._resizeObserver) {
+    renderPreview._resizeObserver = new ResizeObserver(() => {
+      const f = document.getElementById('gf-preview-frame')
+      if (f) updateViewportSize(f)
+    })
+    renderPreview._resizeObserver.observe(frame)
+  }
 }
 
 // ─── Code source ──────────────────────────────────────────────────────────────
@@ -482,6 +491,31 @@ function debounce(fn, delay) {
     clearTimeout(timer)
     timer = setTimeout(() => fn(...args), delay)
   }
+}
+
+// ─── HMR : recharge l'iframe ou le nav quand un composant change ──────────────
+
+if (import.meta.hot) {
+  import.meta.hot.on('gofast:update', async () => {
+    const frame = document.getElementById('gf-preview-frame')
+    if (frame) {
+      // Page preview : recharge l'iframe
+      if (frame.src) frame.src = frame.src
+    } else {
+      // Page index : re-fetch showcase.json et re-render
+      try {
+        const res = await fetch(SHOWCASE_JSON + '?t=' + Date.now())
+        if (res.ok) {
+          const data = await res.json()
+          state.components = data.components || []
+          state.pages = data.pages || []
+          renderNav()
+          renderStats()
+          if (state.pages.length > 0) renderPagesNav()
+        }
+      } catch (_) {}
+    }
+  })
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────

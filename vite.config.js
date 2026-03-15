@@ -37,8 +37,9 @@ function goFastPlugin() {
 
     // ─── Dev : middleware pre-Vite ──────────────────────────────────────────
     configureServer(server) {
-      // Génère showcase.json au démarrage
+      // Génère showcase.json + sprite icônes au démarrage
       import('./scripts/generate-showcase.js').then(({ generateShowcase }) => generateShowcase())
+      import('./scripts/generate-icons.js').then(({ generateIcons }) => generateIcons())
 
       // Watch : regénère showcase.json si un composant change
       server.watcher.on('change', async (file) => {
@@ -50,12 +51,22 @@ function goFastPlugin() {
           await generateShowcase()
           server.ws.send({ type: 'custom', event: 'gofast:update' })
         }
+        // Watch : regénère sprite.svg + doc.html si une icône change
+        if (file.includes('dev/assets/icons/unitaires') && file.endsWith('.svg')) {
+          const { generateIcons } = await import('./scripts/generate-icons.js')
+          await generateIcons()
+        }
       })
       server.watcher.on('add', async (file) => {
         if (file.includes('dev/components') || file.includes('dev/pages')) {
           const { generateShowcase } = await import('./scripts/generate-showcase.js')
           await generateShowcase()
           server.ws.send({ type: 'custom', event: 'gofast:update' })
+        }
+        // Watch : regénère sprite.svg + doc.html si une icône est ajoutée
+        if (file.includes('dev/assets/icons/unitaires') && file.endsWith('.svg')) {
+          const { generateIcons } = await import('./scripts/generate-icons.js')
+          await generateIcons()
         }
       })
 
@@ -161,12 +172,16 @@ if (config.tailwind) {
 
 export default defineConfig({
   plugins,
+  server: {
+    port: 3000,
+    open: '/',
+    watch: {
+      // Exclure les fichiers générés du watcher pour éviter les boucles
+      ignored: (file) => file.includes('node_modules') || file.includes('dev/assets/icons/sprite.svg') || file.includes('dev/assets/icons/doc.html')
+    }
+  },
   build: {
     outDir: 'public',
     emptyOutDir: true
-  },
-  server: {
-    port: 3000,
-    open: '/'
   }
 })

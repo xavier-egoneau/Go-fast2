@@ -1,0 +1,23 @@
+@use '../base/variables' as *;
+
+// =============================================================================
+// Icon — Atom
+// SVG inline héritant la couleur du parent via currentColor
+// =============================================================================
+
+.icon {
+  // Le composant est directement un <svg> — pas de wrapper
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  fill: currentColor;
+  vertical-align: middle;
+  flex-shrink: 0;
+
+  // Tailles — contrôlées via font-size pour que width/height 1em suivent
+  &--xs { font-size: $font-size-xs; }   // 0.75rem — 12px
+  &--sm { font-size: $font-size-base; } // 1rem    — 16px
+  &--md { font-size: $font-size-xl; }   // 1.25rem — 20px
+  &--lg { font-size: $font-size-2xl; }  // 1.5rem  — 24px
+  &--xl { font-size: $font-size-3xl; }  // 1.875rem — 30px
+}

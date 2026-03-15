@@ -26,7 +26,41 @@ Chaque composant `[nom]` (kebab-case) est un dossier dans `dev/components/` :
 dev/components/[nom]/
 ├── [nom].json   ← Source de vérité : métadonnées + contrôles du showcase
 ├── [nom].twig   ← Template de rendu
-└── [nom].md     ← Documentation (optionnel)
+└── [nom].md     ← Documentation (obligatoire)
+```
+
+**Structure imposée pour `[nom].md` :**
+
+```markdown
+# [Nom du composant]
+
+## Usage
+[Quand et pourquoi utiliser ce composant. Cas d'usage typiques.]
+
+## Props
+
+| Prop | Type | Défaut | Description |
+|------|------|--------|-------------|
+| `prop` | `string` | `'valeur'` | Description de la prop |
+
+## Accessibilité
+[Attributs ARIA utilisés, comportement clavier, points d'attention.]
+
+## Exemples
+
+### Exemple de base
+\`\`\`twig
+{% include 'dev/components/[nom]/[nom].twig' with {
+  prop: 'valeur'
+} %}
+\`\`\`
+
+### Variante [nom]
+\`\`\`twig
+{% include 'dev/components/[nom]/[nom].twig' with {
+  variant: 'nom-variante'
+} %}
+\`\`\`
 ```
 
 Et un fichier SCSS dans :
@@ -273,7 +307,11 @@ dev/components/[nom]/
 @use 'components/[nom]';
 ```
 
-### Étape 6 — Vérifier
+### Étape 6 — Créer `[nom].md`
+- Suivre la structure imposée (section 2 de ce document)
+- Renseigner : Usage, Props (toutes), Accessibilité, Exemples (base + variantes)
+
+### Étape 7 — Vérifier
 - Le showcase se régénère automatiquement (generate-showcase.js)
 - Le composant apparaît dans la liste du showcase
 - Les contrôles du JSON génèrent bien les bons contrôles interactifs
@@ -291,6 +329,7 @@ dev/components/[nom]/
 | Fichier JSON | `kebab-case.json` | `form-field.json` |
 | Classes CSS | BEM — `.block__element--modifier` | `.btn--primary` |
 | Variables SCSS | `$categorie-nom` | `$color-primary`, `$spacing-md` |
+| Fichier SVG icône | `kebab-case.svg` dans `dev/assets/icons/unitaires/` | `arrow-right.svg` |
 
 ---
 
@@ -307,6 +346,75 @@ dev/components/[nom]/
 | Import SCSS auto-généré | Import manuel dans `style.scss`, dans l'ordre |
 | `outline: none` sans alternative | `@include focus-ring` sur `:focus-visible` |
 | Classe CSS sans préfixe BEM dans composant | Utiliser le nom du bloc comme préfixe |
+
+---
+
+## 11. Convention icônes natives
+
+Les icônes utilisent un **sprite SVG auto-généré**. C'est le seul mécanisme autorisé.
+
+### Architecture
+
+```
+dev/assets/icons/
+├── unitaires/        ← Sources — un fichier SVG par icône (à modifier ici)
+│   ├── close.svg
+│   └── search.svg
+├── sprite.svg        ← Auto-généré — ne pas modifier à la main
+└── doc.html          ← Auto-généré — documentation visuelle avec copy-to-clipboard
+```
+
+### Ajouter une icône
+
+1. Déposer le fichier `[nom].svg` dans `dev/assets/icons/unitaires/`
+2. Le watcher Vite régénère `sprite.svg` + `doc.html` automatiquement au démarrage ou lors du save
+3. En dehors du dev server : `npm run icons`
+
+### Règles SVG (fichiers unitaires/)
+- `viewBox` obligatoire — supprimer `width`/`height` fixes
+- `fill="currentColor"` sur les paths — supprimer les couleurs hardcodées
+- Noms sémantiques en `kebab-case` : `close.svg`, `arrow-right.svg` (pas `x.svg`, pas `arrow_right.svg`)
+
+### Atom `icon` — usage
+```twig
+{% include 'dev/components/icon/icon.twig' with {
+  name: 'search',
+  size: 'md',
+  label: 'Rechercher'
+} %}
+```
+
+### Props de l'atom `icon`
+
+| Prop | Type | Défaut | Description |
+|------|------|--------|-------------|
+| `name` | `string` | `'placeholder'` | Nom du fichier SVG sans extension (ex: `search`) |
+| `size` | `string` | `'md'` | `xs` (12px) / `sm` (16px) / `md` (20px) / `lg` (24px) / `xl` (30px) |
+| `label` | `string` | `''` | Texte accessible. Vide = décoratif (`aria-hidden="true"`) |
+| `class` | `string` | `''` | Classes CSS additionnelles |
+
+### Rendu HTML généré
+```html
+<!-- Icône signifiante -->
+<svg class="icon icon--md" role="img" aria-label="Rechercher" focusable="false">
+  <use href="/dev/assets/icons/sprite.svg#icon-search"></use>
+</svg>
+
+<!-- Icône décorative -->
+<svg class="icon icon--md" aria-hidden="true" focusable="false">
+  <use href="/dev/assets/icons/sprite.svg#icon-search"></use>
+</svg>
+```
+
+### Erreurs fréquentes
+
+| Erreur | Correct |
+|--------|---------|
+| Modifier `sprite.svg` à la main | Modifier les SVGs dans `unitaires/` |
+| SVG avec `fill` hardcodé | `fill="currentColor"` |
+| SVG avec `width`/`height` fixes | `viewBox` uniquement |
+| Icône sans `label` ni `aria-hidden` | Toujours l'un ou l'autre |
+| Nom de fichier non-sémantique (`x.svg`) | Nom sémantique (`close.svg`) |
 
 ---
 

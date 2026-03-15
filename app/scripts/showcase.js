@@ -5,6 +5,140 @@
 
 const SHOWCASE_JSON = '/dev/data/showcase.json'
 
+// ─── Stress test ──────────────────────────────────────────────────────────────
+
+const STRESS_MODES = [
+  {
+    id: 'normal',
+    label: 'Normal',
+    description: 'Valeurs par défaut'
+  },
+  {
+    id: 'long',
+    label: 'Long',
+    description: 'Texte de 200+ caractères'
+  },
+  {
+    id: 'empty',
+    label: 'Vide',
+    description: 'Contenu vide'
+  },
+  {
+    id: 'overflow',
+    label: 'Overflow',
+    description: 'Texte sans espace (débordement)'
+  }
+]
+
+const STRESS_LONG_TEXT = 'Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat duis aute irure dolor'
+
+const STRESS_OVERFLOW_TEXT = 'Loremipsumdolorsitametconsecteturadipiscingelitseddoeiusmodtemporincididuntutlaboreetdoloremagnaaliquautenimadminimveniamquisnostrudexercitationullamco'
+
+let stressModeIndex = 0
+
+function getStressValue(ctrlType) {
+  const mode = STRESS_MODES[stressModeIndex]
+  if (mode.id === 'normal' || ctrlType !== 'text') return null
+  if (mode.id === 'long') return STRESS_LONG_TEXT
+  if (mode.id === 'empty') return ''
+  if (mode.id === 'overflow') return STRESS_OVERFLOW_TEXT
+  return null
+}
+
+function applyStressToControls(item) {
+  if (!item) return
+  const allControls = { ...(item.variants || {}), ...(item.content || {}) }
+  Object.entries(allControls).forEach(([key, ctrl]) => {
+    const stressVal = getStressValue(ctrl.type)
+    if (stressVal !== null) {
+      state.controlValues[key] = stressVal
+      // Sync l'input dans le DOM si présent
+      const input = document.getElementById(`gf-ctrl-${key}`)
+      if (input) input.value = stressVal
+    }
+  })
+}
+
+function resetControlsToDefaults(item) {
+  if (!item) return
+  const allControls = { ...(item.variants || {}), ...(item.content || {}) }
+  Object.entries(allControls).forEach(([key, ctrl]) => {
+    if (ctrl.type === 'text') {
+      state.controlValues[key] = ctrl.default ?? ''
+      const input = document.getElementById(`gf-ctrl-${key}`)
+      if (input) input.value = ctrl.default ?? ''
+    }
+  })
+}
+
+function updateStressModeUI() {
+  const mode = STRESS_MODES[stressModeIndex]
+  const label = document.getElementById('gf-stress-mode-label')
+  const btn = document.getElementById('gf-toggle-stress')
+
+  if (label) label.textContent = mode.label
+
+  if (btn) {
+    const isActive = mode.id !== 'normal'
+    btn.classList.toggle('gf-btn-icon--active', isActive)
+    btn.setAttribute('aria-label', `Stress test : ${mode.label} — ${mode.description}`)
+  }
+}
+
+function initStressTest(item) {
+  const toggleBtn = document.getElementById('gf-toggle-stress')
+  const prevBtn = document.getElementById('gf-stress-prev')
+  const nextBtn = document.getElementById('gf-stress-next')
+  const control = document.getElementById('gf-stress-control')
+
+  // Ne montrer le sélecteur de mode que si l'item a des champs text
+  const hasTextFields = item && Object.values({ ...(item.variants || {}), ...(item.content || {}) })
+    .some(ctrl => ctrl.type === 'text')
+
+  if (!hasTextFields) {
+    if (toggleBtn) toggleBtn.hidden = true
+    return
+  }
+
+  if (control) control.hidden = false
+
+  toggleBtn?.addEventListener('click', () => {
+    // Cycle rapide : Normal → Long → Vide → Overflow → Normal
+    stressModeIndex = (stressModeIndex + 1) % STRESS_MODES.length
+    updateStressModeUI()
+    if (stressModeIndex === 0) {
+      resetControlsToDefaults(state.activeItem)
+    } else {
+      applyStressToControls(state.activeItem)
+    }
+    renderPreview()
+  })
+
+  prevBtn?.addEventListener('click', () => {
+    stressModeIndex = (stressModeIndex - 1 + STRESS_MODES.length) % STRESS_MODES.length
+    updateStressModeUI()
+    if (stressModeIndex === 0) {
+      resetControlsToDefaults(state.activeItem)
+    } else {
+      applyStressToControls(state.activeItem)
+    }
+    renderPreview()
+  })
+
+  nextBtn?.addEventListener('click', () => {
+    stressModeIndex = (stressModeIndex + 1) % STRESS_MODES.length
+    updateStressModeUI()
+    if (stressModeIndex === 0) {
+      resetControlsToDefaults(state.activeItem)
+    } else {
+      applyStressToControls(state.activeItem)
+    }
+    renderPreview()
+  })
+
+  updateStressModeUI()
+}
+
 // ─── État global ─────────────────────────────────────────────────────────────
 
 let state = {
@@ -164,6 +298,7 @@ function initPreviewPage() {
   renderControls(item)
   renderPreview()
   initCopyCode()
+  initStressTest(item)
 
   document.getElementById('gf-toggle-code')
     ?.addEventListener('click', toggleCodeView)

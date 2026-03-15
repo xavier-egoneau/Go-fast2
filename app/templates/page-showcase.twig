@@ -37,6 +37,18 @@
       <button class="gf-btn-icon" id="gf-toggle-a11y" aria-label="Lancer le test accessibilité" title="Tester l'accessibilité (axe-core)">
         <span class="material-icons" aria-hidden="true">accessibility</span>
       </button>
+      <div class="gf-stress-control" id="gf-stress-control" hidden>
+        <span class="gf-stress-control__label" id="gf-stress-mode-label" aria-live="polite">Normal</span>
+        <button class="gf-btn-icon gf-stress-control__btn" id="gf-stress-prev" aria-label="Mode stress précédent" title="Mode précédent">
+          <span class="material-icons" aria-hidden="true">chevron_left</span>
+        </button>
+        <button class="gf-btn-icon gf-stress-control__btn" id="gf-stress-next" aria-label="Mode stress suivant" title="Mode suivant">
+          <span class="material-icons" aria-hidden="true">chevron_right</span>
+        </button>
+      </div>
+      <button class="gf-btn-icon" id="gf-toggle-stress" aria-label="Activer le mode stress test" title="Stress test (contenu long / vide / overflow)">
+        <span class="material-icons" aria-hidden="true">bug_report</span>
+      </button>
     </div>
   </header>
 

@@ -8,6 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "reset": "node scripts/reset-project.js",
+    "icons": "node scripts/generate-icons.js",
+    "test:a11y": "node scripts/test-a11y.js",
     "postinstall": "node app/scripts/welcome.js || true"
   },
   "devDependencies": {

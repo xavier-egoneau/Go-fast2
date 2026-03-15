@@ -1,40 +1,37 @@
-# Tasks — Go-fast v2
+# Tasks — Go-fast v2 Améliorations
 
-## Groupe 1 — Config & build [séquentiel]
-- [x] `package.json` + `gofast.config.json` + `.gitignore` mis à jour
-- [x] `vite.config.js` (Vituum + Twig + Tailwind conditionnel + plugin generate-showcase)
-- [x] `postcss.config.js` (Autoprefixer)
+## Groupe 1 — Fondations [séquentiel]
+> Établit les règles sur lesquelles tous les autres groupes s'appuient
 
-## Groupe 2 — Squelette app/ + scripts/ [parallélisable]
-> Tâches indépendantes — seront traitées simultanément par plusieurs agents
-- [x] `app/config/design-tokens.json` + structure dossiers `app/`
-- [x] `scripts/generate-showcase.js` (scan dev/ → showcase.json)
-- [x] `scripts/reset-project.js` + `app/scripts/welcome.js`
+- [x] Mettre à jour `GUIDELINES_AI.md` : rendre `[nom].md` obligatoire avec structure imposée (sections : Usage, Props, Accessibilité, Exemples)
+- [x] Définir dans `GUIDELINES_AI.md` la convention icônes natives (SVG inline via Twig, nommage, dossier `icons/`, fallback texte)
 
-## Groupe 3 — Squelette dev/ base [parallélisable avec groupe 2]
-> Indépendant de app/ et scripts/
-- [x] `dev/assets/scss/base/` — `_variables.scss`, `_reset.scss`, `_mixins.scss`, `_typography.scss`, `style.scss`
-- [x] `dev/layouts/base.twig` + structure `dev/data/`
+## Groupe 2 — Composant icône [séquentiel]
+> Nécessite que le Groupe 1 soit complet (convention définie)
 
-## Groupe 4 — Showcase interactif [séquentiel]
-> Nécessite que groupes 2 et 3 soient complets
-- [x] `app/templates/index.twig` + `page-showcase.twig`
-- [x] `app/scripts/showcase.js` (fetch JSON, contrôles, re-render)
-- [x] `app/styles/showcase.scss` (isolation totale du framework)
-- [x] `app/scripts/quality.js` (axe-core)
+- [x] Créer l'atom `icon` : `icon.json` + `icon.twig` + `_icon.scss`
+- [x] Créer `icon.md` — premier exemple de documentation obligatoire
+- [x] Importer `icon` dans `dev/assets/scss/style.scss`
 
-## Groupe 5 — Composants démo [parallélisable]
-> Tâches indépendantes — seront traitées simultanément par plusieurs agents
-- [x] `button` (atom) — JSON + Twig + SCSS
-- [x] `card` (molecule) — JSON + Twig + SCSS
-- [x] `form-field` (molecule) — JSON + Twig + SCSS (inclut atoms `label` + `input`)
+## Groupe 3 — Amélioration showcase app [parallélisable]
+> Tâches indépendantes — fichiers distincts dans `app/`
 
-## Groupe 6 — Docs IA [parallélisable]
-> Tâches indépendantes — seront traitées simultanément par plusieurs agents
-- [x] `GUIDELINES_AI.md` — document central (hiérarchie, exemples, règles)
-- [x] `.claude/commands/` — `new.md`, `dev.md`, `add.md`
-- [x] `.github/prompts/` (miroir) + `AGENTS.md` + mise à jour `CLAUDE.md`
+- [x] **Edge cases** : ajouter un mécanisme "stress test" dans le showcase — contrôles de contenu long, contenu vide, overflow (via champ `stress` dans le JSON ou mode dédié)
+- [x] **axe-core** : créer un script `test:a11y` dans `package.json` qui lance axe-core sur tous les composants via Puppeteer/Node
 
-## Groupe 7 — Finition [séquentiel]
-> Nécessite que tous les groupes précédents soient complets
-- [x] `README.md` utilisateur
+## Groupe 4 — Documentation composants existants [parallélisable]
+> Nécessite que Groupe 1 soit complet (structure .md définie). Chaque fichier est indépendant.
+
+- [x] Créer `dev/components/button/button.md`
+- [x] Créer `dev/components/label/label.md`
+- [x] Créer `dev/components/input/input.md`
+- [x] Créer `dev/components/badge/badge.md`
+- [x] Créer `dev/components/spinner/spinner.md`
+- [x] Créer `dev/components/avatar/avatar.md`
+- [x] Créer `dev/components/toggle/toggle.md`
+- [x] Créer `dev/components/grid/grid.md`
+- [x] Créer `dev/components/form-field/form-field.md`
+- [x] Créer `dev/components/card/card.md`
+- [x] Créer `dev/components/modal/modal.md`
+- [x] Créer `dev/components/tabs/tabs.md`
+- [x] Créer `dev/components/head-menu/head-menu.md`

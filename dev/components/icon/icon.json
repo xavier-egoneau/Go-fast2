@@ -1,0 +1,27 @@
+{
+  "name": "Icon",
+  "level": "atom",
+  "category": "Media",
+  "description": "Icône SVG inline. Atom natif du système — base de tous les composants qui affichent une icône.",
+  "variants": {
+    "name": {
+      "label": "Icône",
+      "type": "select",
+      "default": "search",
+      "options": ["add", "bell", "bike", "Brain", "call", "close", "menu", "search"]
+    },
+    "size": {
+      "label": "Taille",
+      "type": "select",
+      "default": "md",
+      "options": ["xs", "sm", "md", "lg", "xl"]
+    }
+  },
+  "content": {
+    "label": {
+      "label": "Label accessible (vide = décoratif)",
+      "type": "text",
+      "default": "Rechercher"
+    }
+  }
+}

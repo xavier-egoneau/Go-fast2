@@ -30,3 +30,5 @@ Thumbs.db
 # ia files
 task.md
 SPEC_V2.md
+/server
+.mcp.json

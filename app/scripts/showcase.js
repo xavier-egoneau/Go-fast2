@@ -73,25 +73,18 @@ function resetControlsToDefaults(item) {
 
 function updateStressModeUI() {
   const mode = STRESS_MODES[stressModeIndex]
-  const label = document.getElementById('gf-stress-mode-label')
   const btn = document.getElementById('gf-toggle-stress')
-
-  if (label) label.textContent = mode.label
-
   if (btn) {
-    const isActive = mode.id !== 'normal'
-    btn.classList.toggle('gf-btn-icon--active', isActive)
-    btn.setAttribute('aria-label', `Stress test : ${mode.label} — ${mode.description}`)
+    btn.classList.toggle('gf-btn-icon--active', mode.id !== 'normal')
+    btn.setAttribute('aria-label', `Stress test : ${mode.label}`)
+    btn.setAttribute('title', `Stress test : ${mode.label}`)
   }
 }
 
 function initStressTest(item) {
   const toggleBtn = document.getElementById('gf-toggle-stress')
-  const prevBtn = document.getElementById('gf-stress-prev')
-  const nextBtn = document.getElementById('gf-stress-next')
-  const control = document.getElementById('gf-stress-control')
 
-  // Ne montrer le sélecteur de mode que si l'item a des champs text
+  // Ne montrer le bouton que si l'item a des champs text
   const hasTextFields = item && Object.values({ ...(item.variants || {}), ...(item.content || {}) })
     .some(ctrl => ctrl.type === 'text')
 
@@ -100,32 +93,7 @@ function initStressTest(item) {
     return
   }
 
-  if (control) control.hidden = false
-
   toggleBtn?.addEventListener('click', () => {
-    // Cycle rapide : Normal → Long → Vide → Overflow → Normal
-    stressModeIndex = (stressModeIndex + 1) % STRESS_MODES.length
-    updateStressModeUI()
-    if (stressModeIndex === 0) {
-      resetControlsToDefaults(state.activeItem)
-    } else {
-      applyStressToControls(state.activeItem)
-    }
-    renderPreview()
-  })
-
-  prevBtn?.addEventListener('click', () => {
-    stressModeIndex = (stressModeIndex - 1 + STRESS_MODES.length) % STRESS_MODES.length
-    updateStressModeUI()
-    if (stressModeIndex === 0) {
-      resetControlsToDefaults(state.activeItem)
-    } else {
-      applyStressToControls(state.activeItem)
-    }
-    renderPreview()
-  })
-
-  nextBtn?.addEventListener('click', () => {
     stressModeIndex = (stressModeIndex + 1) % STRESS_MODES.length
     updateStressModeUI()
     if (stressModeIndex === 0) {

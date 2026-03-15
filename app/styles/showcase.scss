@@ -616,36 +616,6 @@ $gf-transition:   150ms ease;
   }
 }
 
-// ─── Stress test control ─────────────────────────────────────────────────────
-
-.gf-stress-control {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-
-  &[hidden] { display: none; }
-
-  &__label {
-    font-size: 0.75rem;
-    font-family: $gf-mono;
-    color: $gf-text-muted;
-    padding: 0.2rem 0.5rem;
-    background: $gf-bg;
-    border: 1px solid $gf-border;
-    border-radius: $gf-radius;
-    white-space: nowrap;
-    min-width: 4.5rem;
-    text-align: center;
-  }
-
-  &__btn {
-    width: 1.75rem;
-    height: 1.75rem;
-    flex-shrink: 0;
-
-    .material-icons { font-size: 1rem; }
-  }
-}
 
 // ─── Erreur globale ───────────────────────────────────────────────────────────
 

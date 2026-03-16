@@ -27,8 +27,6 @@ Thumbs.db
 *.tmp
 *.temp
 
-# Contenu projet (framework source only — supprimé par init sur un vrai projet)
-dev/.gitignore
 
 # ia files
 task.md

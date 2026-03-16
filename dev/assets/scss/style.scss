@@ -1,0 +1,15 @@
+// =============================================================================
+// style.scss — test
+// =============================================================================
+
+// Base
+@use 'base/variables';
+@use 'base/reset';
+@use 'base/typography';
+@use 'base/mixins';
+
+/* Tailwind */
+@import "tailwindcss";
+
+// Components
+// @use 'components/mon-composant';

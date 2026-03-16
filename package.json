@@ -1,7 +1,7 @@
 {
-  "name": "go-fast",
+  "name": "test",
   "version": "2.0.0",
-  "description": "Starter kit d'intégration HTML — Atomic Design + Showcase interactif multi-AI",
+  "description": "test",
   "type": "module",
   "scripts": {
     "init": "node scripts/init-project.js",

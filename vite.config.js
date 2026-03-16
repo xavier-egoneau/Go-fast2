@@ -112,7 +112,7 @@ function goFastPlugin() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="/dev/assets/scss/style.scss">
+  <link rel="stylesheet" href="${config.styleEntry || '/dev/assets/scss/style.scss'}">
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     body {

@@ -35,3 +35,21 @@
 - [x] Créer `dev/components/modal/modal.md`
 - [x] Créer `dev/components/tabs/tabs.md`
 - [x] Créer `dev/components/head-menu/head-menu.md`
+
+## Intégration Figma MCP
+
+### Config
+- [x] Ajouter la config Figma MCP dans .mcp.json (commentée, prête à activer)
+- [x] Documenter la convention de nommage tokens Figma ↔ _variables.scss
+
+### Commande principale
+- [x] Créer /gofast-from-figma pour Claude (.claude/commands/gofast-from-figma.md)
+- [x] Créer version Copilot (.github/prompts/gofast-from-figma.prompt.md)
+- [x] Créer version Codex (.codex/prompts/gofast-from-figma.md)
+
+### Script de validation
+- [x] scripts/validate-figma-tokens.js — vérifie que les tokens Figma mappent avec _variables.scss
+
+### Documentation
+- [x] docs/figma-integration.md — guide d'activation et workflow designer → dev
+- [x] Mettre à jour README.md avec la section Figma

@@ -4,6 +4,9 @@ node_modules/
 # Build output
 public/
 
+# enlever cette ligne sur un vrai projet
+dev/
+
 # Generated data (auto-généré par generate-showcase.js)
 dev/data/showcase.json
 

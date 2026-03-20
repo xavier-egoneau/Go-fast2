@@ -34,4 +34,8 @@ Thumbs.db
 # ia files
 task.md
 SPEC_V2.md
-.mcp.json
+
+# Environment variables (locales, jamais versionnées)
+.env
+.env.local
+.env.*.local

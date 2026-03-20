@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { walkFiles } from "../utils/repoFs.js";
 import type { PersistenceService } from "./persistence.js";
 import type {
   ComponentUsage,
@@ -19,15 +20,9 @@ export type {
   UiHandlerReference,
 } from "./plugins/languagePlugin.js";
 
-const DEFAULT_EXCLUDED_DIRS = new Set([
-  ".git",
-  "node_modules",
-  "dist",
-  "build",
-  ".next",
-  "coverage",
-  ".orbit",
-]);
+// Additional path prefixes excluded from the structural index (beyond repoFs defaults).
+// Dot-directories (e.g. .github, .vscode) are skipped to avoid indexing config/tooling noise.
+const EXTRA_EXCLUDED_DIR_PREFIXES = ["."];
 
 export type IndexedFile = {
   filePath: string;
@@ -137,10 +132,17 @@ export class RepoIndexer {
   }
 
   async buildIndex(): Promise<RepoIndex> {
-    const absolutePaths = await this.walkIndexableFiles(this.rootDir);
+    const relativePaths = await walkFiles(this.rootDir, this.rootDir, [], {
+      filter: (absPath) => {
+        const rel = absPath.slice(this.rootDir.length + 1).replace(/\\/g, "/");
+        if (EXTRA_EXCLUDED_DIR_PREFIXES.some((p) => rel.startsWith(p))) return false;
+        return this.plugins.some((plugin) => plugin.supports(absPath));
+      },
+    });
     const files: IndexedFile[] = [];
 
-    for (const absolutePath of absolutePaths) {
+    for (const relativePath of relativePaths) {
+      const absolutePath = path.join(this.rootDir, relativePath);
       const indexedFile = await this.indexFile(absolutePath);
       if (indexedFile) files.push(indexedFile);
     }
@@ -320,20 +322,4 @@ export class RepoIndexer {
     return index.files.find((f) => f.filePath === normalized) ?? null;
   }
 
-  private async walkIndexableFiles(dir: string, results: string[] = []): Promise<string[]> {
-    const entries = await fs.readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const absolutePath = path.join(dir, entry.name);
-      const relativePath = normalizeRepoPath(path.relative(this.rootDir, absolutePath));
-      if (entry.isDirectory()) {
-        if (DEFAULT_EXCLUDED_DIRS.has(entry.name) || relativePath.startsWith(".")) continue;
-        await this.walkIndexableFiles(absolutePath, results);
-        continue;
-      }
-      if (entry.isFile() && this.plugins.some((p) => p.supports(absolutePath))) {
-        results.push(absolutePath);
-      }
-    }
-    return results;
-  }
 }

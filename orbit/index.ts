@@ -25,7 +25,7 @@ const MAX_CONSOLE_LOGS = 200;
 const MAX_RUNTIME_LOG_ENTRIES = 500;
 
 const server = new McpServer({
-  name: "tidewave-like-mcp",
+  name: "orbit",
   version: "0.1.0",
 });
 
@@ -53,6 +53,7 @@ registerCoreTools(server, {
 registerRepoTools(server, {
   rootDir: ROOT_DIR,
   maxFileSizeBytes: MAX_FILE_SIZE_BYTES,
+  repoIndexer,
 });
 
 registerRepoGraphTools(server, {

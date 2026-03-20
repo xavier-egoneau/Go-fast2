@@ -93,6 +93,20 @@ export function registerRuntimeTools(server: McpServer, options: RegisterRuntime
   );
 
   server.registerTool(
+    "runtime_prune_exited",
+    {
+      title: "Prune exited processes",
+      description: "Supprime de la memoire les processus termines pour liberer les ressources.",
+      inputSchema: {},
+    },
+    async () => {
+      options.runtimeBridge.pruneExited();
+      const remaining = options.runtimeBridge.listProcesses();
+      return json({ remaining: remaining.length, processes: remaining });
+    }
+  );
+
+  server.registerTool(
     "runtime_errors",
     {
       title: "Runtime errors",

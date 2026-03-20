@@ -76,7 +76,7 @@ export class BrowserSessionService {
       await page.goto(url, { waitUntil, timeout: 30_000 });
     }
 
-    return this.toTabSnapshot(tab);
+    return this.toTabSnapshotAsync(tab);
   }
 
   async switchTab(tabId: string): Promise<TabSnapshot> {
@@ -85,7 +85,7 @@ export class BrowserSessionService {
       throw new Error(`Onglet introuvable: ${tabId}`);
     }
     this.state.activeTabId = tabId;
-    return this.toTabSnapshot(tab);
+    return this.toTabSnapshotAsync(tab);
   }
 
   async listTabs(): Promise<TabSnapshot[]> {
@@ -280,15 +280,6 @@ export class BrowserSessionService {
     if (tab.consoleLogs.length > this.maxConsoleLogs) {
       tab.consoleLogs.shift();
     }
-  }
-
-  private toTabSnapshot(tab: Tab): TabSnapshot {
-    return {
-      id: tab.id,
-      url: tab.page.url(),
-      title: "",
-      active: tab.id === this.state.activeTabId,
-    };
   }
 
   private async toTabSnapshotAsync(tab: Tab): Promise<TabSnapshot> {

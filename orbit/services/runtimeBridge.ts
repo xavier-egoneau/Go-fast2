@@ -123,6 +123,14 @@ export class RuntimeBridgeService {
     return this.toSnapshot(record);
   }
 
+  pruneExited(): void {
+    for (const [id, record] of this.processes) {
+      if (record.status === "exited") {
+        this.processes.delete(id);
+      }
+    }
+  }
+
   listProcesses(): RuntimeProcessSnapshot[] {
     return Array.from(this.processes.values())
       .map((record) => this.toSnapshot(record))

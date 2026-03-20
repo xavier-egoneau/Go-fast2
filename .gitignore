@@ -28,11 +28,7 @@ Thumbs.db
 *.temp
 
 
-# Import source (projet à transposer — contenu tiers)
-import/
-
 # ia files
 task.md
-context.md
 SPEC_V2.md
 .mcp.json

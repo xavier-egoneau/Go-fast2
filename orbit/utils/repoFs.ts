@@ -8,6 +8,7 @@ const DEFAULT_IGNORED_PREFIXES = [
   "build/",
   ".next/",
   "coverage/",
+  ".orbit/",
 ];
 
 export function normalizeSafePath(rootDir: string, inputPath: string): string {
@@ -30,7 +31,14 @@ export async function pathExists(targetPath: string): Promise<boolean> {
   }
 }
 
-export async function walkFiles(rootDir: string, dir = rootDir, result: string[] = []): Promise<string[]> {
+export type WalkOptions = {
+  /** If provided, only files whose relative path matches this regex are included. */
+  pattern?: RegExp;
+  /** If provided, only include files accepted by this predicate (used for plugin filtering). */
+  filter?: (absolutePath: string) => boolean;
+};
+
+export async function walkFiles(rootDir: string, dir = rootDir, result: string[] = [], options: WalkOptions = {}): Promise<string[]> {
   const entries = await fs.readdir(dir, { withFileTypes: true });
 
   for (const entry of entries) {
@@ -42,11 +50,13 @@ export async function walkFiles(rootDir: string, dir = rootDir, result: string[]
     }
 
     if (entry.isDirectory()) {
-      await walkFiles(rootDir, absolutePath, result);
+      await walkFiles(rootDir, absolutePath, result, options);
       continue;
     }
 
     if (entry.isFile()) {
+      if (options.filter && !options.filter(absolutePath)) continue;
+      if (options.pattern && !options.pattern.test(relativePath)) continue;
       result.push(relativePath);
     }
   }

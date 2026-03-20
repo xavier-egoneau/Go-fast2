@@ -4,6 +4,12 @@ import type { RepoIndex } from "./repoIndexer.js";
 
 const CACHE_DIR = ".orbit";
 const CACHE_FILE = "index-cache.json";
+const SCHEMA_VERSION = 1;
+
+type CacheEnvelope = {
+  schemaVersion: number;
+  index: RepoIndex;
+};
 
 export class PersistenceService {
   private readonly cacheFilePath: string;
@@ -14,13 +20,16 @@ export class PersistenceService {
 
   async saveIndex(index: RepoIndex): Promise<void> {
     await fs.mkdir(path.dirname(this.cacheFilePath), { recursive: true });
-    await fs.writeFile(this.cacheFilePath, JSON.stringify(index), "utf8");
+    const envelope: CacheEnvelope = { schemaVersion: SCHEMA_VERSION, index };
+    await fs.writeFile(this.cacheFilePath, JSON.stringify(envelope), "utf8");
   }
 
   async loadIndex(): Promise<RepoIndex | null> {
     try {
       const raw = await fs.readFile(this.cacheFilePath, "utf8");
-      return JSON.parse(raw) as RepoIndex;
+      const parsed = JSON.parse(raw) as Partial<CacheEnvelope>;
+      if (parsed.schemaVersion !== SCHEMA_VERSION || !parsed.index) return null;
+      return parsed.index;
     } catch {
       return null;
     }

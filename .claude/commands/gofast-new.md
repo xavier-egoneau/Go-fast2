@@ -2,11 +2,21 @@
 
 Tu vas créer un nouveau composant pour ce projet Go-fast v2.
 
-## Étape 1 — Lis GUIDELINES_AI.md
+## Étape 1 — Vérifie que le projet est initialisé
+
+Avant toute création, vérifie que le projet est initialisé :
+- `dev/components/` existe
+- `gofast.config.json` existe à la racine
+
+Si l'un de ces éléments est absent, **arrête-toi** et informe l'utilisateur :
+
+> Le projet n'est pas encore initialisé. Lance `/gofast-init` ou `npm run init` avant de créer des composants.
+
+## Étape 2 — Lis GUIDELINES_AI.md
 
 Lis le fichier `GUIDELINES_AI.md` à la racine du projet. Il contient toutes les conventions, règles et exemples. Tu dois les respecter intégralement.
 
-## Étape 2 — Demande les informations manquantes
+## Étape 3 — Demande les informations manquantes
 
 Si l'utilisateur n'a pas précisé, demande :
 1. **Niveau** : atom / molecule / organism / template / page
@@ -14,7 +24,7 @@ Si l'utilisateur n'a pas précisé, demande :
 3. **Catégorie** : Forms / Layout / Navigation / Feedback / Typography / Media / ou autre
 4. **Description** : une phrase décrivant le rôle du composant
 
-## Étape 3 — Lis la stratégie CSS du projet
+## Étape 4 — Lis la stratégie CSS du projet
 
 Lis `gofast.config.json` à la racine. Les champs `scss` et `tailwind` déterminent les fichiers à créer :
 
@@ -24,7 +34,7 @@ Lis `gofast.config.json` à la racine. Les champs `scss` et `tailwind` détermin
 | `false`| `true`     | Tailwind seul |
 | `true` | `true`     | SCSS + Tailwind |
 
-## Étape 4 — Crée les fichiers
+## Étape 5 — Crée les fichiers
 
 Pour un composant (atom/molecule/organism/template) :
 
@@ -57,7 +67,7 @@ Pour une **page** (`dev/pages/[nom].twig`) :
 - Contenu réel (pas de zones vides)
 - Pas de JSON associé
 
-## Étape 5 — Vérifie
+## Étape 6 — Vérifie
 
 Avant de livrer, vérifie mentalement :
 - [ ] Toutes les variables Twig ont un `|default()`

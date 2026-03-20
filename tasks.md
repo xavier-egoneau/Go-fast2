@@ -35,3 +35,25 @@
 - [x] Créer `dev/components/modal/modal.md`
 - [x] Créer `dev/components/tabs/tabs.md`
 - [x] Créer `dev/components/head-menu/head-menu.md`
+
+## Groupe 5 — Améliorations starter kit [parallélisable]
+> Session 2026-03-20 — outillage, qualité, commandes
+
+### Commandes manquantes
+- [ ] gofast-rename : renommer un composant (dossier, fichiers, imports SCSS, références JSON)
+- [ ] gofast-move : changer le niveau atomique d'un composant (ex: atom → molecule)
+- [ ] gofast-list : lister tous les composants avec niveau et statut (complet/incomplet/vide)
+- [ ] gofast-audit : vérifier la conformité des composants (|default(), BEM, .md présent, import SCSS, JSON valide)
+
+### Scripts
+- [x] Watch automatique icônes : déjà implémenté dans vite.config.js — watch `add` + `change` sur `dev/assets/icons/unitaires/*.svg`
+- [x] Validation JSON schema : scripts/validate-json.js + intégration vite.config.js + npm run validate
+- [x] gofast-list en script npm aussi : scripts/list-components.js + npm run list
+- [x] npm run upgrade : scripts/upgrade-app.js — met à jour app/ via git sparse-checkout sans toucher dev/
+
+### Qualité
+- [x] Stylelint pour le SCSS : .stylelintrc.json + stylelint-config-standard-scss + npm run lint:scss
+- [x] Guard dans gofast-new pour détecter un projet non initialisé (vérifie dev/components/ + gofast.config.json)
+
+### Init
+- [x] Créer commande Claude `/gofast-init` dédiée au scaffolding (wraps scripts/init-project.js) + versions Copilot + Codex

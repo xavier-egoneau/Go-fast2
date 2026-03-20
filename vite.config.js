@@ -41,6 +41,18 @@ function goFastPlugin() {
       import('./scripts/generate-showcase.js').then(({ generateShowcase }) => generateShowcase())
       import('./scripts/generate-icons.js').then(({ generateIcons }) => generateIcons())
 
+      // Valide les JSON de composants au démarrage
+      import('./scripts/validate-json.js').then(({ validateAllComponents }) => {
+        const errors = validateAllComponents()
+        if (errors.length > 0) {
+          console.warn(`\n[json] ⚠️  ${errors.length} erreur(s) dans les JSON de composants :`)
+          for (const { file, error } of errors) {
+            console.warn(`  • ${file} — ${error}`)
+          }
+          console.warn()
+        }
+      })
+
       // Watch : regénère showcase.json si un composant change
       server.watcher.on('change', async (file) => {
         if (

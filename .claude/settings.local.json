@@ -16,7 +16,8 @@
       "Bash(npm run build:project:tailwind:*)",
       "Bash(npm run export:*)",
       "Bash(ls:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(git ls-tree:*)"
     ],
     "deny": [],
     "ask": []

@@ -52,8 +52,8 @@
 - [x] npm run upgrade : scripts/upgrade-app.js — met à jour app/ via git sparse-checkout sans toucher dev/
 
 ### Qualité
-- [ ] Stylelint pour le SCSS
-- [ ] Guard dans gofast-new pour détecter un projet non initialisé
+- [x] Stylelint pour le SCSS : .stylelintrc.json + stylelint-config-standard-scss + npm run lint:scss
+- [x] Guard dans gofast-new pour détecter un projet non initialisé (vérifie dev/components/ + gofast.config.json)
 
 ### Init
-- [ ] Créer commande Claude `/gofast-init` dédiée au scaffolding (wraps scripts/init-project.js) — `/spec` couvre la spec projet, mais il manque une commande IA pour guider l'init
+- [x] Créer commande Claude `/gofast-init` dédiée au scaffolding (wraps scripts/init-project.js) + versions Copilot + Codex

@@ -25,26 +25,27 @@ Guide complet pour connecter Figma à Claude Code via le MCP officiel Figma, et 
 
 ---
 
-## Étape 2 — Activer le MCP Figma dans `.mcp.json`
+## Étape 2 — Configurer la clé API via `.env`
 
-Ouvrir `.mcp.json` à la racine du projet :
+Le `.mcp.json` est versionné et utilise la variable d'environnement `${FIGMA_API_KEY}` — la clé réelle ne doit jamais être commitée.
 
-**Avant (désactivé) :**
-```json
-{
-  "mcpServers": {
-    "orbit": { ... },
-    "_figma_DISABLED": {
-      "_comment": "Pour activer : renommer cette clé en 'figma'...",
-      "type": "http",
-      "url": "https://mcp.figma.com/mcp",
-      "headers": { "X-Figma-Token": "FIGMA_API_KEY" }
-    }
-  }
-}
+**1. Copier `.env.example` en `.env` :**
+
+```bash
+cp .env.example .env
 ```
 
-**Après (activé) :**
+**2. Renseigner la clé dans `.env` :**
+
+```
+# Figma MCP - requis pour /gofast-from-figma
+FIGMA_API_KEY=your_figma_api_key_here
+```
+
+> **`.env` est dans `.gitignore`** — il reste local à votre machine.
+
+**`.mcp.json` (déjà configuré, versionné) :**
+
 ```json
 {
   "mcpServers": {
@@ -53,14 +54,14 @@ Ouvrir `.mcp.json` à la racine du projet :
       "type": "http",
       "url": "https://mcp.figma.com/mcp",
       "headers": {
-        "X-Figma-Token": "votre-clé-api-figma"
+        "X-Figma-Token": "${FIGMA_API_KEY}"
       }
     }
   }
 }
 ```
 
-> **⚠️ Sécurité** : ne jamais commiter `.mcp.json` avec une vraie clé API. Utiliser `.gitignore` ou des variables d'environnement si le fichier est partagé.
+Claude Code résout automatiquement `${FIGMA_API_KEY}` depuis l'environnement au démarrage.
 
 ---
 
@@ -147,14 +148,15 @@ Ou format Style Dictionary / Tokens Studio (hiérarchique ou plat).
 | Les composants Figma complexes nécessitent une révision manuelle | Traiter les composants simples en premier |
 | Les tokens non nommés selon la convention ne sont pas mappés | Respecter `docs/figma-tokens-convention.md` |
 | Les variantes Figma sont inférées, pas toujours exhaustives | Vérifier et compléter le JSON généré |
-| La clé API Figma ne doit pas être commitée | Utiliser `.env` local ou variable d'env |
+| La clé API Figma ne doit pas être commitée | Stocker dans `.env` (voir Étape 2) |
 
 ---
 
 ## Structure des fichiers liés
 
 ```
-.mcp.json                              ← Config MCP (bloc figma à activer)
+.mcp.json                              ← Config MCP (versionné, clé via ${FIGMA_API_KEY})
+.env.example                           ← Template des variables d'environnement requises
 docs/figma-tokens-convention.md        ← Table de correspondance tokens ↔ SCSS
 docs/figma-integration.md              ← Ce guide
 scripts/validate-figma-tokens.js       ← Script de validation

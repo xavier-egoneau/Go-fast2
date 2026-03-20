@@ -10,6 +10,9 @@
     "preview": "vite preview",
     "reset": "node scripts/reset-project.js",
     "icons": "node scripts/generate-icons.js",
+    "list": "node scripts/list-components.js",
+    "validate": "node scripts/validate-json.js",
+    "upgrade": "node scripts/upgrade-app.js",
     "test:a11y": "node scripts/test-a11y.js",
     "postinstall": "node app/scripts/welcome.js || true"
   },

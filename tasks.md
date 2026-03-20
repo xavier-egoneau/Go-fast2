@@ -47,9 +47,9 @@
 
 ### Scripts
 - [x] Watch automatique icônes : déjà implémenté dans vite.config.js — watch `add` + `change` sur `dev/assets/icons/unitaires/*.svg`
-- [ ] Validation JSON schema : valider les .json de composants au lancement du dev server
-- [ ] gofast-list en script npm aussi (npm run list)
-- [ ] npm run upgrade : mettre à jour app/ sans toucher dev/
+- [x] Validation JSON schema : scripts/validate-json.js + intégration vite.config.js + npm run validate
+- [x] gofast-list en script npm aussi : scripts/list-components.js + npm run list
+- [x] npm run upgrade : scripts/upgrade-app.js — met à jour app/ via git sparse-checkout sans toucher dev/
 
 ### Qualité
 - [ ] Stylelint pour le SCSS

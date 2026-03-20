@@ -161,3 +161,40 @@ Pour une analyse complète en ligne de commande :
 ```bash
 npm run test:a11y
 ```
+
+---
+
+## Figma Integration (beta)
+
+Générez des composants Go-fast directement depuis des frames Figma annotées "Ready for dev" via le MCP Figma officiel.
+
+### Prérequis
+
+1. Une clé API Figma (Personal Access Token)
+2. Activer le bloc `"figma"` dans `.mcp.json` avec votre clé
+3. Relancer Claude Code
+
+### Workflow
+
+```
+Designer annote la frame "Ready for dev"
+          ↓
+/from-figma → coller le lien Figma
+          ↓
+Claude lit la frame, mappe les tokens, génère les 4 fichiers
+          ↓
+Vérifier dans le showcase : http://localhost:3000
+```
+
+### Valider les tokens
+
+```bash
+npm run validate:figma -- --tokens=path/to/figma-tokens.json
+```
+
+Compare les tokens Figma exportés avec les variables SCSS du projet et affiche les écarts.
+
+### Documentation complète
+
+→ `docs/figma-integration.md` — guide d'activation, workflow et limites
+→ `docs/figma-tokens-convention.md` — convention de nommage tokens Figma ↔ variables SCSS

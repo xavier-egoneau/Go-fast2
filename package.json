@@ -15,6 +15,7 @@
     "upgrade": "node scripts/upgrade-app.js",
     "lint:scss": "stylelint \"dev/assets/scss/**/*.scss\"",
     "test:a11y": "node scripts/test-a11y.js",
+    "validate:figma": "node scripts/validate-figma-tokens.js",
     "postinstall": "node app/scripts/welcome.js || true"
   },
   "devDependencies": {

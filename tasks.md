@@ -35,3 +35,25 @@
 - [x] Créer `dev/components/modal/modal.md`
 - [x] Créer `dev/components/tabs/tabs.md`
 - [x] Créer `dev/components/head-menu/head-menu.md`
+
+## Groupe 5 — Améliorations starter kit [parallélisable]
+> Session 2026-03-20 — outillage, qualité, commandes
+
+### Commandes manquantes
+- [ ] gofast-rename : renommer un composant (dossier, fichiers, imports SCSS, références JSON)
+- [ ] gofast-move : changer le niveau atomique d'un composant (ex: atom → molecule)
+- [ ] gofast-list : lister tous les composants avec niveau et statut (complet/incomplet/vide)
+- [ ] gofast-audit : vérifier la conformité des composants (|default(), BEM, .md présent, import SCSS, JSON valide)
+
+### Scripts
+- [x] Watch automatique icônes : déjà implémenté dans vite.config.js — watch `add` + `change` sur `dev/assets/icons/unitaires/*.svg`
+- [ ] Validation JSON schema : valider les .json de composants au lancement du dev server
+- [ ] gofast-list en script npm aussi (npm run list)
+- [ ] npm run upgrade : mettre à jour app/ sans toucher dev/
+
+### Qualité
+- [ ] Stylelint pour le SCSS
+- [ ] Guard dans gofast-new pour détecter un projet non initialisé
+
+### Init
+- [ ] Créer commande Claude `/gofast-init` dédiée au scaffolding (wraps scripts/init-project.js) — `/spec` couvre la spec projet, mais il manque une commande IA pour guider l'init

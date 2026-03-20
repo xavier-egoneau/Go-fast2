@@ -34,6 +34,8 @@ Thumbs.db
 # ia files
 task.md
 SPEC_V2.md
+.claude/settings.local.json
+.claude/worktrees/*
 
 # Environment variables (locales, jamais versionnées)
 .env

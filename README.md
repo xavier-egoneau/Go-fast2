@@ -83,9 +83,10 @@ Le script ne supprime rien — il crée ou met à jour uniquement les fichiers c
 ```
 go-fast/
 ├── app/                      # Framework showcase — ne pas modifier
-│   ├── scripts/              # showcase.js, welcome.js
-│   ├── styles/               # showcase.scss (isolation totale)
-│   └── templates/            # index.twig, page-showcase.twig
+│   ├── config/
+│   ├── scripts/
+│   ├── styles/
+│   └── templates/
 │
 ├── dev/                      # Votre projet — travaillez ici
 │   ├── components/           # Atoms, molecules, organisms, templates
@@ -99,7 +100,10 @@ go-fast/
 │   │   │   ├── base/         # Variables, reset, mixins, typographie
 │   │   │   ├── components/   # Un fichier SCSS par composant
 │   │   │   └── style.scss    # Point d'entrée (SCSS / hybride)
-│   │   ├── style.css         # Point d'entrée (Tailwind seul)
+│   │   ├── css/              # Point d'entrée (Tailwind seul)
+│   │   ├── fonts/
+│   │   ├── images/
+│   │   ├── js/
 │   │   └── icons/
 │   │       ├── unitaires/    # SVG sources — déposez vos icônes ici
 │   │       ├── sprite.svg    # Généré automatiquement
@@ -107,8 +111,23 @@ go-fast/
 │   └── data/
 │       └── showcase.json     # Généré automatiquement — ne pas éditer
 │
+├── orbit/                    # MCP server local (browser, runtime, git)
+│   ├── tools/
+│   ├── services/
+│   └── dist/                 # Build requis avant usage
+│
+├── docs/                     # Documentation complémentaire
+│   ├── figma-integration.md
+│   └── figma-tokens-convention.md
+│
 ├── scripts/                  # Scripts Node du framework
 ├── templates/scss/base/      # Templates SCSS base (copiés par init)
+│
+├── .claude/                  # Commandes IA Claude Code (source de vérité)
+├── .github/                  # Instructions Copilot
+├── .codex/                   # Prompts Codex
+│
+├── CLAUDE.md                 # Constitution Claude (auto-chargée)
 ├── GUIDELINES_AI.md          # Conventions complètes — lire avant de coder
 ├── gofast.config.json        # Config projet (CSS strategy, nom)
 └── vite.config.js

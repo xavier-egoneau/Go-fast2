@@ -27,6 +27,36 @@ Principes non-négociables à vérifier avant chaque implémentation :
 - Haiku → exploration, recherche de fichiers
 - Sonnet → implémentation, création de composants
 
+## MCP Orbit
+
+Le serveur MCP `orbit` est disponible dans ce projet (`.mcp.json`). Il expose des outils à utiliser en priorité sur les équivalents natifs quand ils sont plus adaptés au contexte.
+
+### Quand utiliser orbit
+
+| Besoin | Outil orbit |
+|---|---|
+| Vérifier le rendu du showcase dans le navigateur | `browser_open` → `browser_screenshot` |
+| Lire l'état d'une page (URL, éléments, console) | `browser_page_state` |
+| Diagnostiquer une erreur JS dans le showcase | `browser_console_logs`, `app_diagnose` |
+| Lancer `npm run dev` ou un script en arrière-plan | `runtime_start_process` |
+| Exécuter une commande shell ponctuelle | `dev_run_command` |
+| Vérifier les erreurs runtime d'un process | `runtime_errors`, `runtime_read_logs` |
+| Chercher du texte dans le repo | `repo_search_text` |
+
+### Workflow showcase typique
+
+```
+runtime_start_process("npm run dev")
+  → browser_open("http://localhost:3000")
+  → browser_screenshot()          ← vérification visuelle
+  → browser_page_state()          ← erreurs console éventuelles
+```
+
+### Prérequis
+
+Orbit doit être buildé avant usage : `cd orbit && npm run build`
+Le build est déjà effectué — `orbit/dist/` existe.
+
 ## Token Optimization Notes
 - Run /clear between unrelated experiments
 - Run /compact when context gets large

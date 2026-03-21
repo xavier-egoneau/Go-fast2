@@ -17,7 +17,10 @@
       "Bash(npm run export:*)",
       "Bash(ls:*)",
       "Bash(grep:*)",
-      "Bash(git ls-tree:*)"
+      "Bash(git ls-tree:*)",
+      "Bash(grep -h \"server.tool\\(\" /Users/xavieregoneau/projets/Go-fast2/orbit/tools/*.ts)",
+      "Bash(grep -h \"tool\\(\" /Users/xavieregoneau/projets/Go-fast2/orbit/tools/*.ts)",
+      "Bash(grep \"registerTool\\(\" /Users/xavieregoneau/projets/Go-fast2/orbit/tools/*.ts)"
     ],
     "deny": [],
     "ask": []

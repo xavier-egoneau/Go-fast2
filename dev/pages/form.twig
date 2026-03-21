@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Formulaire — MonSite</title>
+  <link rel="stylesheet" href="/dev/assets/scss/style.scss">
+</head>
+<body>
+
+  {% include 'dev/components/header-nav/header-nav.twig' with {
+    variant: 'light',
+    sticky: true,
+    logoText: 'MonSite',
+    ctaText: 'Commencer',
+    links: [
+      { label: 'Accueil',   href: '#' },
+      { label: 'Articles',  href: '#' },
+      { label: 'Tarifs',    href: '#' },
+      { label: 'Contact',   href: '#', active: true }
+    ]
+  } %}
+
+  <main class="form-page" id="main-content">
+
+    <div class="form-page__inner">
+
+      <header class="form-page__header">
+        <h1 class="form-page__title">Créer un compte</h1>
+        <p class="form-page__subtitle">Remplissez les informations ci-dessous pour rejoindre MonSite.</p>
+      </header>
+
+      <form class="form-page__form" novalidate>
+
+        {# ── Section : Informations personnelles ──────────────────────────── #}
+
+        <section class="form-page__section">
+          <h2 class="form-page__section-title">Informations personnelles</h2>
+
+          {% set rowContent %}
+            {% include 'dev/components/input/input.twig' with {
+              id: 'prenom', label: 'Prénom', type: 'text', placeholder: 'ex : Jean', required: true
+            } %}
+            {% include 'dev/components/input/input.twig' with {
+              id: 'nom', label: 'Nom', type: 'text', placeholder: 'ex : Dupont', required: true
+            } %}
+          {% endset %}
+          {% include 'dev/components/grid/grid.twig' with { cols: '1', colsMd: '2', gap: 'lg', children: rowContent } %}
+
+          {% set rowContent %}
+            {% include 'dev/components/input/input.twig' with {
+              id: 'email', label: 'Adresse e-mail', type: 'email',
+              placeholder: 'ex : jean@exemple.fr', required: true,
+              helpText: 'Utilisée pour la connexion et les notifications.'
+            } %}
+            {% include 'dev/components/input/input.twig' with {
+              id: 'tel', label: 'Téléphone', type: 'tel', placeholder: 'ex : +33 6 12 34 56 78'
+            } %}
+          {% endset %}
+          {% include 'dev/components/grid/grid.twig' with { cols: '1', colsMd: '2', gap: 'lg', children: rowContent } %}
+
+          {% set rowContent %}
+            {% include 'dev/components/input/input.twig' with {
+              id: 'naissance', label: 'Date de naissance', type: 'date'
+            } %}
+            {% include 'dev/components/input/input.twig' with {
+              id: 'age', label: 'Âge', type: 'number', placeholder: 'ex : 30'
+            } %}
+            {% include 'dev/components/select/select.twig' with {
+              id: 'pays', label: 'Pays', required: true,
+              placeholder: 'Choisissez un pays',
+              options: [
+                { value: 'fr', label: 'France' },
+                { value: 'be', label: 'Belgique' },
+                { value: 'ch', label: 'Suisse' },
+                { value: 'ca', label: 'Canada' },
+                { value: 'lu', label: 'Luxembourg' }
+              ]
+            } %}
+          {% endset %}
+          {% include 'dev/components/grid/grid.twig' with { cols: '1', colsMd: '3', gap: 'lg', children: rowContent } %}
+        </section>
+
+        {# ── Section : Compte ─────────────────────────────────────────────── #}
+
+        <section class="form-page__section">
+          <h2 class="form-page__section-title">Accès au compte</h2>
+
+          {% set rowContent %}
+            {% include 'dev/components/input/input.twig' with {
+              id: 'password', label: 'Mot de passe', type: 'password',
+              placeholder: 'Min. 8 caractères', required: true,
+              helpText: 'Majuscule, chiffre et caractère spécial recommandés.'
+            } %}
+            {% include 'dev/components/input/input.twig' with {
+              id: 'password-confirm', label: 'Confirmer le mot de passe',
+              type: 'password', placeholder: 'Répétez le mot de passe', required: true
+            } %}
+          {% endset %}
+          {% include 'dev/components/grid/grid.twig' with { cols: '1', colsMd: '2', gap: 'lg', children: rowContent } %}
+
+          {% set rowContent %}
+            {% include 'dev/components/select/select.twig' with {
+              id: 'profil', label: 'Type de profil',
+              placeholder: 'Choisissez un profil',
+              options: [
+                { value: 'dev',        label: 'Développeur' },
+                { value: 'designer',   label: 'Designer' },
+                { value: 'manager',    label: 'Chef de projet' },
+                { value: 'other',      label: 'Autre' }
+              ]
+            } %}
+          {% endset %}
+          {% include 'dev/components/grid/grid.twig' with { cols: '1', colsMd: '2', gap: 'lg', children: rowContent } %}
+        </section>
+
+        {# ── Section : Préférences ─────────────────────────────────────────── #}
+
+        <section class="form-page__section">
+          <h2 class="form-page__section-title">Préférences</h2>
+
+          {% set rowContent %}
+            {% include 'dev/components/radio/radio.twig' with {
+              name: 'abonnement',
+              legend: 'Abonnement',
+              value: 'mensuel',
+              options: [
+                { value: 'gratuit',  label: 'Gratuit — fonctions de base' },
+                { value: 'mensuel',  label: 'Mensuel — 9 €/mois' },
+                { value: 'annuel',   label: 'Annuel — 79 €/an' }
+              ]
+            } %}
+            <div class="form-page__switches">
+              {% include 'dev/components/switch/switch.twig' with {
+                id: 'notif-email', label: 'Notifications par e-mail', checked: true
+              } %}
+              {% include 'dev/components/switch/switch.twig' with {
+                id: 'notif-sms', label: 'Notifications par SMS'
+              } %}
+              {% include 'dev/components/switch/switch.twig' with {
+                id: 'newsletter', label: 'Recevoir la newsletter', checked: true
+              } %}
+            </div>
+          {% endset %}
+          {% include 'dev/components/grid/grid.twig' with { cols: '1', colsMd: '2', gap: 'xl', children: rowContent } %}
+        </section>
+
+        {# ── Section : Consentements ───────────────────────────────────────── #}
+
+        <section class="form-page__section">
+          <h2 class="form-page__section-title">Consentements</h2>
+
+          {% include 'dev/components/checkbox/checkbox.twig' with {
+            id: 'cgu', required: true,
+            label: 'J\'accepte les conditions générales d\'utilisation et la politique de confidentialité.'
+          } %}
+          {% include 'dev/components/checkbox/checkbox.twig' with {
+            id: 'marketing',
+            label: 'J\'accepte de recevoir des offres commerciales personnalisées.'
+          } %}
+        </section>
+
+        {# ── Actions ──────────────────────────────────────────────────────── #}
+
+        <div class="form-page__actions">
+          {% include 'dev/components/button/button.twig' with {
+            text: 'Annuler', variant: 'ghost'
+          } %}
+          {% include 'dev/components/button/button.twig' with {
+            text: 'Créer mon compte', variant: 'primary'
+          } %}
+        </div>
+
+      </form>
+    </div>
+
+  </main>
+
+  {% include 'dev/components/footer/footer.twig' with {
+    variant: 'dark',
+    logoText: 'MonSite',
+    tagline: 'Construisons quelque chose de grand.',
+    copyright: '© 2025 MonSite. Tous droits réservés.'
+  } %}
+
+</body>
+</html>

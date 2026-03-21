@@ -13,7 +13,21 @@ Twig.extend(function (T) {
   const origLoader = T.Templates.loaders['fs']
   T.Templates.loaders['fs'] = function (location, params, callback, errorCallback) {
     if (!path.isAbsolute(location)) {
+      // Chemin relatif : résoudre depuis la racine du projet
       location = path.join(ROOT, location)
+    } else if (!fs.existsSync(location)) {
+      // Chemin absolu mais inexistant : Twig l'a pré-résolu depuis le dossier
+      // du template parent (include imbriqué). On re-résout depuis ROOT en
+      // cherchant le suffixe de chemin qui existe réellement.
+      const rel = path.relative(ROOT, location)
+      const parts = rel.split(path.sep)
+      for (let i = 1; i < parts.length; i++) {
+        const candidate = path.join(ROOT, ...parts.slice(i))
+        if (fs.existsSync(candidate)) {
+          location = candidate
+          break
+        }
+      }
     }
     return origLoader.call(this, location, params, callback, errorCallback)
   }

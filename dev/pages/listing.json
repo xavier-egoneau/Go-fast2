@@ -1,0 +1,13 @@
+{
+  "name": "Page listing",
+  "category": "Pages",
+  "description": "Page de liste d'articles avec header, grille de cards et footer.",
+  "variants": {
+    "gridCols": {
+      "label": "Colonnes",
+      "type": "select",
+      "default": "3",
+      "options": ["1", "2", "3"]
+    }
+  }
+}

@@ -1,0 +1,124 @@
+{% set gridCols = gridCols|default('3') %}
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Listing — MonSite</title>
+  <link rel="stylesheet" href="/dev/assets/scss/style.scss">
+</head>
+<body>
+
+  {% include 'dev/components/header-nav/header-nav.twig' with {
+    variant: 'light',
+    sticky: true,
+    logoText: 'MonSite',
+    ctaText: 'Commencer',
+    links: [
+      { label: 'Accueil',  href: '#' },
+      { label: 'Articles', href: '#', active: true },
+      { label: 'Tarifs',   href: '#' },
+      { label: 'Contact',  href: '#' }
+    ]
+  } %}
+
+  <main class="listing-page" id="main-content">
+
+    <section class="listing-page__hero">
+      <div class="listing-page__hero-inner">
+        <h1 class="listing-page__title">Nos derniers articles</h1>
+        <p class="listing-page__subtitle">Découvrez nos ressources, tutoriels et actualités.</p>
+      </div>
+    </section>
+
+    <section class="listing-page__content" aria-label="Liste des articles">
+
+      {% set articles = [
+        {
+          title: 'Introduction à l\'Atomic Design',
+          text: 'Comprendre la méthode Atomic Design pour structurer vos interfaces de façon cohérente et maintenable.',
+          tag: 'Méthodo',
+          ctaText: 'Lire l\'article',
+          imageUrl: 'https://placehold.co/600x400/e0f2fe/0369a1?text=Atomic+Design',
+          imageAlt: 'Illustration Atomic Design'
+        },
+        {
+          title: 'Construire un design system avec SCSS',
+          text: 'Mettre en place un design system robuste grâce aux variables et mixins SCSS pour une cohérence visuelle totale.',
+          tag: 'SCSS',
+          ctaText: 'Lire l\'article',
+          imageUrl: 'https://placehold.co/600x400/fce7f3/be185d?text=Design+System',
+          imageAlt: 'Illustration Design System'
+        },
+        {
+          title: 'Accessibilité web : les fondamentaux',
+          text: 'Les règles essentielles pour rendre vos interfaces accessibles à tous, avec des exemples concrets et actionnables.',
+          tag: 'A11y',
+          ctaText: 'Lire l\'article',
+          imageUrl: 'https://placehold.co/600x400/dcfce7/15803d?text=Accessibilité',
+          imageAlt: 'Illustration accessibilité'
+        },
+        {
+          title: 'Vite.js en 2025 : ce qu\'il faut savoir',
+          text: 'Tour d\'horizon des fonctionnalités clés de Vite.js et pourquoi c\'est devenu l\'outil de référence pour les projets front.',
+          tag: 'Tooling',
+          ctaText: 'Lire l\'article',
+          imageUrl: 'https://placehold.co/600x400/fef9c3/a16207?text=Vite.js',
+          imageAlt: 'Illustration Vite.js'
+        },
+        {
+          title: 'BEM : la convention CSS qui scale',
+          text: 'Pourquoi BEM reste la meilleure convention de nommage CSS pour les projets d\'équipe, et comment l\'appliquer efficacement.',
+          tag: 'CSS',
+          ctaText: 'Lire l\'article',
+          imageUrl: 'https://placehold.co/600x400/ede9fe/6d28d9?text=BEM',
+          imageAlt: 'Illustration BEM'
+        },
+        {
+          title: 'Twig pour les intégrateurs',
+          text: 'Guide pratique du moteur de template Twig : syntaxe, filtres, includes et bonnes pratiques pour l\'intégration HTML.',
+          tag: 'Twig',
+          ctaText: 'Lire l\'article',
+          imageUrl: 'https://placehold.co/600x400/ffedd5/c2410c?text=Twig',
+          imageAlt: 'Illustration Twig'
+        }
+      ] %}
+
+      {% set gridContent %}
+        {% for article in articles %}
+          {% include 'dev/components/card/card.twig' with {
+            variant: 'default',
+            title: article.title,
+            text: article.text,
+            tag: article.tag,
+            ctaText: article.ctaText,
+            imageUrl: article.imageUrl,
+            imageAlt: article.imageAlt,
+            hasImage: true,
+            hasCta: true
+          } %}
+        {% endfor %}
+      {% endset %}
+
+      {% include 'dev/components/grid/grid.twig' with {
+        cols: '1',
+        colsSm: gridCols == '1' ? '1' : '2',
+        colsLg: gridCols,
+        gap: 'xl',
+        children: gridContent
+      } %}
+
+    </section>
+
+  </main>
+
+  {% include 'dev/components/footer/footer.twig' with {
+    variant: 'dark',
+    logoText: 'MonSite',
+    tagline: 'Construisons quelque chose de grand.',
+    copyright: '© 2025 MonSite. Tous droits réservés.'
+  } %}
+
+</body>
+</html>

@@ -1,0 +1,46 @@
+{% set variant  = variant|default('light') %}
+{% set sticky   = sticky|default(false) %}
+{% set logoText = logoText|default('MonSite') %}
+{% set ctaText  = ctaText|default('Commencer') %}
+
+{% set links = links|default([
+  { label: 'Accueil',    href: '#' },
+  { label: 'Produits',   href: '#' },
+  { label: 'Tarifs',     href: '#' },
+  { label: 'Contact',    href: '#' }
+]) %}
+
+<header class="header-nav header-nav--{{ variant }}{% if sticky %} header-nav--sticky{% endif %}" role="banner">
+  <div class="header-nav__inner">
+
+    <a href="/" class="header-nav__logo" aria-label="Retour à l'accueil">
+      <span class="header-nav__logo-mark" aria-hidden="true">◈</span>
+      <span class="header-nav__logo-name">{{ logoText }}</span>
+    </a>
+
+    <nav class="header-nav__nav" aria-label="Navigation principale">
+      <ul class="header-nav__list" role="list">
+        {% for link in links %}
+          <li class="header-nav__item">
+            <a
+              href="{{ link.href|default('#') }}"
+              class="header-nav__link{% if link.active|default(false) %} header-nav__link--active{% endif %}"
+              {% if link.active|default(false) %}aria-current="page"{% endif %}
+            >
+              {{ link.label|default('Lien') }}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </nav>
+
+    <div class="header-nav__cta">
+      {% include 'dev/components/button/button.twig' with {
+        text: ctaText,
+        variant: variant == 'dark' ? 'outline' : 'primary',
+        size: 'sm'
+      } %}
+    </div>
+
+  </div>
+</header>

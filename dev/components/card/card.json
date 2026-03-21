@@ -1,0 +1,46 @@
+{
+  "name": "Card",
+  "level": "molecule",
+  "category": "Layout",
+  "description": "Conteneur de contenu structuré avec image, titre, texte et action optionnels.",
+  "variants": {
+    "variant": {
+      "label": "Variante",
+      "type": "select",
+      "default": "default",
+      "options": ["default", "outlined", "elevated"]
+    },
+    "horizontal": {
+      "label": "Horizontal",
+      "type": "checkbox",
+      "default": false
+    },
+    "hasImage": {
+      "label": "Avec image",
+      "type": "checkbox",
+      "default": true
+    },
+    "hasCta": {
+      "label": "Avec bouton",
+      "type": "checkbox",
+      "default": true
+    }
+  },
+  "content": {
+    "title": {
+      "label": "Titre",
+      "type": "text",
+      "default": "Titre de la carte"
+    },
+    "text": {
+      "label": "Description",
+      "type": "text",
+      "default": "Courte description du contenu de la carte."
+    },
+    "ctaText": {
+      "label": "Texte du bouton",
+      "type": "text",
+      "default": "En savoir plus"
+    }
+  }
+}

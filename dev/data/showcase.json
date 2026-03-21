@@ -1,0 +1,508 @@
+{
+  "components": [
+    {
+      "id": "button",
+      "path": "dev/components/button/button",
+      "name": "Button",
+      "level": "atom",
+      "category": "Forms",
+      "description": "Élément d'action interactif. Supporte plusieurs variantes visuelles, tailles et états.",
+      "variants": {
+        "variant": {
+          "label": "Variante",
+          "type": "select",
+          "default": "primary",
+          "options": [
+            "primary",
+            "secondary",
+            "outline",
+            "ghost",
+            "danger"
+          ]
+        },
+        "size": {
+          "label": "Taille",
+          "type": "select",
+          "default": "md",
+          "options": [
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "full": {
+          "label": "Pleine largeur",
+          "type": "checkbox",
+          "default": false
+        },
+        "disabled": {
+          "label": "Désactivé",
+          "type": "checkbox",
+          "default": false
+        }
+      },
+      "content": {
+        "text": {
+          "label": "Texte",
+          "type": "text",
+          "default": "Cliquez ici"
+        }
+      }
+    },
+    {
+      "id": "card",
+      "path": "dev/components/card/card",
+      "name": "Card",
+      "level": "molecule",
+      "category": "Layout",
+      "description": "Conteneur de contenu structuré avec image, titre, texte et action optionnels.",
+      "variants": {
+        "variant": {
+          "label": "Variante",
+          "type": "select",
+          "default": "default",
+          "options": [
+            "default",
+            "outlined",
+            "elevated"
+          ]
+        },
+        "horizontal": {
+          "label": "Horizontal",
+          "type": "checkbox",
+          "default": false
+        },
+        "hasImage": {
+          "label": "Avec image",
+          "type": "checkbox",
+          "default": true
+        },
+        "hasCta": {
+          "label": "Avec bouton",
+          "type": "checkbox",
+          "default": true
+        }
+      },
+      "content": {
+        "title": {
+          "label": "Titre",
+          "type": "text",
+          "default": "Titre de la carte"
+        },
+        "text": {
+          "label": "Description",
+          "type": "text",
+          "default": "Courte description du contenu de la carte."
+        },
+        "ctaText": {
+          "label": "Texte du bouton",
+          "type": "text",
+          "default": "En savoir plus"
+        }
+      }
+    },
+    {
+      "id": "checkbox",
+      "path": "dev/components/checkbox/checkbox",
+      "name": "Checkbox",
+      "level": "atom",
+      "category": "Forms",
+      "description": "Case à cocher accessible avec label, état checked, disabled et erreur.",
+      "variants": {
+        "checked": {
+          "label": "Coché",
+          "type": "checkbox",
+          "default": false
+        },
+        "disabled": {
+          "label": "Désactivé",
+          "type": "checkbox",
+          "default": false
+        },
+        "hasError": {
+          "label": "Erreur",
+          "type": "checkbox",
+          "default": false
+        }
+      },
+      "content": {
+        "label": {
+          "label": "Label",
+          "type": "text",
+          "default": "J'accepte les conditions d'utilisation"
+        },
+        "errorMessage": {
+          "label": "Message d'erreur",
+          "type": "text",
+          "default": "Vous devez accepter les conditions."
+        }
+      }
+    },
+    {
+      "id": "footer",
+      "path": "dev/components/footer/footer",
+      "name": "Footer",
+      "level": "organism",
+      "category": "Navigation",
+      "description": "Pied de page avec logo, colonnes de liens et mentions légales.",
+      "variants": {
+        "variant": {
+          "label": "Variante",
+          "type": "select",
+          "default": "dark",
+          "options": [
+            "dark",
+            "light"
+          ]
+        }
+      },
+      "content": {
+        "logoText": {
+          "label": "Logo (texte)",
+          "type": "text",
+          "default": "MonSite"
+        },
+        "tagline": {
+          "label": "Tagline",
+          "type": "text",
+          "default": "Construisons quelque chose de grand."
+        },
+        "copyright": {
+          "label": "Copyright",
+          "type": "text",
+          "default": "© 2025 MonSite. Tous droits réservés."
+        }
+      }
+    },
+    {
+      "id": "grid",
+      "path": "dev/components/grid/grid",
+      "name": "Grid",
+      "level": "atom",
+      "category": "Layout",
+      "description": "Conteneur CSS Grid configurable. Gère colonnes, gap et alignement pour toute mise en page.",
+      "variants": {
+        "cols": {
+          "label": "Colonnes",
+          "type": "select",
+          "default": "3",
+          "options": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "6",
+            "12",
+            "auto"
+          ]
+        },
+        "gap": {
+          "label": "Gap",
+          "type": "select",
+          "default": "md",
+          "options": [
+            "none",
+            "xs",
+            "sm",
+            "md",
+            "lg",
+            "xl"
+          ]
+        },
+        "align": {
+          "label": "Align items",
+          "type": "select",
+          "default": "stretch",
+          "options": [
+            "stretch",
+            "start",
+            "center",
+            "end"
+          ]
+        }
+      },
+      "content": {}
+    },
+    {
+      "id": "header-nav",
+      "path": "dev/components/header-nav/header-nav",
+      "name": "Header Nav",
+      "level": "organism",
+      "category": "Navigation",
+      "description": "En-tête de page avec logo, liens de navigation et bouton d'action principal.",
+      "variants": {
+        "variant": {
+          "label": "Variante",
+          "type": "select",
+          "default": "light",
+          "options": [
+            "light",
+            "dark"
+          ]
+        },
+        "sticky": {
+          "label": "Sticky",
+          "type": "checkbox",
+          "default": false
+        }
+      },
+      "content": {
+        "logoText": {
+          "label": "Logo (texte)",
+          "type": "text",
+          "default": "MonSite"
+        },
+        "ctaText": {
+          "label": "Texte du bouton",
+          "type": "text",
+          "default": "Commencer"
+        }
+      }
+    },
+    {
+      "id": "input",
+      "path": "dev/components/input/input",
+      "name": "Input",
+      "level": "atom",
+      "category": "Forms",
+      "description": "Champ de saisie texte, nombre ou date. Gère tous les états classiques : placeholder, disabled, error, required.",
+      "variants": {
+        "type": {
+          "label": "Type",
+          "type": "select",
+          "default": "text",
+          "options": [
+            "text",
+            "email",
+            "password",
+            "number",
+            "date",
+            "tel",
+            "search"
+          ]
+        },
+        "size": {
+          "label": "Taille",
+          "type": "select",
+          "default": "md",
+          "options": [
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "disabled": {
+          "label": "Désactivé",
+          "type": "checkbox",
+          "default": false
+        },
+        "required": {
+          "label": "Requis",
+          "type": "checkbox",
+          "default": false
+        },
+        "hasError": {
+          "label": "Erreur",
+          "type": "checkbox",
+          "default": false
+        }
+      },
+      "content": {
+        "label": {
+          "label": "Label",
+          "type": "text",
+          "default": "Adresse e-mail"
+        },
+        "placeholder": {
+          "label": "Placeholder",
+          "type": "text",
+          "default": "ex : jean@exemple.fr"
+        },
+        "helpText": {
+          "label": "Texte d'aide",
+          "type": "text",
+          "default": ""
+        },
+        "errorMessage": {
+          "label": "Message d'erreur",
+          "type": "text",
+          "default": "Ce champ est invalide."
+        }
+      }
+    },
+    {
+      "id": "radio",
+      "path": "dev/components/radio/radio",
+      "name": "Radio",
+      "level": "atom",
+      "category": "Forms",
+      "description": "Groupe de boutons radio accessibles. Sélection unique parmi plusieurs options.",
+      "variants": {
+        "disabled": {
+          "label": "Désactivé",
+          "type": "checkbox",
+          "default": false
+        },
+        "hasError": {
+          "label": "Erreur",
+          "type": "checkbox",
+          "default": false
+        },
+        "inline": {
+          "label": "Inline",
+          "type": "checkbox",
+          "default": false
+        }
+      },
+      "content": {
+        "legend": {
+          "label": "Légende",
+          "type": "text",
+          "default": "Abonnement"
+        },
+        "errorMessage": {
+          "label": "Message d'erreur",
+          "type": "text",
+          "default": "Veuillez choisir une option."
+        }
+      }
+    },
+    {
+      "id": "select",
+      "path": "dev/components/select/select",
+      "name": "Select",
+      "level": "atom",
+      "category": "Forms",
+      "description": "Liste déroulante avec flèche personnalisée. Gère placeholder, disabled, error et required.",
+      "variants": {
+        "size": {
+          "label": "Taille",
+          "type": "select",
+          "default": "md",
+          "options": [
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "disabled": {
+          "label": "Désactivé",
+          "type": "checkbox",
+          "default": false
+        },
+        "required": {
+          "label": "Requis",
+          "type": "checkbox",
+          "default": false
+        },
+        "hasError": {
+          "label": "Erreur",
+          "type": "checkbox",
+          "default": false
+        }
+      },
+      "content": {
+        "label": {
+          "label": "Label",
+          "type": "text",
+          "default": "Pays"
+        },
+        "placeholder": {
+          "label": "Placeholder",
+          "type": "text",
+          "default": "Choisissez un pays"
+        },
+        "helpText": {
+          "label": "Texte d'aide",
+          "type": "text",
+          "default": ""
+        },
+        "errorMessage": {
+          "label": "Message d'erreur",
+          "type": "text",
+          "default": "Veuillez sélectionner une option."
+        }
+      }
+    },
+    {
+      "id": "switch",
+      "path": "dev/components/switch/switch",
+      "name": "Switch",
+      "level": "atom",
+      "category": "Forms",
+      "description": "Toggle on/off accessible. Utilisé pour activer ou désactiver un paramètre immédiatement.",
+      "variants": {
+        "checked": {
+          "label": "Activé",
+          "type": "checkbox",
+          "default": false
+        },
+        "disabled": {
+          "label": "Désactivé",
+          "type": "checkbox",
+          "default": false
+        },
+        "size": {
+          "label": "Taille",
+          "type": "select",
+          "default": "md",
+          "options": [
+            "sm",
+            "md",
+            "lg"
+          ]
+        }
+      },
+      "content": {
+        "label": {
+          "label": "Label",
+          "type": "text",
+          "default": "Notifications par e-mail"
+        },
+        "labelOn": {
+          "label": "État activé",
+          "type": "text",
+          "default": "Activé"
+        },
+        "labelOff": {
+          "label": "État désactivé",
+          "type": "text",
+          "default": "Désactivé"
+        }
+      }
+    }
+  ],
+  "pages": [
+    {
+      "id": "form",
+      "path": "dev/pages/form",
+      "name": "Page formulaire",
+      "level": "page",
+      "category": "Pages",
+      "description": "Page de création de compte avec tous les composants de formulaire, header et footer.",
+      "variants": {},
+      "content": {}
+    },
+    {
+      "id": "listing",
+      "path": "dev/pages/listing",
+      "name": "Page listing",
+      "level": "page",
+      "category": "Pages",
+      "description": "Page de liste d'articles avec header, grille de cards et footer.",
+      "variants": {
+        "gridCols": {
+          "label": "Colonnes",
+          "type": "select",
+          "default": "3",
+          "options": [
+            "1",
+            "2",
+            "3"
+          ]
+        }
+      },
+      "content": {}
+    }
+  ]
+}

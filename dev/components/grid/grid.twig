@@ -1,0 +1,16 @@
+{% set cols    = cols|default('3') %}
+{% set colsSm  = colsSm|default('') %}
+{% set colsMd  = colsMd|default('') %}
+{% set colsLg  = colsLg|default('') %}
+{% set gap     = gap|default('md') %}
+{% set align   = align|default('stretch') %}
+{% set tag     = tag|default('div') %}
+
+{% set classes = 'grid grid--cols-' ~ cols ~ ' grid--gap-' ~ gap ~ ' grid--align-' ~ align %}
+{% if colsSm %}{% set classes = classes ~ ' grid--sm-cols-' ~ colsSm %}{% endif %}
+{% if colsMd %}{% set classes = classes ~ ' grid--md-cols-' ~ colsMd %}{% endif %}
+{% if colsLg %}{% set classes = classes ~ ' grid--lg-cols-' ~ colsLg %}{% endif %}
+
+<{{ tag }} class="{{ classes }}">
+  {{ children|default('') }}
+</{{ tag }}>

@@ -1,0 +1,46 @@
+{% set variant    = variant|default('default') %}
+{% set horizontal = horizontal|default(false) %}
+{% set hasImage   = hasImage|default(true) %}
+{% set hasCta     = hasCta|default(true) %}
+{% set title      = title|default('Titre de la carte') %}
+{% set text       = text|default('Courte description du contenu de la carte.') %}
+{% set ctaText    = ctaText|default('En savoir plus') %}
+{% set imageUrl   = imageUrl|default('https://placehold.co/600x400') %}
+{% set imageAlt   = imageAlt|default('') %}
+{% set tag        = tag|default('') %}
+
+<article class="card card--{{ variant }}{% if horizontal %} card--horizontal{% endif %}">
+
+  {% if hasImage %}
+    <div class="card__media">
+      <img
+        class="card__image"
+        src="{{ imageUrl }}"
+        alt="{{ imageAlt }}"
+        loading="lazy"
+      >
+    </div>
+  {% endif %}
+
+  <div class="card__body">
+
+    {% if tag %}
+      <span class="card__tag">{{ tag }}</span>
+    {% endif %}
+
+    <h3 class="card__title">{{ title }}</h3>
+    <p class="card__text">{{ text }}</p>
+
+    {% if hasCta %}
+      <div class="card__footer">
+        {% include 'dev/components/button/button.twig' with {
+          text: ctaText,
+          variant: 'outline',
+          size: 'sm'
+        } %}
+      </div>
+    {% endif %}
+
+  </div>
+
+</article>

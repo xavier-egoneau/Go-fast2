@@ -1,0 +1,64 @@
+@use '../base/variables' as *;
+@use '../base/mixins' as *;
+
+.grid {
+  display: grid;
+  width: 100%;
+
+  // ── Colonnes ───────────────────────────────────────────────────────────────
+
+  &--cols-1  { grid-template-columns: repeat(1,  1fr); }
+  &--cols-2  { grid-template-columns: repeat(2,  1fr); }
+  &--cols-3  { grid-template-columns: repeat(3,  1fr); }
+  &--cols-4  { grid-template-columns: repeat(4,  1fr); }
+  &--cols-6  { grid-template-columns: repeat(6,  1fr); }
+  &--cols-12 { grid-template-columns: repeat(12, 1fr); }
+  &--cols-auto {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  }
+
+  // ── Colonnes responsive ────────────────────────────────────────────────────
+
+  @include respond-to('sm') {
+    &--sm-cols-1  { grid-template-columns: repeat(1,  1fr); }
+    &--sm-cols-2  { grid-template-columns: repeat(2,  1fr); }
+    &--sm-cols-3  { grid-template-columns: repeat(3,  1fr); }
+    &--sm-cols-4  { grid-template-columns: repeat(4,  1fr); }
+    &--sm-cols-6  { grid-template-columns: repeat(6,  1fr); }
+    &--sm-cols-12 { grid-template-columns: repeat(12, 1fr); }
+  }
+
+  @include respond-to('md') {
+    &--md-cols-1  { grid-template-columns: repeat(1,  1fr); }
+    &--md-cols-2  { grid-template-columns: repeat(2,  1fr); }
+    &--md-cols-3  { grid-template-columns: repeat(3,  1fr); }
+    &--md-cols-4  { grid-template-columns: repeat(4,  1fr); }
+    &--md-cols-6  { grid-template-columns: repeat(6,  1fr); }
+    &--md-cols-12 { grid-template-columns: repeat(12, 1fr); }
+  }
+
+  @include respond-to('lg') {
+    &--lg-cols-1  { grid-template-columns: repeat(1,  1fr); }
+    &--lg-cols-2  { grid-template-columns: repeat(2,  1fr); }
+    &--lg-cols-3  { grid-template-columns: repeat(3,  1fr); }
+    &--lg-cols-4  { grid-template-columns: repeat(4,  1fr); }
+    &--lg-cols-6  { grid-template-columns: repeat(6,  1fr); }
+    &--lg-cols-12 { grid-template-columns: repeat(12, 1fr); }
+  }
+
+  // ── Gap ────────────────────────────────────────────────────────────────────
+
+  &--gap-none { gap: 0; }
+  &--gap-xs   { gap: $spacing-xs; }
+  &--gap-sm   { gap: $spacing-sm; }
+  &--gap-md   { gap: $spacing-md; }
+  &--gap-lg   { gap: $spacing-lg; }
+  &--gap-xl   { gap: $spacing-xl; }
+
+  // ── Alignement ─────────────────────────────────────────────────────────────
+
+  &--align-stretch { align-items: stretch; }
+  &--align-start   { align-items: start; }
+  &--align-center  { align-items: center; }
+  &--align-end     { align-items: end; }
+}

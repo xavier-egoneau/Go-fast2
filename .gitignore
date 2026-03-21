@@ -4,11 +4,7 @@ node_modules/
 # Build output
 public/
 
-# enlever cette ligne sur un vrai projet
-dev/
-
-# Generated data (auto-généré par generate-showcase.js)
-dev/data/showcase.json
+# dev/ est géré par dev/.gitignore (contenu ignoré, dossier tracké)
 
 # Logs
 npm-debug.log*
@@ -32,10 +28,14 @@ Thumbs.db
 
 
 # ia files
-task.md
+tasks.md
 SPEC_V2.md
 .claude/settings.local.json
 .claude/worktrees/
+
+# Orbit MCP — artefacts de build
+orbit/dist/
+orbit/node_modules/
 
 # Environment variables (locales, jamais versionnées)
 .env

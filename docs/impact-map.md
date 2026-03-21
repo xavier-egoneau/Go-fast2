@@ -127,3 +127,10 @@ npm run setup-agentic -- --tool codex     # si .codex/ est actif
 
 **Impacts directs :**
 - `gofast-from-figma.md` → le référence à l'étape de mapping des tokens
+
+---
+
+## `docs/impact-map.md` (ce fichier)
+
+**Impacts directs :**
+- `CLAUDE.md` → si le nom ou l'emplacement du fichier change

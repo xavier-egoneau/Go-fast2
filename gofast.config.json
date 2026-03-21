@@ -1,6 +1,6 @@
 {
-  "projectName": "test",
-  "tailwind": true,
+  "projectName": "",
+  "tailwind": false,
   "scss": true,
   "styleEntry": "/dev/assets/scss/style.scss"
 }

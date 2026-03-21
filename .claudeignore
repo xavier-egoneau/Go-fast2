@@ -45,3 +45,7 @@ coverage/
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
+
+# Orbit MCP — artefacts de build et dépendances
+orbit/dist/
+orbit/node_modules/

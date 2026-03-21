@@ -1,34 +1,28 @@
-# Tasks — Refactor agentic setup
+# Tasks — Corrections post-critique
 
 ## Contexte
 
-Simplification de la gestion des fichiers IA :
-- `.claude/` devient la source de vérité unique (suppression de `.ai/`)
-- `setup-agentic.js` ne fait que créer (jamais supprimer) et génère copilot ou codex depuis `.claude/`
-- Les commandes spec retirées de `.claude/commands/` (déjà fait)
+Suite à la critique du projet, 6 points à corriger.
 
 ---
 
 ## Tâches
 
-- [ ] Supprimer le dossier `.ai/` (devenu redondant)
-- [ ] Réécrire `scripts/setup-agentic.js`
-  - Source : `.claude/commands/` + `CLAUDE.md`
-  - Cibles au choix : `--tool copilot` et/ou `--tool codex`
-  - Copilot → `.github/prompts/*.prompt.md` + `.github/copilot-instructions.md`
-  - Codex → `.codex/prompts/*.prompt.md` + `AGENTS.md`
-  - Ne supprime rien — création uniquement
-- [ ] Mettre à jour `.claude/commands/add-tool.md`
-  - Retirer toutes les références à `.ai/`
-  - Source de vérité = `.claude/commands/`
-  - Adapter la checklist à la nouvelle archi
-- [ ] Réécrire `.claude/README.md`
-  - Retirer les refs `.ai/` et le workflow spec
-  - Documenter la nouvelle archi (`.claude/` → source, script → génère copilot/codex)
-- [ ] Mettre à jour `.github/README.md` (idem)
-- [ ] Mettre à jour `.github/copilot-instructions.md`
-  - Retirer `/dev`, `/plan` de la liste des commandes (trop générique)
-  - Ne garder que les commandes gofast
-- [ ] Réécrire `.codex/README.md`
-  - Retirer les refs spec et `.ai/`
-  - Documenter la nouvelle archi
+- [ ] **Refactorer la gestion de `dev/` dans `.gitignore`**
+  - Supprimer `dev/` du `.gitignore` racine
+  - Créer `dev/.gitignore` avec `*` + `!.gitignore` (ignore le contenu, garde le dossier tracké)
+
+- [ ] **Corriger la typo `task.md` → `tasks.md` dans `.gitignore`**
+
+- [ ] **Réinitialiser `gofast.config.json`**
+  - Retirer le nom "test", remettre à l'état template vierge
+
+- [ ] **Ajouter `orbit/dist/` et `orbit/node_modules/` dans `.gitignore` et `.claudeignore`**
+
+- [ ] **Ajouter une entrée auto-référente dans `docs/impact-map.md`**
+  - "Si tu modifies impact-map.md → mettre à jour CLAUDE.md si le lien change"
+
+- [ ] **Clarifier `add-tool.md` vs `setup-agentic`**
+  - `/add-tool` écrit uniquement dans `.claude/commands/`
+  - La sync vers `.github/` et `.codex/` se fait via `npm run setup-agentic`
+  - Retirer la logique de création multi-cibles de `add-tool.md`

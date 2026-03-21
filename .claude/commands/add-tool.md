@@ -27,50 +27,36 @@ Si l'utilisateur n'a pas tout donné, demande seulement ce qui manque :
 
 Si le besoin est assez clair, ne pose pas de questions inutiles.
 
-## Étape 3 — Choisis le mapping de noms
+## Étape 3 — Crée la commande Claude
 
-Normalise le nom fourni par l'utilisateur et crée les fichiers correspondants :
+`.claude/commands/` est la source de vérité unique. Tu ne crées **que** le fichier Claude :
 
-- Claude Code (toujours) :
-  - `.claude/commands/[nom].md`
-- GitHub Copilot (si `.github/prompts/` existe) :
-  - `.github/prompts/[nom].prompt.md`
-- Codex (si `.codex/prompts/` existe) :
-  - `.codex/prompts/[nom].prompt.md`
+- `.claude/commands/[nom].md`
 
-Utilise le même nom logique partout.
+Les variantes Copilot et Codex sont générées automatiquement depuis cette source via `npm run setup-agentic`. Tu ne les écris pas à la main.
 
-## Étape 4 — Génère les versions
+## Étape 4 — Règles de rédaction
 
-La logique doit être identique dans toutes les variantes, avec seulement les adaptations nécessaires au client :
+- pas de frontmatter
+- références à `CLAUDE.md` pour la constitution
+- étapes numérotées, checklist de vérification en fin de commande
+- règle d'exécution explicite en dernière section
 
-- Claude (source de vérité) :
-  - pas de frontmatter
-  - références à `CLAUDE.md`
-- Copilot :
-  - ajouter le frontmatter attendu (`agent`, `description`)
-  - références à `.github/copilot-instructions.md`
-- Codex :
-  - format prompt simple
-  - remplacer `CLAUDE.md` par `AGENTS.md`
-
-## Étape 5 — Règles de synchronisation
-
-- le fond doit rester le même dans toutes les variantes
-- les différences ne doivent venir que du client cible
-- évite les divergences de workflow
-
-## Étape 6 — Vérifie avant de livrer
+## Étape 5 — Vérifie avant de livrer
 
 - [ ] `.claude/commands/[nom].md` existe
-- [ ] les variantes existent pour chaque outil actif dans le repo
-- [ ] le nom est cohérent partout
-- [ ] le comportement de base est le même partout
-- [ ] les références de fichiers sont adaptées à chaque outil
+- [ ] le nom est en kebab-case
+- [ ] le comportement attendu est décrit clairement
+- [ ] une checklist de vérification est présente
 
 ## Règle d'exécution
 
 Ne te contente pas de proposer un contenu.
-Crée ou mets à jour réellement les fichiers dans le repo.
+Crée ou mets à jour réellement le fichier dans `.claude/commands/`.
 
-> Pour synchroniser Copilot et Codex à partir de `.claude/`, utilise `npm run setup-agentic`.
+Ensuite, informe l'utilisateur :
+> Commande créée dans `.claude/commands/`. Pour la déployer vers Copilot ou Codex :
+> ```bash
+> npm run setup-agentic -- --tool copilot
+> npm run setup-agentic -- --tool codex
+> ```

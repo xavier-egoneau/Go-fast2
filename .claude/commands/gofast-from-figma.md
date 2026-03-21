@@ -7,7 +7,11 @@
 
 ---
 
-## Étape 1 — Reçois le lien Figma
+## Étape 1 — Lis GUIDELINES_AI.md
+
+Lis le fichier `GUIDELINES_AI.md` à la racine du projet. Il contient toutes les conventions, règles et exemples. Tu dois les respecter intégralement lors de la génération.
+
+## Étape 2 — Reçois le lien Figma
 
 L'utilisateur fournit un lien vers une frame Figma annotée "Ready for dev".
 
@@ -15,7 +19,7 @@ Format attendu : `https://www.figma.com/file/[fileId]/...?node-id=[nodeId]`
 
 Si le lien est absent, demande-le avant de continuer.
 
-## Étape 2 — Lis la frame via Figma MCP
+## Étape 3 — Lis la frame via Figma MCP
 
 Utilise l'outil Figma MCP pour lire le contenu de la frame :
 
@@ -27,7 +31,7 @@ Utilise l'outil Figma MCP pour lire le contenu de la frame :
    - Les **styles appliqués** (couleurs, typographie, espacements) → mapper vers les tokens Go-fast
    - La **structure des éléments enfants** → inférer la composition et les props
 
-## Étape 3 — Déterminer les métadonnées du composant
+## Étape 4 — Déterminer les métadonnées du composant
 
 À partir des données Figma, déduire :
 
@@ -41,7 +45,7 @@ Utilise l'outil Figma MCP pour lire le contenu de la frame :
 
 Si des informations sont manquantes ou ambiguës, demande confirmation avant de générer.
 
-## Étape 4 — Mapper les tokens Figma → variables SCSS
+## Étape 5 — Mapper les tokens Figma → variables SCSS
 
 Pour chaque style rencontré dans la frame :
 
@@ -54,7 +58,7 @@ Exemples :
 - Padding `16px` / `1rem` → `$spacing-md`
 - Border-radius `6px` / `0.375rem` → `$radius-md`
 
-## Étape 5 — Lire la config CSS du projet
+## Étape 6 — Lire la config CSS du projet
 
 Lire `gofast.config.json` pour déterminer la stratégie CSS :
 
@@ -64,7 +68,7 @@ Lire `gofast.config.json` pour déterminer la stratégie CSS :
 | `false` | `true` | Classes Tailwind uniquement |
 | `true` | `true` | SCSS BEM + classes Tailwind |
 
-## Étape 6 — Générer les 4 fichiers
+## Étape 7 — Générer les 4 fichiers
 
 ### `dev/components/[slug]/[slug].json`
 
@@ -128,7 +132,7 @@ Structure obligatoire :
 \`\`\`
 ```
 
-## Étape 7 — Ajouter l'import SCSS *(si scss: true)*
+## Étape 8 — Ajouter l'import SCSS *(si scss: true)*
 
 Ouvrir `dev/assets/scss/style.scss` et ajouter à la fin des imports composants :
 
@@ -136,7 +140,7 @@ Ouvrir `dev/assets/scss/style.scss` et ajouter à la fin des imports composants 
 @use 'components/[slug]';
 ```
 
-## Étape 8 — Vérification finale
+## Étape 9 — Vérification finale
 
 Avant de livrer, vérifier mentalement :
 
@@ -148,7 +152,7 @@ Avant de livrer, vérifier mentalement :
 - [ ] L'import SCSS est ajouté dans `style.scss`
 - [ ] Le fichier `.md` contient Usage, Props, Accessibilité, Exemples
 
-## Étape 9 — Rapport de génération
+## Étape 10 — Rapport de génération
 
 Afficher un résumé :
 

@@ -1,33 +1,24 @@
-# Workflow spec -> plan -> dev pour Codex
+# Go-fast v2 — Codex
 
-Version Codex du workflow deja present pour Claude Code et GitHub Copilot.
+Les prompts sont dans `.codex/prompts/`.
 
-L'objectif est de garder la meme structuration IA dans le repo :
-- un lot de prompts reutilisables
-- un fichier de constitution dedie a Codex
-- le meme vocabulaire de commandes : `/spec`, `/plan`, `/dev`, `/resume`, `/add`, `/new`
+> Ces fichiers sont **générés** depuis `.claude/` via `npm run setup-agentic -- --tool codex`.
+> Ne les modifie pas directement — édite la source dans `.claude/commands/`.
+
+---
 
 ## Principe
 
-Codex ne consomme pas forcement des slash-commands locales comme Claude ou Copilot selon le client utilise.
-Du coup, cette version est pensee comme une bibliotheque de prompts projet :
+Codex ne consomme pas de slash-commands locales comme Claude ou Copilot.
+Cette version est une bibliothèque de prompts projet :
 
-1. ouvrir le prompt voulu dans `.codex/prompts/`
-2. le coller dans la session Codex
-3. laisser Codex executer le workflow
+1. ouvre le prompt voulu dans `.codex/prompts/`
+2. colle-le dans la session Codex
+3. laisse Codex exécuter le workflow
 
 ## Fichier de constitution
 
-La version Codex utilise `CODEX.md` a la racine du projet comme fichier de constitution genere par `/spec`.
-
-Pourquoi pas `AGENTS.md` ?
-- `AGENTS.md` contient deja les instructions stables du projet
-- l'ecraser automatiquement serait trop risqué
-- `CODEX.md` joue donc le role de constitution evolutive du projet, comme `CLAUDE.md` pour Claude
-
-Les prompts Codex ci-dessous demandent systematiquement de lire :
-- `AGENTS.md` pour les regles permanentes du repo
-- `CODEX.md` pour la constitution generee par le workflow
+La version Codex utilise `AGENTS.md` à la racine du projet (généré par `setup-agentic`).
 
 ## Prompts disponibles
 
@@ -36,35 +27,23 @@ Les prompts Codex ci-dessous demandent systematiquement de lire :
 ├── README.md
 └── prompts/
     ├── gofast-new.prompt.md
-    ├── spec-init.prompt.md
-    ├── spec-plan.prompt.md
-    ├── spec-dev.prompt.md
-    ├── spec-resume.prompt.md
-    └── spec-add.prompt.md
+    ├── gofast-edit.prompt.md
+    ├── gofast-delete.prompt.md
+    ├── gofast-rename.prompt.md
+    ├── gofast-move.prompt.md
+    ├── gofast-list.prompt.md
+    ├── gofast-audit.prompt.md
+    ├── gofast-from-figma.prompt.md
+    └── add-tool.prompt.md
 ```
 
-## Workflow recommande
-
-- Nouveau projet : `/spec` -> `/plan` -> `/dev`
-- Nouvelle session : `/resume`
-- Nouvelle feature en cours de projet : `/add` -> `/plan` -> `/dev`
-- Nouveau composant Go-fast : `/new`
-- Nouvelle commande IA multi-clients : `/add-tool`
-
-## Fichiers generes par le workflow
+## Structure complète
 
 ```
 projet/
-├── AGENTS.md
-├── CODEX.md
-├── spec.md
-├── context.md
-├── tasks.md
-└── .codex/
-    └── prompts/
+├── .claude/          ← source de vérité (éditer ici)
+├── .codex/           ← généré par setup-agentic
+├── AGENTS.md         ← constitution Codex (générée par setup-agentic)
+└── scripts/
+    └── setup-agentic.js
 ```
-
-## Note d'usage
-
-Si tu veux un usage encore plus natif pour Codex, l'etape suivante serait de transformer ces prompts en skills specialises ou en wrappers d'outillage selon ton environnement.
-La base ci-dessous te donne deja le meme coeur methodologique que `.claude/commands/` et `.github/prompts/`.

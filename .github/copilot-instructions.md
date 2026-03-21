@@ -12,7 +12,6 @@ Ce fichier est chargé automatiquement par GitHub Copilot dans tous les chats du
 - Stack : Vite + Vituum + Twig + SCSS + axe-core
 - `app/` → framework showcase (ne pas modifier)
 - `dev/` → projet utilisateur (travailler ici)
-- Lis `tasks.md` s'il existe et coche les tâches complétées
 
 ## Règles non-négociables
 
@@ -28,6 +27,12 @@ Ce fichier est chargé automatiquement par GitHub Copilot dans tous les chats du
 
 | Commande | Rôle |
 |----------|------|
-| `/new` | Créer un composant (atom / molecule / organism / template / page) |
-| `/dev` | Implémenter les tâches |
-| `/plan` | Planifier les tâches |
+| `/new` | Créer un composant (atom / molecule / organism / template) |
+| `/edit` | Modifier un composant existant |
+| `/delete` | Supprimer un composant |
+| `/rename` | Renommer un composant |
+| `/move` | Changer le niveau atomique d'un composant |
+| `/list` | Lister les composants |
+| `/audit` | Auditer la conformité des composants |
+| `/from-figma` | Générer un composant depuis Figma |
+| `/add-tool` | Créer un outil IA pour Claude, Copilot et/ou Codex |

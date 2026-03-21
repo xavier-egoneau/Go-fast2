@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import readline from 'readline'
+import { spawnSync } from 'child_process'
 import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -123,6 +124,14 @@ async function init() {
   }
 
   console.log(`\n✅ Projet "${projectName}" prêt. Lancez npm run dev pour commencer.\n`)
+
+  // 10. Configurer les outils agentiques
+  // Transférer les args --tool passés à init-project.js (ex: npm run init -- --tool claude)
+  const agenticArgs = process.argv.slice(2)
+  const setupScript = path.join(ROOT, 'scripts', 'setup-agentic.js')
+  if (fs.existsSync(setupScript)) {
+    spawnSync(process.execPath, [setupScript, ...agenticArgs], { stdio: 'inherit' })
+  }
 }
 
 init().catch(err => {

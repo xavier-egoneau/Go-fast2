@@ -126,7 +126,7 @@ function parseArgs() {
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--tool' && args[i + 1]) {
       const t = args[i + 1].toLowerCase()
-      if (!TOOL_CONFIGS[t]) {
+      if (!getToolConfig(t, ROOT)) {
         console.error(`❌ Outil inconnu : "${t}". Valeurs acceptées : copilot, codex`)
         process.exit(1)
       }
@@ -141,24 +141,31 @@ async function promptTools() {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
   const ask = (q) => new Promise(resolve => rl.question(q, resolve))
 
-  console.log('\nOutils cibles :')
-  console.log('  1. GitHub Copilot')
-  console.log('  2. Codex')
-  console.log('\nIndique les numéros séparés par des virgules (ex: 1,2) :')
+  console.log('\nQuel(s) outil(s) IA utilises-tu ?')
+  console.log('  1. Claude (Claude Code)')
+  console.log('  2. GitHub Copilot')
+  console.log('  3. Codex')
+  console.log('\nIndique les numéros séparés par des virgules (ex: 1,2,3) :')
 
   const answer = (await ask('Choix : ')).trim()
   rl.close()
 
-  const map = { '1': 'copilot', '2': 'codex' }
+  if (answer === '') {
+    console.error('❌ Choix invalide.')
+    process.exit(1)
+  }
+
+  const map = { '2': 'copilot', '3': 'codex' }
   const tools = []
   for (const part of answer.split(',')) {
     const key = part.trim()
     if (map[key] && !tools.includes(map[key])) tools.push(map[key])
   }
 
+  // Claude seul (choix 1 uniquement)
   if (tools.length === 0) {
-    console.error('❌ Aucun outil sélectionné.')
-    process.exit(1)
+    console.log('\n✅ Claude est déjà prêt via .claude/ — rien à générer.\n')
+    process.exit(0)
   }
 
   return tools

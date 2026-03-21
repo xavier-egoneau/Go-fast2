@@ -1,5 +1,5 @@
 {
-  "projectName": "",
+  "projectName": "test",
   "tailwind": false,
   "scss": true,
   "styleEntry": "/dev/assets/scss/style.scss"

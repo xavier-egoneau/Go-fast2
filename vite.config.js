@@ -32,8 +32,34 @@ function renderTwig(twigPath, data = {}) {
 
 // Plugin principal : routage .html → .twig + génération showcase.json
 function goFastPlugin() {
+  let isBuild = false
+
   return {
     name: 'gofast',
+
+    // ─── Build : génère index.html depuis index.twig pour Rollup ───────────
+    config(cfg, { command }) {
+      if (command !== 'build') return
+      isBuild = true
+
+      const indexTwig = path.join(ROOT, 'app/templates/index.twig')
+      const indexHtml = path.join(ROOT, 'index.html')
+
+      if (fs.existsSync(indexTwig)) {
+        fs.writeFileSync(indexHtml, fs.readFileSync(indexTwig, 'utf8'), 'utf8')
+      }
+
+      cfg.build = cfg.build || {}
+      cfg.build.rollupOptions = cfg.build.rollupOptions || {}
+      cfg.build.rollupOptions.input = indexHtml
+    },
+
+    // ─── Build : nettoie index.html temporaire après la build ──────────────
+    closeBundle() {
+      if (!isBuild) return
+      const indexHtml = path.join(ROOT, 'index.html')
+      if (fs.existsSync(indexHtml)) fs.unlinkSync(indexHtml)
+    },
 
     // ─── Dev : middleware pre-Vite ──────────────────────────────────────────
     configureServer(server) {

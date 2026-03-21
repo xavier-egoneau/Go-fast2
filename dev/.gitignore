@@ -1,4 +1,0 @@
-# Ignore tout le contenu de dev/ — ce dossier est généré par npm run init
-# Ne pas modifier ce fichier
-*
-!.gitignore

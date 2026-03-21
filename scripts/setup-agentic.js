@@ -20,8 +20,6 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
-const COMMANDS_SRC = path.join(ROOT, '.claude', 'commands')
-const INSTRUCTIONS_SRC = path.join(ROOT, 'CLAUDE.md')
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -71,52 +69,51 @@ function transformForCodex(content) {
 // Tool configs
 // ---------------------------------------------------------------------------
 
-const TOOL_CONFIGS = {
-  copilot: {
-    label: 'GitHub Copilot',
-    instructionsDest: path.join(ROOT, '.github', 'copilot-instructions.md'),
-    commandsDest: path.join(ROOT, '.github', 'prompts'),
-    commandFileName: (name) => `${name}.prompt.md`,
-    transform: transformForCopilot,
-  },
-  codex: {
-    label: 'Codex',
-    instructionsDest: path.join(ROOT, 'AGENTS.md'),
-    commandsDest: path.join(ROOT, '.codex', 'prompts'),
-    commandFileName: (name) => `${name}.prompt.md`,
-    transform: transformForCodex,
-  },
+function getToolConfig(toolId, rootDir) {
+  const configs = {
+    copilot: {
+      label: 'GitHub Copilot',
+      instructionsDest: path.join(rootDir, '.github', 'copilot-instructions.md'),
+      commandsDest: path.join(rootDir, '.github', 'prompts'),
+      commandFileName: (name) => `${name}.prompt.md`,
+      transform: transformForCopilot,
+    },
+    codex: {
+      label: 'Codex',
+      instructionsDest: path.join(rootDir, 'AGENTS.md'),
+      commandsDest: path.join(rootDir, '.codex', 'prompts'),
+      commandFileName: (name) => `${name}.prompt.md`,
+      transform: transformForCodex,
+    },
+  }
+  return configs[toolId] ?? null
 }
 
 // ---------------------------------------------------------------------------
 // Deploy
 // ---------------------------------------------------------------------------
 
-function deployTool(toolId) {
-  const config = TOOL_CONFIGS[toolId]
-  console.log(`\n→ ${config.label}`)
+export function deployTool(toolId, rootDir = ROOT) {
+  const config = getToolConfig(toolId, rootDir)
+  if (!config) throw new Error(`Outil inconnu : "${toolId}"`)
 
-  // Instructions
-  const instructions = readFile(INSTRUCTIONS_SRC)
-  writeFile(config.instructionsDest, instructions)
+  const instructionsSrc = path.join(rootDir, 'CLAUDE.md')
+  const commandsSrc = path.join(rootDir, '.claude', 'commands')
 
-  // Commands
-  if (!fs.existsSync(COMMANDS_SRC)) {
-    console.error(`  ❌ dossier manquant : .claude/commands/`)
-    process.exit(1)
-  }
+  if (!fs.existsSync(instructionsSrc)) throw new Error(`Fichier manquant : CLAUDE.md`)
+  if (!fs.existsSync(commandsSrc)) throw new Error(`Dossier manquant : .claude/commands/`)
+
+  writeFile(config.instructionsDest, readFile(instructionsSrc))
 
   ensureDir(config.commandsDest)
-  const files = fs.readdirSync(COMMANDS_SRC).filter(f => f.endsWith('.md'))
-
+  const files = fs.readdirSync(commandsSrc).filter(f => f.endsWith('.md'))
   for (const file of files) {
     const name = file.replace(/\.md$/, '')
-    const src = readFile(path.join(COMMANDS_SRC, file))
-    const dest = config.transform(src)
-    writeFile(path.join(config.commandsDest, config.commandFileName(name)), dest)
+    const src = readFile(path.join(commandsSrc, file))
+    writeFile(path.join(config.commandsDest, config.commandFileName(name)), config.transform(src))
   }
 
-  console.log(`  → ${files.length} commandes déployées`)
+  return { tool: toolId, commandsDeployed: files.length }
 }
 
 // ---------------------------------------------------------------------------
@@ -180,7 +177,7 @@ async function main() {
     selectedTools = await promptTools()
   }
 
-  console.log(`\nOutils sélectionnés : ${selectedTools.map(t => TOOL_CONFIGS[t].label).join(', ')}`)
+  console.log(`\nOutils sélectionnés : ${selectedTools.map(t => getToolConfig(t, ROOT)?.label ?? t).join(', ')}`)
   console.log('\n── Déploiement ──────────────────────────────────────')
 
   for (const tool of selectedTools) {

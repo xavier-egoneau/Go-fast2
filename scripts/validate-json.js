@@ -38,8 +38,8 @@ export function validateComponentJson(jsonPath) {
   return errors
 }
 
-export function validateAllComponents() {
-  const componentsDir = path.join(ROOT, 'dev/components')
+export function validateAllComponents(rootDir = ROOT) {
+  const componentsDir = path.join(rootDir, 'dev/components')
   if (!fs.existsSync(componentsDir)) return []
 
   const allErrors = []

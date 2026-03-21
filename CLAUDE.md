@@ -64,4 +64,17 @@ Le build est déjà effectué — `orbit/dist/` existe.
 
 ## Commande de tests
 
-*(pas de suite de tests automatisés — vérification manuelle via le showcase)*
+```bash
+npm test              # suite complète (Vitest)
+npm run test:watch    # mode watch
+npm run test:a11y     # axe-core sur les composants
+npm run lint:scss     # Stylelint sur le SCSS
+```
+
+Les tests couvrent :
+- Conformité JSON des composants (`validate-json`)
+- Génération du showcase (`generate-showcase`)
+- Déploiement multi-outils (`setup-agentic`)
+- Scaffolding d'un nouveau projet (`init-project`)
+- Conformité Twig : `|default()` sur toutes les variables
+- Conformité SCSS : zéro valeur hardcodée dans les composants

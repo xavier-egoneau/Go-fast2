@@ -28,13 +28,85 @@ function copyDir(src, dest) {
   }
 }
 
+export function scaffoldProject(config, rootDir = ROOT) {
+  const { projectName, scss: useScss, tailwind: useTailwind } = config
+  const packageName = projectName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+
+  // 1. Scaffolding de dev/
+  rimraf(path.join(rootDir, 'dev'))
+
+  const dirs = [
+    'dev/components',
+    'dev/pages',
+    'dev/data',
+    'dev/assets/scss/components',
+    'dev/assets/icons/unitaires',
+  ]
+  dirs.forEach(d => ensureDir(path.join(rootDir, d)))
+
+  // 2. Copier les fichiers SCSS base depuis templates/ (si SCSS)
+  if (useScss) {
+    copyDir(
+      path.join(rootDir, 'templates/scss/base'),
+      path.join(rootDir, 'dev/assets/scss/base')
+    )
+  }
+
+  // 3. Générer le fichier de styles selon la stratégie
+  const styleFile = useTailwind && !useScss ? 'style.css' : 'style.scss'
+  const styleDir = useTailwind && !useScss ? 'dev/assets' : 'dev/assets/scss'
+
+  ensureDir(path.join(rootDir, styleDir))
+
+  let styleContent = useTailwind && !useScss
+    ? `/* =============================================================================\n   style.css — ${projectName}\n   ============================================================================= */\n\n@import "tailwindcss";\n`
+    : `// =============================================================================\n// style.scss — ${projectName}\n// =============================================================================\n\n`
+
+  if (useScss) {
+    styleContent += `// Base\n@use 'base/variables';\n@use 'base/reset';\n@use 'base/typography';\n@use 'base/mixins';\n\n`
+    if (useTailwind) styleContent += `/* Tailwind */\n@import "tailwindcss";\n\n`
+    styleContent += `// Components\n// @use 'components/mon-composant';\n`
+  }
+
+  fs.writeFileSync(path.join(rootDir, styleDir, styleFile), styleContent, 'utf8')
+
+  // 4. showcase.json vide
+  fs.writeFileSync(
+    path.join(rootDir, 'dev/data/showcase.json'),
+    JSON.stringify({ components: [], pages: [] }, null, 2),
+    'utf8'
+  )
+
+  // 5. Mettre à jour gofast.config.json
+  const styleEntry = useTailwind && !useScss ? '/dev/assets/style.css' : '/dev/assets/scss/style.scss'
+  fs.writeFileSync(
+    path.join(rootDir, 'gofast.config.json'),
+    JSON.stringify({ projectName, tailwind: useTailwind, scss: useScss, styleEntry }, null, 2) + '\n',
+    'utf8'
+  )
+
+  // 6. Mettre à jour package.json
+  const pkgPath = path.join(rootDir, 'package.json')
+  if (fs.existsSync(pkgPath)) {
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
+    pkg.name = packageName
+    pkg.description = projectName
+    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8')
+  }
+
+  // 7. Supprimer dev/.gitignore (présent dans le repo source uniquement)
+  const devGitignore = path.join(rootDir, 'dev', '.gitignore')
+  if (fs.existsSync(devGitignore)) fs.unlinkSync(devGitignore)
+
+  return { projectName, packageName, useScss, useTailwind, styleFile, styleEntry }
+}
+
 async function init() {
   console.log('\n🚀 Go-fast v2 — Initialisation du projet\n')
 
   // 1. Nom du projet
   const rawName = (await ask('Nom du projet : ')).trim()
   const projectName = rawName || 'mon-projet'
-  const packageName = projectName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
 
   // 2. Stratégie CSS
   console.log('\nStratégie CSS :')
@@ -47,86 +119,20 @@ async function init() {
   const useScss = cssChoice !== '2'
   const useTailwind = cssChoice === '2' || cssChoice === '3'
 
-  // 3. Scaffolding de dev/
   console.log('\n📁 Scaffolding dev/...')
-  rimraf(path.join(ROOT, 'dev'))
-
-  const dirs = [
-    'dev/components',
-    'dev/pages',
-    'dev/data',
-    'dev/assets/scss/components',
-    'dev/assets/icons/unitaires',
-  ]
-  dirs.forEach(d => ensureDir(path.join(ROOT, d)))
-
-  // 4. Copier les fichiers SCSS base depuis templates/ (si SCSS)
-  if (useScss) {
-    copyDir(
-      path.join(ROOT, 'templates/scss/base'),
-      path.join(ROOT, 'dev/assets/scss/base')
-    )
-    console.log('✓ SCSS base copié depuis templates/')
-  }
-
-  // 5. Générer le fichier de styles selon la stratégie
-  // Tailwind only → style.css (Sass ne peut pas résoudre @import "tailwindcss")
-  // SCSS ou hybride → style.scss
-  const styleFile = useTailwind && !useScss ? 'style.css' : 'style.scss'
-  const styleDir = useTailwind && !useScss
-    ? 'dev/assets'
-    : 'dev/assets/scss'
-
-  ensureDir(path.join(ROOT, styleDir))
-
-  let styleContent = useTailwind && !useScss
-    ? `/* =============================================================================\n   style.css — ${projectName}\n   ============================================================================= */\n\n@import "tailwindcss";\n`
-    : `// =============================================================================\n// style.scss — ${projectName}\n// =============================================================================\n\n`
-
-  if (useScss) {
-    styleContent += `// Base\n@use 'base/variables';\n@use 'base/reset';\n@use 'base/typography';\n@use 'base/mixins';\n\n`
-    if (useTailwind) styleContent += `/* Tailwind */\n@import "tailwindcss";\n\n`
-    styleContent += `// Components\n// @use 'components/mon-composant';\n`
-  }
-
-  fs.writeFileSync(path.join(ROOT, styleDir, styleFile), styleContent, 'utf8')
-  console.log(`✓ ${styleFile} configuré`)
-
-  // 6. showcase.json vide
-  fs.writeFileSync(
-    path.join(ROOT, 'dev/data/showcase.json'),
-    JSON.stringify({ components: [], pages: [] }, null, 2),
-    'utf8'
-  )
+  const result = scaffoldProject({ projectName, scss: useScss, tailwind: useTailwind })
+  console.log(`✓ SCSS base copié depuis templates/`)
+  console.log(`✓ ${result.styleFile} configuré`)
   console.log('✓ dev/data/showcase.json initialisé')
-
-  // 7. Mettre à jour gofast.config.json
-  const styleEntry = useTailwind && !useScss
-    ? '/dev/assets/style.css'
-    : '/dev/assets/scss/style.scss'
-  const config = { projectName, tailwind: useTailwind, scss: useScss, styleEntry }
-  fs.writeFileSync(path.join(ROOT, 'gofast.config.json'), JSON.stringify(config, null, 2) + '\n', 'utf8')
   console.log('✓ gofast.config.json mis à jour')
-
-  // 8. Mettre à jour package.json
-  const pkgPath = path.join(ROOT, 'package.json')
-  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
-  pkg.name = packageName
-  pkg.description = projectName
-  fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8')
   console.log('✓ package.json mis à jour')
-
-  // 9. Supprimer dev/.gitignore (présent dans le repo source uniquement)
-  const devGitignore = path.join(ROOT, 'dev', '.gitignore')
-  if (fs.existsSync(devGitignore)) {
-    fs.unlinkSync(devGitignore)
+  if (!fs.existsSync(path.join(ROOT, 'dev', '.gitignore'))) {
     console.log('✓ dev/.gitignore supprimé')
   }
 
   console.log(`\n✅ Projet "${projectName}" prêt. Lancez npm run dev pour commencer.\n`)
 
-  // 10. Configurer les outils agentiques
-  // Transférer les args --tool passés à init-project.js (ex: npm run init -- --tool claude)
+  // Configurer les outils agentiques
   const agenticArgs = process.argv.slice(2)
   const setupScript = path.join(ROOT, 'scripts', 'setup-agentic.js')
   if (fs.existsSync(setupScript)) {

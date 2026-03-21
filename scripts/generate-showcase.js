@@ -5,10 +5,10 @@ import { fileURLToPath } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
 
-export async function generateShowcase() {
-  const componentsDir = path.join(ROOT, 'dev', 'components')
-  const pagesDir = path.join(ROOT, 'dev', 'pages')
-  const dataDir = path.join(ROOT, 'dev', 'data')
+export async function generateShowcase(rootDir = ROOT) {
+  const componentsDir = path.join(rootDir, 'dev', 'components')
+  const pagesDir = path.join(rootDir, 'dev', 'pages')
+  const dataDir = path.join(rootDir, 'dev', 'data')
   const outputFile = path.join(dataDir, 'showcase.json')
 
   // Crée dev/data/ si absent

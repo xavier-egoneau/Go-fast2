@@ -50,15 +50,31 @@ npm run reset      # Remettre dev/ à zéro sans reconfigurer
 
 ## Commandes IA
 
-```
-/new     → Créer un composant (atom / molecule / organism / template / page)
-/edit    → Modifier un composant existant
-/delete  → Supprimer un composant
-/plan    → Planifier les tâches du projet
-/dev     → Implémenter les tâches planifiées
+Les commandes sont disponibles dans Claude Code via `/nom`. Elles lisent `gofast.config.json` et adaptent le scaffold à la stratégie CSS choisie.
+
+| Commande | Rôle |
+|---|---|
+| `/new` | Créer un composant (atom / molecule / organism / template / page) |
+| `/edit` | Modifier un composant existant |
+| `/delete` | Supprimer un composant |
+| `/rename` | Renommer un composant |
+| `/move` | Changer le niveau atomique d'un composant |
+| `/list` | Lister les composants |
+| `/audit` | Auditer la conformité des composants |
+| `/from-figma` | Générer un composant depuis une frame Figma |
+| `/add-tool` | Créer un outil IA pour Claude, Copilot et/ou Codex |
+
+### Support multi-IA
+
+`.claude/` est la source de vérité des commandes. Pour les déployer vers d'autres outils :
+
+```bash
+npm run setup-agentic -- --tool copilot   # génère .github/prompts/ + copilot-instructions.md
+npm run setup-agentic -- --tool codex     # génère .codex/prompts/ + AGENTS.md
+npm run setup-agentic -- --tool copilot --tool codex  # les deux
 ```
 
-> Les commandes lisent `gofast.config.json` et adaptent le scaffold à la stratégie CSS choisie.
+Le script ne supprime rien — il crée ou met à jour uniquement les fichiers cibles.
 
 ---
 

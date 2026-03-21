@@ -5,9 +5,10 @@
 Go-fast v2 — starter kit d'intégration HTML Atomic Design.
 Stack : Vite + Vituum + Twig + SCSS + axe-core. Pas de framework frontend.
 
-## Document de référence
+## Documents de référence
 
-**Lis `GUIDELINES_AI.md`** avant toute création ou modification de composant. C'est la source de vérité complète.
+- **`GUIDELINES_AI.md`** — conventions complètes, à lire avant toute création ou modification de composant
+- **`docs/impact-map.md`** — carte d'impact : si tu modifies un fichier, consulte ce document pour savoir ce qu'il faut mettre à jour en cascade
 
 ## Constitution
 

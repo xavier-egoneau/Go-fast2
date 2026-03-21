@@ -2,8 +2,8 @@
 
 Starter kit d'intégration HTML — Atomic Design + Showcase interactif + Multi-AI
 
-![alt text](image.png)
-![alt text](image-1.png)
+![alt text](docs/img/image.png)
+![alt text](docs/img/image-1.png)
 
 ---
 
@@ -117,8 +117,10 @@ go-fast/
 │   └── dist/                 # Build requis avant usage
 │
 ├── docs/                     # Documentation complémentaire
+│   ├── img/                  # Images utilisées dans la doc
 │   ├── figma-integration.md
-│   └── figma-tokens-convention.md
+│   ├── figma-tokens-convention.md
+│   └── impact-map.md
 │
 ├── scripts/                  # Scripts Node du framework
 ├── templates/scss/base/      # Templates SCSS base (copiés par init)

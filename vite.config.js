@@ -65,7 +65,10 @@ function goFastPlugin() {
 
       cfg.build = cfg.build || {}
       cfg.build.rollupOptions = cfg.build.rollupOptions || {}
-      cfg.build.rollupOptions.input = indexHtml
+      cfg.build.rollupOptions.input = {
+        main: indexHtml,
+        design: path.join(ROOT, 'design/index.html')
+      }
     },
 
     // ─── Build : nettoie index.html temporaire après la build ──────────────
@@ -77,6 +80,75 @@ function goFastPlugin() {
 
     // ─── Dev : middleware pre-Vite ──────────────────────────────────────────
     configureServer(server) {
+      server.middlewares.use('/__design_api/scenes/save', async (req, res, next) => {
+        if (req.method !== 'POST') return next()
+        let body = ''
+        req.on('data', chunk => { body += chunk })
+        req.on('end', () => {
+          try {
+            const { fileName, scene } = JSON.parse(body || '{}')
+            if (!fileName || !scene) throw new Error('fileName et scene requis')
+            const safeFileName = path.basename(fileName)
+            const scenesDir = path.join(ROOT, 'design', 'scenes')
+            const indexPath = path.join(scenesDir, 'index.json')
+            const scenePath = path.join(scenesDir, safeFileName)
+            fs.mkdirSync(scenesDir, { recursive: true })
+            fs.writeFileSync(scenePath, JSON.stringify(scene, null, 2), 'utf8')
+
+            let index = []
+            if (fs.existsSync(indexPath)) {
+              index = JSON.parse(fs.readFileSync(indexPath, 'utf8'))
+            }
+            const entry = {
+              id: scene.id || safeFileName.replace(/\.scene\.json$/, ''),
+              name: scene.name || safeFileName,
+              file: safeFileName
+            }
+            const existingIndex = index.findIndex(item => item.file === safeFileName)
+            if (existingIndex >= 0) index[existingIndex] = entry
+            else index.push(entry)
+            fs.writeFileSync(indexPath, JSON.stringify(index, null, 2), 'utf8')
+
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ ok: true, entry }))
+          } catch (error) {
+            res.statusCode = 500
+            res.end(error.message)
+          }
+        })
+      })
+
+      server.middlewares.use('/__design_api/scenes/delete', async (req, res, next) => {
+        if (req.method !== 'POST') return next()
+        let body = ''
+        req.on('data', chunk => { body += chunk })
+        req.on('end', () => {
+          try {
+            const { fileName } = JSON.parse(body || '{}')
+            if (!fileName) throw new Error('fileName requis')
+            const safeFileName = path.basename(fileName)
+            const scenesDir = path.join(ROOT, 'design', 'scenes')
+            const indexPath = path.join(scenesDir, 'index.json')
+            const scenePath = path.join(scenesDir, safeFileName)
+
+            if (fs.existsSync(scenePath) && safeFileName !== 'default.scene.json') {
+              fs.unlinkSync(scenePath)
+            }
+
+            if (fs.existsSync(indexPath)) {
+              const index = JSON.parse(fs.readFileSync(indexPath, 'utf8')).filter(item => item.file !== safeFileName)
+              fs.writeFileSync(indexPath, JSON.stringify(index, null, 2), 'utf8')
+            }
+
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ ok: true }))
+          } catch (error) {
+            res.statusCode = 500
+            res.end(error.message)
+          }
+        })
+      })
+
       // Génère showcase.json + sprite icônes au démarrage
       import('./scripts/generate-showcase.js').then(({ generateShowcase }) => generateShowcase())
       import('./scripts/generate-icons.js').then(({ generateIcons }) => generateIcons())

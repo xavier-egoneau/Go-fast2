@@ -7,6 +7,10 @@ import { diffScenes } from './core/diff.js'
 import { validateActionSet } from './core/action-validate.js'
 import { applyActionSetToScene } from './core/action-apply.js'
 import { buildAIContext } from './core/ai-context.js'
+import { buildBrainPrompt } from './core/agent-prompt.js'
+import { getDefaultAgentProviderId, runAgentProvider } from './core/agent-runtime.js'
+import { createEmptyActionSet } from './core/action-schema.js'
+import { normalizeBrainOutput } from './core/brain-output.js'
 import {
   getState,
   patchState,
@@ -302,6 +306,70 @@ function toggleAgentPanel() {
   render()
 }
 
+function stringifyAgentJson(value) {
+  return JSON.stringify(value, null, 2)
+}
+
+function buildAgentPromptPreview() {
+  return buildBrainPrompt({
+    intent: getAgentState().input,
+    context: buildAIContext(getState(), getEntryById)
+  })
+}
+
+function handleAgentFillContext() {
+  const context = buildAIContext(getState(), getEntryById)
+  patchAgentState({ input: stringifyAgentJson(context), promptPreview: buildAgentPromptPreview(), runtimeError: '' })
+  render()
+}
+
+function handleAgentFillTemplate() {
+  patchAgentState({
+    actionJson: stringifyAgentJson(normalizeBrainOutput(createEmptyActionSet())),
+    validationErrors: [],
+    runtimeError: '',
+    lastSummary: '',
+    lastWarnings: [],
+    requiresNewComponent: false,
+    unresolved: [],
+    previewScene: null,
+    promptPreview: buildAgentPromptPreview()
+  })
+  render()
+}
+
+function handleAgentRefreshPrompt() {
+  patchAgentState({ promptPreview: buildAgentPromptPreview(), runtimeError: '' })
+  render()
+}
+
+async function handleAgentRun() {
+  try {
+    const agent = getAgentState()
+    const promptPreview = buildAgentPromptPreview()
+    const { output } = await runAgentProvider(agent.providerId, {
+      intent: agent.input,
+      context: buildAIContext(getState(), getEntryById),
+      prompt: promptPreview,
+      manualJson: agent.actionJson
+    })
+
+    patchAgentState({
+      promptPreview,
+      actionJson: stringifyAgentJson(output),
+      runtimeError: '',
+      validationErrors: [],
+      lastSummary: output.summary || '',
+      lastWarnings: output.warnings || [],
+      requiresNewComponent: output.requiresNewComponent || false,
+      unresolved: output.unresolved || []
+    })
+  } catch (error) {
+    patchAgentState({ runtimeError: error.message || 'Runtime error' })
+  }
+  render()
+}
+
 function handleAgentValidate() {
   const state = getState()
   const agent = getAgentState()
@@ -310,11 +378,24 @@ function handleAgentValidate() {
     const result = validateActionSet(parsed, state, getEntryById)
     patchAgentState({
       validationErrors: result.errors,
+      runtimeError: '',
       lastSummary: result.normalized?.summary || '',
-      previewScene: null
+      lastWarnings: result.normalized?.warnings || [],
+      requiresNewComponent: result.normalized?.requiresNewComponent || false,
+      unresolved: result.normalized?.unresolved || [],
+      previewScene: null,
+      promptPreview: buildAgentPromptPreview()
     })
   } catch (error) {
-    patchAgentState({ validationErrors: [error.message], previewScene: null })
+    patchAgentState({
+      validationErrors: [error.message],
+      runtimeError: '',
+      lastWarnings: [],
+      requiresNewComponent: false,
+      unresolved: [],
+      previewScene: null,
+      promptPreview: buildAgentPromptPreview()
+    })
   }
   render()
 }
@@ -326,19 +407,32 @@ function handleAgentPreview() {
     const parsed = JSON.parse(agent.actionJson || '{}')
     const result = validateActionSet(parsed, state, getEntryById)
     if (!result.valid) {
-      patchAgentState({ validationErrors: result.errors, previewScene: null })
+      patchAgentState({ validationErrors: result.errors, runtimeError: '', previewScene: null, promptPreview: buildAgentPromptPreview() })
       render()
       return
     }
     const previewScene = applyActionSetToScene(state.scene, result.normalized)
     patchAgentState({
       validationErrors: [],
+      runtimeError: '',
       lastSummary: result.normalized.summary || '',
-      previewScene
+      lastWarnings: result.normalized.warnings || [],
+      requiresNewComponent: result.normalized.requiresNewComponent || false,
+      unresolved: result.normalized.unresolved || [],
+      previewScene,
+      promptPreview: buildAgentPromptPreview()
     })
     render()
   } catch (error) {
-    patchAgentState({ validationErrors: [error.message], previewScene: null })
+    patchAgentState({
+      validationErrors: [error.message],
+      runtimeError: '',
+      lastWarnings: [],
+      requiresNewComponent: false,
+      unresolved: [],
+      previewScene: null,
+      promptPreview: buildAgentPromptPreview()
+    })
     render()
   }
 }
@@ -350,12 +444,19 @@ function handleAgentApply() {
     if (!getAgentState().previewScene) return
   }
   replaceWorkingScene(getAgentState().previewScene)
-  patchAgentState({ previewScene: null })
+  patchAgentState({ previewScene: null, validationErrors: [], runtimeError: '' })
   render()
 }
 
 function handleAgentClearPreview() {
-  patchAgentState({ previewScene: null, validationErrors: [] })
+  patchAgentState({
+    previewScene: null,
+    validationErrors: [],
+    runtimeError: '',
+    lastWarnings: [],
+    requiresNewComponent: false,
+    unresolved: []
+  })
   render()
 }
 
@@ -551,6 +652,24 @@ function renderInspector() {
   `
 }
 
+function renderTopbarMenu(label, items = [], options = {}) {
+  const danger = options.danger ? ' ds-menu__button--danger' : ''
+  const active = options.active ? ' ds-menu__button--active' : ''
+  return `
+    <details class="ds-menu">
+      <summary class="ds-btn ds-menu__button${danger}${active}">${escapeHtml(label)}</summary>
+      <div class="ds-menu__content">
+        ${items.map(item => {
+          if (item.type === 'file') {
+            return `<label class="ds-menu__item">${escapeHtml(item.label)}<input type="file" accept="application/json,.json" data-action="${escapeAttr(item.action)}" hidden></label>`
+          }
+          return `<button class="ds-menu__item${item.danger ? ' ds-menu__item--danger' : ''}" data-action="${escapeAttr(item.action)}">${escapeHtml(item.label)}</button>`
+        }).join('')}
+      </div>
+    </details>
+  `
+}
+
 function renderTopbar() {
   const { scene, tokensLoaded, history, historyIndex, sceneFiles, activeSceneFile } = getState()
   const agent = getAgentState()
@@ -571,21 +690,27 @@ function renderTopbar() {
           <button class="ds-btn" data-action="undo" ${historyIndex <= 0 ? 'disabled' : ''}>Undo</button>
           <button class="ds-btn" data-action="redo" ${historyIndex >= history.length - 1 ? 'disabled' : ''}>Redo</button>
         </div>
-        <button class="ds-btn" data-action="toggle-agent">${agent.open ? 'Hide Agent' : 'Show Agent'}</button>
-        <button class="ds-btn" data-action="export-scene">Exporter</button>
-        <button class="ds-btn" data-action="save-scene-file">Save scene file</button>
-        <button class="ds-btn" data-action="save-scene-as">Save scene as…</button>
-        <button class="ds-btn ds-btn--danger" data-action="delete-scene-file">Delete scene file</button>
-        <button class="ds-btn" data-action="save-as-base">Save current as base</button>
-        <button class="ds-btn" data-action="reset-to-base">Reset to base</button>
-        <button class="ds-btn" data-action="new-working-scene">New working scene</button>
-        <button class="ds-btn" data-action="duplicate-scene">Duplicate scene</button>
-        <label class="ds-btn" style="display:inline-flex;align-items:center;cursor:pointer;">Import scene<input type="file" accept="application/json,.json" data-action="import-scene" hidden></label>
-        <button class="ds-btn" data-action="add-note">Ajouter une note</button>
-        <button class="ds-btn" data-action="apply-viewport-selected">Appliquer à la sélection</button>
-        <button class="ds-btn" data-action="clear-scene">Vider la scène</button>
-        <button class="ds-btn ds-btn--danger" data-action="remove-selected">Supprimer la sélection</button>
-        <button class="ds-btn" data-action="reset-storage">Reset local</button>
+        ${renderTopbarMenu('Scene', [
+          { label: 'Exporter', action: 'export-scene' },
+          { label: 'Save scene file', action: 'save-scene-file' },
+          { label: 'Save scene as…', action: 'save-scene-as' },
+          { label: 'Import scene', action: 'import-scene', type: 'file' },
+          { label: 'Delete scene file', action: 'delete-scene-file', danger: true }
+        ])}
+        ${renderTopbarMenu('Workspace', [
+          { label: 'Save current as base', action: 'save-as-base' },
+          { label: 'Reset to base', action: 'reset-to-base' },
+          { label: 'New working scene', action: 'new-working-scene' },
+          { label: 'Duplicate scene', action: 'duplicate-scene' },
+          { label: 'Reset local', action: 'reset-storage', danger: true }
+        ])}
+        ${renderTopbarMenu('Canvas', [
+          { label: 'Ajouter une note', action: 'add-note' },
+          { label: 'Appliquer à la sélection', action: 'apply-viewport-selected' },
+          { label: 'Vider la scène', action: 'clear-scene', danger: true },
+          { label: 'Supprimer la sélection', action: 'remove-selected', danger: true }
+        ], { danger: false })}
+        <button class="ds-btn ${agent.open ? 'ds-btn--active' : ''}" data-action="toggle-agent">Agent</button>
       </div>
     </header>
   `
@@ -593,8 +718,8 @@ function renderTopbar() {
 
 function renderLayout() {
   const agent = getAgentState()
-  const content = `${renderLibrary()}${renderCanvas()}${renderInspector()}${agent.open ? renderAgentPanel() : ''}`
-  return `<div class="ds-app">${renderTopbar()}<div class="ds-layout" style="grid-template-columns:${agent.open ? '300px 1fr 320px 360px' : '300px 1fr 320px'};">${content}</div></div>`
+  const content = `${renderLibrary()}${renderCanvas()}${renderInspector()}${renderAgentPanel()}`
+  return `<div class="ds-app">${renderTopbar()}<div class="ds-layout${agent.open ? ' ds-layout--with-agent' : ''}">${content}</div></div>`
 }
 
 function setFramesInteractive(interactive) {
@@ -734,12 +859,19 @@ function stopResize() {
 
 function bindAgentEvents() {
   const agent = getAgentState()
+  rootEl.querySelector('[data-agent-action="provider"]')?.addEventListener('change', event => {
+    patchAgentState({ providerId: event.target.value, runtimeError: '', promptPreview: buildAgentPromptPreview() })
+  })
   rootEl.querySelector('[data-agent-action="input"]')?.addEventListener('input', event => {
-    patchAgentState({ input: event.target.value })
+    patchAgentState({ input: event.target.value, runtimeError: '' })
   })
   rootEl.querySelector('[data-agent-action="json"]')?.addEventListener('input', event => {
-    patchAgentState({ actionJson: event.target.value })
+    patchAgentState({ actionJson: event.target.value, runtimeError: '' })
   })
+  rootEl.querySelector('[data-agent-action="fill-context"]')?.addEventListener('click', handleAgentFillContext)
+  rootEl.querySelector('[data-agent-action="fill-template"]')?.addEventListener('click', handleAgentFillTemplate)
+  rootEl.querySelector('[data-agent-action="refresh-prompt"]')?.addEventListener('click', handleAgentRefreshPrompt)
+  rootEl.querySelector('[data-agent-action="run"]')?.addEventListener('click', () => { handleAgentRun().catch(error => patchAgentState({ runtimeError: error.message || 'Runtime error' })) })
   rootEl.querySelector('[data-agent-action="validate"]')?.addEventListener('click', handleAgentValidate)
   rootEl.querySelector('[data-agent-action="preview"]')?.addEventListener('click', handleAgentPreview)
   rootEl.querySelector('[data-agent-action="apply"]')?.addEventListener('click', handleAgentApply)
@@ -747,8 +879,20 @@ function bindAgentEvents() {
 
   if (agent.open) {
     const context = buildAIContext(getState(), getEntryById)
-    rootEl.querySelector('[data-agent-action="input"]')?.setAttribute('placeholder', JSON.stringify(context.selection || context.scene, null, 2).slice(0, 120))
+    rootEl.querySelector('[data-agent-action="input"]')?.setAttribute('placeholder', stringifyAgentJson(context.selection || context.scene).slice(0, 120))
   }
+}
+
+function bindTopbarMenus() {
+  const menus = [...rootEl.querySelectorAll('.ds-menu')]
+  menus.forEach(menu => {
+    menu.addEventListener('toggle', () => {
+      if (!menu.open) return
+      menus.forEach(other => {
+        if (other !== menu) other.removeAttribute('open')
+      })
+    })
+  })
 }
 
 function bindEvents() {
@@ -790,7 +934,6 @@ function bindEvents() {
   rootEl.querySelector('[data-action="apply-viewport-selected"]')?.addEventListener('click', applyViewportToSelected)
   rootEl.querySelector('[data-action="undo"]')?.addEventListener('click', undoHistory)
   rootEl.querySelector('[data-action="redo"]')?.addEventListener('click', redoHistory)
-  rootEl.querySelector('[data-action="toggle-agent"]')?.addEventListener('click', toggleAgentPanel)
   rootEl.querySelector('[data-action="export-scene"]')?.addEventListener('click', exportCurrentScene)
   rootEl.querySelector('[data-action="save-scene-file"]')?.addEventListener('click', () => { saveCurrentSceneToFile().catch(error => alert(error.message)) })
   rootEl.querySelector('[data-action="save-scene-as"]')?.addEventListener('click', () => { saveCurrentSceneAsNewFile().catch(error => alert(error.message)) })
@@ -799,10 +942,12 @@ function bindEvents() {
   rootEl.querySelector('[data-action="reset-to-base"]')?.addEventListener('click', resetToBaseScene)
   rootEl.querySelector('[data-action="new-working-scene"]')?.addEventListener('click', createNewWorkingScene)
   rootEl.querySelector('[data-action="duplicate-scene"]')?.addEventListener('click', duplicateCurrentScene)
-  rootEl.querySelector('[data-action="import-scene"]')?.addEventListener('change', importSceneFromFile)
+  rootEl.querySelectorAll('[data-action="import-scene"]').forEach(input => input.addEventListener('change', importSceneFromFile))
   rootEl.querySelector('[data-action="remove-selected"]')?.addEventListener('click', removeSelectedItem)
   rootEl.querySelector('[data-action="clear-scene"]')?.addEventListener('click', clearScene)
   rootEl.querySelector('[data-action="reset-storage"]')?.addEventListener('click', () => resetState())
+  rootEl.querySelector('[data-action="toggle-agent"]')?.addEventListener('click', toggleAgentPanel)
+  bindTopbarMenus()
   bindAgentEvents()
 }
 
@@ -826,6 +971,13 @@ export async function renderApp(root) {
 
   try {
     await loadRegistry()
+
+    const agentTemplate = stringifyAgentJson(normalizeBrainOutput(createEmptyActionSet()))
+    patchAgentState({
+      providerId: getDefaultAgentProviderId(),
+      actionJson: agentTemplate,
+      promptPreview: buildBrainPrompt({ intent: '', context: buildAIContext(getState(), getEntryById) })
+    })
 
     let tokensLoaded = false
     try {

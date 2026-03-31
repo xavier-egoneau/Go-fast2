@@ -13,3 +13,17 @@ export function createEmptyActionSet() {
     actions: []
   }
 }
+
+export function createExampleActionSet() {
+  return {
+    summary: 'Add a note to explore a denser hero layout.',
+    actions: [
+      {
+        type: 'add-note',
+        x: 140,
+        y: 120,
+        text: 'Try a denser hero layout with stronger CTA emphasis.'
+      }
+    ]
+  }
+}

@@ -46,6 +46,15 @@ export function getTokens() {
   return tokensCache
 }
 
+export function serializeTokensForAI() {
+  return tokensCache.map(token => ({
+    id: token.id,
+    scssVar: token.scssVar,
+    category: token.category,
+    value: token.value
+  }))
+}
+
 export function getTokenSummaryForEntry(entry) {
   if (!entry) return []
 

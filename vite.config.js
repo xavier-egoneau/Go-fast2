@@ -4,6 +4,26 @@ import { defineConfig } from 'vite'
 import Twig from 'twig'
 import tailwindcss from '@tailwindcss/vite'
 
+function normalizeBrainOutput(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return {
+      summary: '',
+      actions: [],
+      warnings: [],
+      requiresNewComponent: false,
+      unresolved: []
+    }
+  }
+
+  return {
+    summary: String(payload.summary || ''),
+    actions: Array.isArray(payload.actions) ? payload.actions : [],
+    warnings: Array.isArray(payload.warnings) ? payload.warnings.map(item => String(item)).filter(Boolean) : [],
+    requiresNewComponent: Boolean(payload.requiresNewComponent),
+    unresolved: Array.isArray(payload.unresolved) ? payload.unresolved : []
+  }
+}
+
 const ROOT = process.cwd()
 const config = JSON.parse(fs.readFileSync('./gofast.config.json', 'utf8'))
 
@@ -145,6 +165,40 @@ function goFastPlugin() {
           } catch (error) {
             res.statusCode = 500
             res.end(error.message)
+          }
+        })
+      })
+
+      server.middlewares.use('/__design_api/agent/run', async (req, res, next) => {
+        if (req.method !== 'POST') return next()
+        let body = ''
+        req.on('data', chunk => { body += chunk })
+        req.on('end', () => {
+          try {
+            const payload = JSON.parse(body || '{}')
+            const providerId = String(payload.providerId || 'manual-json')
+
+            if (providerId === 'manual-json') {
+              const parsed = payload.manualJson ? JSON.parse(payload.manualJson) : {}
+              const output = normalizeBrainOutput(parsed)
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({
+                ok: true,
+                provider: { id: 'manual-json', label: 'Manual JSON' },
+                output
+              }))
+              return
+            }
+
+            res.statusCode = 501
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({
+              error: `Provider ${providerId} not implemented yet`
+            }))
+          } catch (error) {
+            res.statusCode = 500
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ error: error.message }))
           }
         })
       })

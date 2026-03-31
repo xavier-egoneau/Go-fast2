@@ -34,6 +34,24 @@ export function listEntries() {
   return registry.all
 }
 
+export function serializeRegistryForAI() {
+  return registry.all.map(entry => ({
+    id: entry.id,
+    kind: entry.kind,
+    name: entry.name,
+    category: entry.category || null,
+    level: entry.level || null,
+    description: entry.description || null,
+    renderMode: entry.renderMode || null,
+    variants: Object.keys(entry.variants || {}),
+    content: Object.keys(entry.content || {}),
+    source: {
+      path: entry.path || null,
+      template: entry.template || null
+    }
+  }))
+}
+
 export function searchEntries(query = '') {
   const q = query.trim().toLowerCase()
   if (!q) return registry.all

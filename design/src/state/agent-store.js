@@ -1,9 +1,17 @@
+const EMPTY_ACTION_JSON = '{\n  "summary": "",\n  "actions": [],\n  "warnings": [],\n  "requiresNewComponent": false,\n  "unresolved": []\n}'
+
 let agentState = {
   open: false,
+  providerId: 'manual-json',
   input: '',
-  actionJson: '{\n  "summary": "",\n  "actions": []\n}',
+  promptPreview: '',
+  actionJson: EMPTY_ACTION_JSON,
   validationErrors: [],
+  runtimeError: '',
   lastSummary: '',
+  lastWarnings: [],
+  requiresNewComponent: false,
+  unresolved: [],
   previewScene: null
 }
 

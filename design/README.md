@@ -53,13 +53,26 @@ Puis ouvrir :
 - scènes JSON locales
 - drag / resize basiques
 - notes sur canvas
+- contrat canvas ↔ brain déjà cadré dans `design/specs/canvas-brain-contract.md`
+- abstraction frontend de providers déjà en place
+- génération de prompt et normalisation de sortie déjà amorcées
+- premier provider réel branché : `codex-cli`
+- contexte brain enrichi avec registry, contrôles, tokens, règles et actions supportées
 
 ### Encore incomplet
 
-- navigation canvas type Figma (pan/zoom) encore limitée
+- bridge runtime local posé mais encore incomplet
+- endpoint local `POST /__design_api/agent/run` en place pour le flux MVP
+- registry providers exposée localement
+- un seul provider CLI réel branché pour l'instant : `codex-cli`
+- test sur scènes et composants réels encore à pousser
+- contexte système renforcé mais encore à durcir sur les refus et dérives réelles
+- audit métier ajouté pour détecter certaines sorties silencieusement hors système
+- feedback de preview remonté plus visiblement au niveau du canvas
+- boucle produit complète `intent -> preview -> apply` encore à fiabiliser
+- navigation canvas type Figma encore limitée
 - multi-select / align / snap / guides absents
 - édition designer-first encore trop faible
-- cerveau agentique réel pas encore branché
 - tokens panel encore rudimentaire
 
 ## Thèse produit
@@ -84,10 +97,12 @@ Le Design Surface réduit ce décalage en faisant travailler le designer dans un
 À ce stade, l'interface peut servir de base. L'élément central qui manque encore est le **cerveau** :
 
 - un agent CLI réel choisi par l'utilisateur
-- connecté via auth / OAuth navigateur
-- piloté depuis l'application
+- piloté depuis l'application via un bridge runtime local
 - capable de lire le contexte de scène
 - capable de transformer la scène en respectant les contraintes du système réel
+
+Règle d'architecture déjà actée : le browser ne doit pas appeler directement un CLI externe.
+Toute exécution réelle doit passer par un bridge local dédié.
 
 ### Vision du cerveau
 
@@ -99,6 +114,15 @@ L'utilisateur choisit son moteur habituel :
 - autre agent CLI compatible
 
 Le Design Surface prépare le contexte, appelle cet agent, et récupère une proposition structurée.
+
+Dans le MVP, l'objectif n'est pas de supporter tous les moteurs d'un coup.
+Il faut d'abord réussir la boucle complète avec **un seul provider réel**, puis généraliser.
+
+État actuel :
+
+- `codex-cli` est branché via `codex exec`
+- `manual-json` reste utile comme provider de dev
+- `claude-code` reste à implémenter
 
 ### Règle absolue
 
@@ -155,7 +179,10 @@ Le cerveau doit être explicitement instruit pour :
 ```json
 {
   "summary": "...",
-  "actions": []
+  "actions": [],
+  "warnings": [],
+  "requiresNewComponent": false,
+  "unresolved": []
 }
 ```
 
@@ -180,6 +207,29 @@ L'IA peut devenir l'interface primaire, mais sous une forme orientée intention 
 
 Le designer ne devrait pas avoir à manipuler du JSON pour travailler.
 Le JSON et les contrats structurés sont des outils internes de développement, pas la surface produit finale.
+
+## Ordre de construction actuel
+
+L'ordre de construction visé est le suivant :
+
+1. verrouiller le contrat canvas ↔ cerveau pour le MVP
+2. construire le bridge runtime local
+3. brancher un premier provider réel
+4. durcir les contraintes système et la réutilisation
+5. valider la boucle complète `intent -> preview -> apply`
+6. renforcer ensuite le pouvoir d'action du designer dans le canvas
+7. rapprocher seulement après la scène du repo réel
+
+Autrement dit : la priorité n'est pas d'ajouter tout de suite plus de polish canvas.
+La priorité est de prouver qu'un vrai cerveau peut transformer une scène sans sortir du système réel.
+
+## Limites actuelles du provider réel
+
+- le premier provider réel est `codex-cli`
+- le bridge utilise une exécution non interactive locale via `codex exec`
+- le flux est validé de bout en bout sur le bridge MVP
+- la validation métier finale reste côté Design Surface via la normalisation et `validateActionSet`
+- le contexte système envoyé doit encore être enrichi avant de faire confiance à des transformations plus ambitieuses
 
 ## Arbitrage produit actuel
 
@@ -208,6 +258,7 @@ Le JSON et les contrats structurés sont des outils internes de développement, 
 - création de logo from scratch
 - remplacement total de Figma
 - outil de chat purement technique exposé au designer
+- appel direct d'un CLI externe depuis le browser
 
 ## Résumé
 

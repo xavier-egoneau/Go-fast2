@@ -8,9 +8,8 @@ import { validateActionSet } from './core/action-validate.js'
 import { applyActionSetToScene } from './core/action-apply.js'
 import { buildAIContext } from './core/ai-context.js'
 import { buildBrainPrompt } from './core/agent-prompt.js'
-import { getDefaultAgentProviderId, runAgentProvider } from './core/agent-runtime.js'
-import { createEmptyActionSet } from './core/action-schema.js'
-import { normalizeBrainOutput } from './core/brain-output.js'
+import { getDefaultAgentProviderId, getPreferredDesignerProviderId, loadAgentProviders, runAgentProvider } from './core/agent-runtime.js'
+import { createEmptyBrainOutput } from './core/brain-contract.js'
 import {
   getState,
   patchState,
@@ -302,7 +301,11 @@ function importSceneFromFile(event) {
 
 function toggleAgentPanel() {
   const agent = getAgentState()
-  patchAgentState({ open: !agent.open })
+  const nextOpen = !agent.open
+  patchAgentState({ open: nextOpen })
+  if (nextOpen) {
+    loadAgentProviders().then(() => render()).catch(() => {})
+  }
   render()
 }
 
@@ -317,15 +320,26 @@ function buildAgentPromptPreview() {
   })
 }
 
-function handleAgentFillContext() {
-  const context = buildAIContext(getState(), getEntryById)
-  patchAgentState({ input: stringifyAgentJson(context), promptPreview: buildAgentPromptPreview(), runtimeError: '' })
-  render()
+function getAgentSelectionHint() {
+  const state = getState()
+  const scene = getRenderedScene()
+  const selectedItem = scene.items.find(item => item.id === state.selectedItemId)
+  const selectedNote = (scene.notes || []).find(note => note.id === state.selectedItemId)
+
+  if (selectedItem) {
+    const entry = getEntryById(selectedItem.ref, selectedItem.kind)
+    return `Élément sélectionné : ${entry?.name || selectedItem.ref}. La demande sera interprétée comme une modification de cet élément, ou comme une variante de page basée sur lui si tu le demandes explicitement.`
+  }
+
+  if (selectedNote) {
+    return 'Annotation sélectionnée : la demande utilisera cette note comme contexte, pas comme composant de prod.'
+  }
+
+  return 'Aucun élément sélectionné : la demande sera interprétée au niveau de la scène ou de la page.'
 }
 
-function handleAgentFillTemplate() {
+function resetAgentFeedback() {
   patchAgentState({
-    actionJson: stringifyAgentJson(normalizeBrainOutput(createEmptyActionSet())),
     validationErrors: [],
     runtimeError: '',
     lastSummary: '',
@@ -333,36 +347,63 @@ function handleAgentFillTemplate() {
     requiresNewComponent: false,
     unresolved: [],
     previewScene: null,
-    promptPreview: buildAgentPromptPreview()
+    promptPreview: buildAgentPromptPreview(),
+    selectionHint: getAgentSelectionHint()
   })
+}
+
+function handleAgentFillTemplate() {
+  patchAgentState({
+    actionJson: stringifyAgentJson(createEmptyBrainOutput())
+  })
+  resetAgentFeedback()
   render()
 }
 
-function handleAgentRefreshPrompt() {
-  patchAgentState({ promptPreview: buildAgentPromptPreview(), runtimeError: '' })
-  render()
-}
-
-async function handleAgentRun() {
+async function handleAgentSubmit() {
   try {
+    await loadRegistry()
+    try {
+      await loadTokens()
+    } catch {}
+
+    const state = getState()
     const agent = getAgentState()
+    const context = buildAIContext(state, getEntryById)
     const promptPreview = buildAgentPromptPreview()
     const { output } = await runAgentProvider(agent.providerId, {
       intent: agent.input,
-      context: buildAIContext(getState(), getEntryById),
+      context,
       prompt: promptPreview,
       manualJson: agent.actionJson
     })
-
-    patchAgentState({
+    const validation = validateActionSet(output, state, getEntryById)
+    const nextPatch = {
       promptPreview,
       actionJson: stringifyAgentJson(output),
       runtimeError: '',
-      validationErrors: [],
+      validationErrors: validation.errors,
       lastSummary: output.summary || '',
       lastWarnings: output.warnings || [],
       requiresNewComponent: output.requiresNewComponent || false,
-      unresolved: output.unresolved || []
+      unresolved: output.unresolved || [],
+      selectionHint: getAgentSelectionHint()
+    }
+
+    if (!validation.valid) {
+      patchAgentState({
+        ...nextPatch,
+        previewScene: null
+      })
+      render()
+      return
+    }
+
+    const previewScene = applyActionSetToScene(state.scene, validation.normalized)
+    replaceWorkingScene(previewScene)
+    patchAgentState({
+      ...nextPatch,
+      previewScene: null
     })
   } catch (error) {
     patchAgentState({ runtimeError: error.message || 'Runtime error' })
@@ -504,6 +545,77 @@ function renderFrames(scene) {
   return `<div class="ds-frame" style="left:64px;top:64px;width:${vp.width + 32}px;height:${vp.height + 72}px;"><div class="ds-frame__label"><span>${escapeHtml(vp.label)}</span><span class="ds-badge">${vp.width} × ${vp.height}</span></div></div>`
 }
 
+function buildAgentFeedbackModel() {
+  const agent = getAgentState()
+  const warnings = agent.lastWarnings || []
+  const unresolved = agent.unresolved || []
+  const validationErrors = agent.validationErrors || []
+
+  if (validationErrors.length) {
+    return {
+      tone: 'error',
+      title: 'La demande ne peut pas encore être appliquée',
+      lead: validationErrors[0],
+      details: [...validationErrors.slice(1), ...warnings, ...unresolved.map(item => `${item.type} — ${item.message}`)]
+    }
+  }
+
+  if (agent.requiresNewComponent) {
+    return {
+      tone: 'warn',
+      title: 'La demande dépasse le système actuel',
+      lead: agent.lastSummary || unresolved[0]?.message || warnings[0] || 'Cette demande nécessite d’étendre les composants existants.',
+      details: [...warnings, ...unresolved.map(item => `${item.type} — ${item.message}`)]
+    }
+  }
+
+  if (warnings.length || unresolved.length) {
+    return {
+      tone: 'info',
+      title: 'La demande a des limites',
+      lead: agent.lastSummary || warnings[0] || unresolved[0]?.message || '',
+      details: [...warnings.slice(1), ...unresolved.map(item => `${item.type} — ${item.message}`)]
+    }
+  }
+
+  return {
+    tone: 'success',
+    title: 'Demande interprétée',
+    lead: agent.lastSummary || 'La machine a produit une proposition exploitable.',
+    details: []
+  }
+}
+
+function renderPreviewStatus() {
+  const agent = getAgentState()
+  const warnings = agent.lastWarnings || []
+  const unresolved = agent.unresolved || []
+  const validationErrors = agent.validationErrors || []
+  const hasContent = agent.previewScene || agent.lastSummary || warnings.length || unresolved.length || validationErrors.length || agent.requiresNewComponent
+
+  if (!hasContent) return ''
+
+  const feedback = buildAgentFeedbackModel()
+
+  return `
+    <section class="ds-preview-banner${agent.previewScene ? ' ds-preview-banner--active' : ''}${validationErrors.length ? ' ds-preview-banner--error' : ''}">
+      <div class="ds-preview-banner__top">
+        <div>
+          <div class="ds-preview-banner__eyebrow">${agent.previewScene ? 'Preview active' : 'Agent feedback'}</div>
+          <div class="ds-preview-banner__title">${escapeHtml(agent.previewScene ? 'Aperçu prêt à être appliqué' : feedback.title)}</div>
+        </div>
+        <div class="ds-preview-banner__actions">
+          <button class="ds-btn" data-agent-action="preview">Preview</button>
+          <button class="ds-btn" data-agent-action="apply" ${agent.previewScene ? '' : 'disabled'}>Apply</button>
+          <button class="ds-btn ds-btn--danger" data-agent-action="clear-preview">Clear</button>
+        </div>
+      </div>
+      ${!agent.previewScene ? `<div class="ds-preview-banner__callout${feedback.tone === 'warn' ? ' ds-preview-banner__callout--warn' : ''}${feedback.tone === 'error' ? ' ds-preview-banner__callout--error' : ''}">${escapeHtml(feedback.lead)}</div>` : ''}
+      ${feedback.details.length ? `<details class="ds-preview-banner__details"><summary>Voir les détails</summary><div class="ds-preview-banner__group">${feedback.details.map(detail => `<div class="ds-preview-banner__item${feedback.tone === 'error' ? ' ds-preview-banner__item--error' : ''}">${escapeHtml(detail)}</div>`).join('')}</div></details>` : ''}
+    </section>
+  `
+}
+
 function renderCanvas() {
   const scene = getRenderedScene()
   const { selectedItemId } = getState()
@@ -511,6 +623,7 @@ function renderCanvas() {
 
   return `
     <main class="ds-canvas-wrap">
+      ${renderPreviewStatus()}
       <div class="ds-canvas" id="ds-canvas">
         ${renderFrames(scene)}
         ${scene.items.length === 0 && notes.length === 0 ? '<div class="ds-empty">Ajoute un composant, une page ou une note depuis la library.</div>' : ''}
@@ -718,7 +831,7 @@ function renderTopbar() {
 
 function renderLayout() {
   const agent = getAgentState()
-  const content = `${renderLibrary()}${renderCanvas()}${renderInspector()}${renderAgentPanel()}`
+  const content = `${renderLibrary()}${renderCanvas()}${renderInspector()}${renderAgentPanel({ selectionHint: getAgentSelectionHint() })}`
   return `<div class="ds-app">${renderTopbar()}<div class="ds-layout${agent.open ? ' ds-layout--with-agent' : ''}">${content}</div></div>`
 }
 
@@ -858,29 +971,21 @@ function stopResize() {
 }
 
 function bindAgentEvents() {
-  const agent = getAgentState()
-  rootEl.querySelector('[data-agent-action="provider"]')?.addEventListener('change', event => {
-    patchAgentState({ providerId: event.target.value, runtimeError: '', promptPreview: buildAgentPromptPreview() })
-  })
   rootEl.querySelector('[data-agent-action="input"]')?.addEventListener('input', event => {
-    patchAgentState({ input: event.target.value, runtimeError: '' })
+    patchAgentState({ input: event.target.value, runtimeError: '' }, { silent: true })
   })
-  rootEl.querySelector('[data-agent-action="json"]')?.addEventListener('input', event => {
-    patchAgentState({ actionJson: event.target.value, runtimeError: '' })
+  rootEl.querySelector('[data-agent-action="input"]')?.addEventListener('keydown', event => {
+    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+      event.preventDefault()
+      handleAgentSubmit().catch(error => patchAgentState({ runtimeError: error.message || 'Runtime error' }))
+    }
   })
-  rootEl.querySelector('[data-agent-action="fill-context"]')?.addEventListener('click', handleAgentFillContext)
-  rootEl.querySelector('[data-agent-action="fill-template"]')?.addEventListener('click', handleAgentFillTemplate)
-  rootEl.querySelector('[data-agent-action="refresh-prompt"]')?.addEventListener('click', handleAgentRefreshPrompt)
-  rootEl.querySelector('[data-agent-action="run"]')?.addEventListener('click', () => { handleAgentRun().catch(error => patchAgentState({ runtimeError: error.message || 'Runtime error' })) })
-  rootEl.querySelector('[data-agent-action="validate"]')?.addEventListener('click', handleAgentValidate)
+  rootEl.querySelector('[data-agent-action="submit-request"]')?.addEventListener('click', () => { handleAgentSubmit().catch(error => patchAgentState({ runtimeError: error.message || 'Runtime error' })) })
   rootEl.querySelector('[data-agent-action="preview"]')?.addEventListener('click', handleAgentPreview)
   rootEl.querySelector('[data-agent-action="apply"]')?.addEventListener('click', handleAgentApply)
   rootEl.querySelector('[data-agent-action="clear-preview"]')?.addEventListener('click', handleAgentClearPreview)
 
-  if (agent.open) {
-    const context = buildAIContext(getState(), getEntryById)
-    rootEl.querySelector('[data-agent-action="input"]')?.setAttribute('placeholder', stringifyAgentJson(context.selection || context.scene).slice(0, 120))
-  }
+  rootEl.querySelector('[data-agent-action="input"]')?.setAttribute('aria-label', getAgentSelectionHint())
 }
 
 function bindTopbarMenus() {
@@ -951,10 +1056,96 @@ function bindEvents() {
   bindAgentEvents()
 }
 
+function buildElementRestoreSelector(element) {
+  if (!element) return null
+  if (element.id) return `#${element.id}`
+
+  const selectors = []
+  const agentAction = element.getAttribute('data-agent-action')
+  const action = element.getAttribute('data-action')
+  const itemId = element.getAttribute('data-item-id')
+  const noteId = element.getAttribute('data-note-id')
+  const key = element.getAttribute('data-key')
+
+  if (agentAction) selectors.push(`[data-agent-action="${agentAction}"]`)
+  if (action) selectors.push(`[data-action="${action}"]`)
+  if (itemId) selectors.push(`[data-item-id="${itemId}"]`)
+  if (noteId) selectors.push(`[data-note-id="${noteId}"]`)
+  if (key) selectors.push(`[data-key="${key}"]`)
+
+  return selectors.length ? selectors.join('') : null
+}
+
+function captureRenderState() {
+  const activeElement = document.activeElement
+  const selector = buildElementRestoreSelector(activeElement)
+  const activeControl = selector
+    ? {
+        selector,
+        value: 'value' in activeElement ? activeElement.value : null,
+        selectionStart: typeof activeElement.selectionStart === 'number' ? activeElement.selectionStart : null,
+        selectionEnd: typeof activeElement.selectionEnd === 'number' ? activeElement.selectionEnd : null
+      }
+    : null
+
+  const frameEntries = [...rootEl.querySelectorAll('.ds-item[data-item-id] .ds-item__frame')].map(frame => {
+    const itemEl = frame.closest('.ds-item')
+    const itemId = itemEl?.getAttribute('data-item-id')
+    if (!itemId) return null
+    return {
+      itemId,
+      src: frame.getAttribute('src') || '',
+      frame
+    }
+  }).filter(Boolean)
+
+  return {
+    activeControl,
+    frames: new Map(frameEntries.map(entry => [entry.itemId, entry]))
+  }
+}
+
+function restorePersistentFrames(renderState) {
+  if (!renderState?.frames?.size) return
+
+  rootEl.querySelectorAll('.ds-item[data-item-id]').forEach(itemEl => {
+    const itemId = itemEl.getAttribute('data-item-id')
+    const nextFrame = itemEl.querySelector('.ds-item__frame')
+    const previous = renderState.frames.get(itemId)
+    if (!nextFrame || !previous) return
+    if ((nextFrame.getAttribute('src') || '') !== previous.src) return
+
+    previous.frame.className = nextFrame.className
+    previous.frame.style.cssText = nextFrame.style.cssText
+    previous.frame.setAttribute('title', nextFrame.getAttribute('title') || '')
+    nextFrame.replaceWith(previous.frame)
+  })
+}
+
+function restoreActiveControl(renderState) {
+  const control = renderState?.activeControl
+  if (!control?.selector) return
+  const nextElement = rootEl.querySelector(control.selector)
+  if (!nextElement) return
+
+  if (control.value !== null && 'value' in nextElement) {
+    nextElement.value = control.value
+  }
+
+  nextElement.focus()
+
+  if (typeof nextElement.setSelectionRange === 'function' && control.selectionStart !== null && control.selectionEnd !== null) {
+    nextElement.setSelectionRange(control.selectionStart, control.selectionEnd)
+  }
+}
+
 function render() {
   if (!rootEl || dragState || resizeState) return
+  const renderState = captureRenderState()
   rootEl.innerHTML = renderLayout()
+  restorePersistentFrames(renderState)
   bindEvents()
+  restoreActiveControl(renderState)
 }
 
 function escapeHtml(value) {
@@ -972,12 +1163,18 @@ export async function renderApp(root) {
   try {
     await loadRegistry()
 
-    const agentTemplate = stringifyAgentJson(normalizeBrainOutput(createEmptyActionSet()))
+    const agentTemplate = stringifyAgentJson(createEmptyBrainOutput())
     patchAgentState({
       providerId: getDefaultAgentProviderId(),
       actionJson: agentTemplate,
-      promptPreview: buildBrainPrompt({ intent: '', context: buildAIContext(getState(), getEntryById) })
+      promptPreview: buildBrainPrompt({ intent: '', context: buildAIContext(getState(), getEntryById) }),
+      selectionHint: getAgentSelectionHint()
     })
+
+    try {
+      await loadAgentProviders()
+      patchAgentState({ providerId: getPreferredDesignerProviderId() })
+    } catch {}
 
     let tokensLoaded = false
     try {

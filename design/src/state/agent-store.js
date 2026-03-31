@@ -1,4 +1,6 @@
-const EMPTY_ACTION_JSON = '{\n  "summary": "",\n  "actions": [],\n  "warnings": [],\n  "requiresNewComponent": false,\n  "unresolved": []\n}'
+import { createEmptyBrainOutput } from '../core/brain-contract.js'
+
+const EMPTY_ACTION_JSON = JSON.stringify(createEmptyBrainOutput(), null, 2)
 
 let agentState = {
   open: false,
@@ -6,6 +8,7 @@ let agentState = {
   input: '',
   promptPreview: '',
   actionJson: EMPTY_ACTION_JSON,
+  selectionHint: '',
   validationErrors: [],
   runtimeError: '',
   lastSummary: '',
@@ -21,8 +24,9 @@ export function getAgentState() {
   return agentState
 }
 
-export function patchAgentState(patch) {
+export function patchAgentState(patch, options = {}) {
   agentState = { ...agentState, ...patch }
+  if (options.silent) return
   listeners.forEach(listener => listener(agentState))
 }
 

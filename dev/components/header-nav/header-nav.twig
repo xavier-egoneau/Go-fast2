@@ -1,4 +1,5 @@
 {% set variant  = variant|default('light') %}
+{% set ctaVariant = ctaVariant|default('auto') %}
 {% set sticky   = sticky|default(false) %}
 {% set logoText = logoText|default('MonSite') %}
 {% set ctaText  = ctaText|default('Commencer') %}
@@ -9,6 +10,8 @@
   { label: 'Tarifs',     href: '#' },
   { label: 'Contact',    href: '#' }
 ]) %}
+
+{% set resolvedCtaVariant = ctaVariant == 'auto' ? (variant == 'dark' ? 'outline' : 'primary') : ctaVariant %}
 
 <header class="header-nav header-nav--{{ variant }}{% if sticky %} header-nav--sticky{% endif %}" role="banner">
   <div class="header-nav__inner">
@@ -37,7 +40,7 @@
     <div class="header-nav__cta">
       {% include 'dev/components/button/button.twig' with {
         text: ctaText,
-        variant: variant == 'dark' ? 'outline' : 'primary',
+        variant: resolvedCtaVariant,
         size: 'sm'
       } %}
     </div>

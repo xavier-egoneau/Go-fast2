@@ -1,31 +1,169 @@
 import fs from 'fs'
+import os from 'os'
 import path from 'path'
+import { spawn } from 'child_process'
 import { defineConfig } from 'vite'
 import Twig from 'twig'
 import tailwindcss from '@tailwindcss/vite'
-
-function normalizeBrainOutput(payload) {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    return {
-      summary: '',
-      actions: [],
-      warnings: [],
-      requiresNewComponent: false,
-      unresolved: []
-    }
-  }
-
-  return {
-    summary: String(payload.summary || ''),
-    actions: Array.isArray(payload.actions) ? payload.actions : [],
-    warnings: Array.isArray(payload.warnings) ? payload.warnings.map(item => String(item)).filter(Boolean) : [],
-    requiresNewComponent: Boolean(payload.requiresNewComponent),
-    unresolved: Array.isArray(payload.unresolved) ? payload.unresolved : []
-  }
-}
+import { normalizeAgentRunPayload, normalizeBrainOutput } from './design/src/core/brain-contract.js'
+import { listAgentProviders } from './design/src/core/agent-providers.js'
 
 const ROOT = process.cwd()
 const config = JSON.parse(fs.readFileSync('./gofast.config.json', 'utf8'))
+function spawnCommand(command, args, options = {}) {
+  const {
+    cwd = ROOT,
+    input = '',
+    timeoutMs = 120000
+  } = options
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd,
+      stdio: 'pipe',
+      env: process.env
+    })
+
+    let stdout = ''
+    let stderr = ''
+    let settled = false
+
+    const timeout = setTimeout(() => {
+      if (settled) return
+      settled = true
+      child.kill('SIGTERM')
+      reject(new Error(`${command} timed out after ${timeoutMs}ms`))
+    }, timeoutMs)
+
+    child.stdout.on('data', chunk => { stdout += String(chunk) })
+    child.stderr.on('data', chunk => { stderr += String(chunk) })
+    child.on('error', error => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      reject(error)
+    })
+    child.on('close', code => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      resolve({ code, stdout, stderr })
+    })
+
+    if (input) child.stdin.write(input)
+    child.stdin.end()
+  })
+}
+
+function getProviderBase(providerId) {
+  return listAgentProviders().find(provider => provider.id === providerId) || listAgentProviders()[0]
+}
+
+async function getCodexProviderState() {
+  const base = getProviderBase('codex-cli')
+
+  try {
+    const status = await spawnCommand('codex', ['login', 'status'], { timeoutMs: 10000 })
+    const combined = `${status.stdout}\n${status.stderr}`
+    const connected = /Logged in/i.test(combined)
+    return {
+      ...base,
+      available: true,
+      connected,
+      authRequired: !connected,
+      reason: connected ? '' : 'Codex CLI is installed but not logged in'
+    }
+  } catch (error) {
+    const message = String(error?.message || error)
+    if (/ENOENT/i.test(message)) {
+      return {
+        ...base,
+        available: false,
+        connected: false,
+        authRequired: false,
+        reason: 'Codex CLI not found in PATH'
+      }
+    }
+
+    return {
+      ...base,
+      available: true,
+      connected: false,
+      authRequired: true,
+      reason: 'Unable to verify Codex login status'
+    }
+  }
+}
+
+async function getRuntimeProviders() {
+  const defaults = listAgentProviders()
+  const providers = await Promise.all(defaults.map(async provider => {
+    if (provider.id === 'codex-cli') return getCodexProviderState()
+    return provider
+  }))
+  return providers
+}
+
+function readCodexOutputFile(filePath) {
+  if (!fs.existsSync(filePath)) {
+    throw new Error('Codex CLI did not produce an output message file')
+  }
+
+  const text = fs.readFileSync(filePath, 'utf8').trim()
+  if (!text) {
+    throw new Error('Codex CLI returned an empty final message')
+  }
+
+  return text
+}
+
+async function runCodexProvider(payload) {
+  const provider = await getCodexProviderState()
+  if (!provider.available) throw new Error(provider.reason || 'Codex CLI is unavailable')
+  if (provider.authRequired) throw new Error(provider.reason || 'Codex CLI authentication is required')
+
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'design-codex-'))
+  const outputPath = path.join(tempDir, 'last-message.json')
+
+  try {
+    const result = await spawnCommand('codex', [
+      'exec',
+      '--skip-git-repo-check',
+      '--sandbox', 'read-only',
+      '--ephemeral',
+      '--output-last-message', outputPath,
+      '-'
+    ], {
+      cwd: ROOT,
+      input: `${payload.prompt || payload.intent || ''}\n`,
+      timeoutMs: 120000
+    })
+
+    if (result.code !== 0) {
+      throw new Error(result.stderr.trim() || result.stdout.trim() || `Codex CLI exited with code ${result.code}`)
+    }
+
+    const rawOutput = readCodexOutputFile(outputPath)
+    const parsed = JSON.parse(rawOutput)
+    return {
+      provider: {
+        ...provider,
+        connected: true,
+        authRequired: false,
+        reason: ''
+      },
+      output: normalizeBrainOutput(parsed)
+    }
+  } catch (error) {
+    const message = String(error?.message || error)
+    if (/Enable JavaScript and cookies to continue|403 Forbidden/i.test(message)) {
+      throw new Error('Codex CLI authentication needs to be refreshed with `codex login`')
+    }
+    throw error
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true })
+  }
+}
 
 // Override le loader fs de Twig : tous les chemins relatifs sont résolus depuis ROOT
 // Cela corrige les includes imbriqués (molecule → atom) qui sinon résolvent depuis le dossier du fichier parent
@@ -100,6 +238,22 @@ function goFastPlugin() {
 
     // ─── Dev : middleware pre-Vite ──────────────────────────────────────────
     configureServer(server) {
+      server.middlewares.use('/__design_api/agent/providers', async (req, res, next) => {
+        if (req.method !== 'GET') return next()
+        try {
+          const providers = await getRuntimeProviders()
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({
+            ok: true,
+            providers
+          }))
+        } catch (error) {
+          res.statusCode = 500
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({ error: error.message }))
+        }
+      })
+
       server.middlewares.use('/__design_api/scenes/save', async (req, res, next) => {
         if (req.method !== 'POST') return next()
         let body = ''
@@ -173,19 +327,30 @@ function goFastPlugin() {
         if (req.method !== 'POST') return next()
         let body = ''
         req.on('data', chunk => { body += chunk })
-        req.on('end', () => {
+        req.on('end', async () => {
           try {
-            const payload = JSON.parse(body || '{}')
-            const providerId = String(payload.providerId || 'manual-json')
+            const payload = normalizeAgentRunPayload(JSON.parse(body || '{}'))
+            const provider = getProviderBase(payload.providerId)
 
-            if (providerId === 'manual-json') {
+            if (provider.id === 'manual-json') {
               const parsed = payload.manualJson ? JSON.parse(payload.manualJson) : {}
               const output = normalizeBrainOutput(parsed)
               res.setHeader('Content-Type', 'application/json')
               res.end(JSON.stringify({
                 ok: true,
-                provider: { id: 'manual-json', label: 'Manual JSON' },
+                provider,
                 output
+              }))
+              return
+            }
+
+            if (provider.id === 'codex-cli') {
+              const result = await runCodexProvider(payload)
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({
+                ok: true,
+                provider: result.provider,
+                output: result.output
               }))
               return
             }
@@ -193,7 +358,8 @@ function goFastPlugin() {
             res.statusCode = 501
             res.setHeader('Content-Type', 'application/json')
             res.end(JSON.stringify({
-              error: `Provider ${providerId} not implemented yet`
+              error: provider.reason || `Provider ${provider.id} not implemented yet`,
+              provider
             }))
           } catch (error) {
             res.statusCode = 500

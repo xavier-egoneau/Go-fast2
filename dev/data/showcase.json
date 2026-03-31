@@ -240,6 +240,19 @@
             "dark"
           ]
         },
+        "ctaVariant": {
+          "label": "Variante du CTA",
+          "type": "select",
+          "default": "auto",
+          "options": [
+            "auto",
+            "primary",
+            "secondary",
+            "outline",
+            "ghost",
+            "danger"
+          ]
+        },
         "sticky": {
           "label": "Sticky",
           "type": "checkbox",

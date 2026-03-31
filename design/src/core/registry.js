@@ -2,6 +2,31 @@ const SHOWCASE_JSON = '/dev/data/showcase.json'
 
 let registry = { components: [], pages: [], all: [] }
 
+function buildEntrySource(entry) {
+  const basePath = entry.path || null
+  const templatePath = basePath ? `${basePath}.twig` : null
+  const metaPath = basePath ? `${basePath}.json` : null
+  const docPath = entry.kind === 'component' && basePath ? `${basePath}.md` : null
+
+  return {
+    path: basePath,
+    template: templatePath,
+    meta: metaPath,
+    documentation: docPath,
+    includeId: templatePath
+  }
+}
+
+function serializeControl([id, control]) {
+  return {
+    id,
+    label: control?.label || id,
+    type: control?.type || 'unknown',
+    default: control?.default ?? null,
+    options: Array.isArray(control?.options) ? [...control.options] : []
+  }
+}
+
 function normalizeEntry(entry, kind) {
   return {
     ...entry,
@@ -43,12 +68,9 @@ export function serializeRegistryForAI() {
     level: entry.level || null,
     description: entry.description || null,
     renderMode: entry.renderMode || null,
-    variants: Object.keys(entry.variants || {}),
-    content: Object.keys(entry.content || {}),
-    source: {
-      path: entry.path || null,
-      template: entry.template || null
-    }
+    variants: Object.entries(entry.variants || {}).map(serializeControl),
+    content: Object.entries(entry.content || {}).map(serializeControl),
+    source: buildEntrySource(entry)
   }))
 }
 

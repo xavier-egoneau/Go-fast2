@@ -21,207 +21,141 @@ Spec de référence : `design/specs/canvas-brain-contract.md`
 
 ## Priorités produit révisées
 
-- [ ] Cerveau / CLI bridge réel
-- [ ] Contraintes système et réutilisation du legacy
-- [ ] Actions impactantes pour le designer (tokens, layout, agencement)
-- [ ] Canvas UX essentielle pour exploration visuelle
-- [ ] Bridge scène → implémentation / repo
-- [ ] Tokens intelligence et projection système
-- [ ] Polish scene manager / canvas avancé
+- [ ] Verrouiller le contrat canvas ↔ cerveau pour le MVP
+- [ ] Brancher un vrai bridge runtime local pour un premier provider réel
+- [ ] Rendre le contexte système suffisamment fiable pour empêcher la dérive
+- [ ] Valider la boucle complète intent → preview → apply dans la scène
+- [ ] Renforcer ensuite l'action designer-first dans le canvas
+- [ ] Seulement après, rapprocher le résultat du repo et de git
 
 ---
 
-## 1. Cerveau / CLI Bridge réel
+## Règles produit non négociables
 
-### Objectif
-
-Brancher un vrai agent CLI local du user au Design Surface au lieu de reconstruire un copilote maison.
-
-### Cibles possibles
-
-- Codex CLI
-- Claude Code
-- GitHub Copilot agent / CLI compatible
-- OpenCode
-- autre agent CLI compatible prompt in / structured out
-
-### Principe
-
-- le user garde son abonnement et son agent habituel
-- l'app fournit un flow de connexion/auth propre (OAuth navigateur ou auth du CLI existant)
-- le Design Surface prépare un contexte scène
-- l'agent reçoit ce contexte + les règles système
-- l'agent renvoie une proposition structurée exploitable
-- l'app permet preview / apply / reject / branch
-
-### Règles non négociables
-
-L'agent doit :
-
-1. réutiliser l'existant avant toute invention
-2. préférer les includes/composants/pages existants
-3. modifier ou recomposer l'existant avant de proposer du neuf
-4. signaler explicitement quand le besoin dépasse le système existant
-5. ne jamais recréer un bloc "presque pareil" si un bloc réel existe déjà
-
-### Livrables MVP
-
-- [ ] abstraction `provider` / `agent runtime`
-- [ ] sélection du moteur dans l'UI
-- [ ] état de connexion du moteur
-- [ ] préparation d'un contexte scène sérialisé
-- [ ] contrat de sortie structuré minimal
-- [ ] preview / apply / reject branchés sur ce moteur réel
-
-### Questions ouvertes
-
-- [ ] quel protocole d'appel uniforme entre Design Surface et agents CLI ?
-- [ ] comment gérer auth/OAuth proprement par provider ?
-- [ ] faut-il appeler directement le CLI ou passer par un bridge local dédié ?
+- [ ] le cerveau réutilise l'existant avant toute invention
+- [ ] le cerveau préfère includes/composants/pages réels aux blocs approximatifs
+- [ ] le cerveau signale explicitement quand le système existant ne suffit pas
+- [ ] le canvas reste simple et designer-facing
+- [ ] le JSON et les contrats structurés restent des outils internes
+- [ ] le panneau agent actuel reste un outil de dev interne et non une UX finale
+- [ ] on ne dérive pas vers un clone Figma complet
+- [ ] on ne dérive pas vers un chat technique exposé au designer
 
 ---
 
-## 2. Contraintes système et réutilisation du legacy
+## Jalons de dev
 
-### Objectif
+### Étape 1 — verrouiller le contrat du cerveau
 
-Faire du cerveau un opérateur du système existant, pas un générateur libre.
+Objectif : figer le contrat MVP déjà largement défini pour pouvoir implémenter sans refaire la spec à chaque itération.
 
-### À rendre explicite dans le contexte envoyé
+- [x] définir le contexte scène minimal envoyé
+- [x] définir les contraintes système envoyées
+- [x] définir la sortie structurée attendue
+- [x] définir les cas de refus / dépassement du système
+- [x] geler la shape MVP d'entrée côté frontend
+- [x] geler la shape MVP de sortie côté runtime
+- [ ] lister explicitement les actions supportées par le canvas
+- [ ] lister explicitement les actions refusées / hors scope
+- [x] aligner `design/README.md`, `design/ROADMAP.md` et `design/specs/`
 
-- registry composants/pages disponibles
-- includes Twig existants et identifiants réels
-- métadonnées JSON des blocs exposés
-- tokens disponibles
-- conventions du projet
-- informations de mapping scène → source
+### Étape 2 — construire le bridge runtime local
 
-### Livrables
+Objectif : faire passer toute exécution réelle par un bridge local au lieu d'appeler un CLI depuis le browser.
 
-- [ ] spec de priorisation de réutilisation
-- [ ] contexte système compact et exploitable
-- [ ] signal "new component required" quand l'agent ne peut pas rester dans le système
-- [ ] traces de décision lisibles dans le summary / diff
+- [x] poser le principe bridge local dédié
+- [x] valider le protocole d'appel frontend → bridge
+- [x] définir le contrat de réponse uniforme du bridge
+- [x] créer le endpoint local `POST /__design_api/agent/run`
+- [x] isoler une abstraction `provider` / `runtime`
+- [x] exposer l'état `available / connected / authRequired / reason`
+- [x] brancher le provider `manual-json` sur ce bridge réel
+- [x] afficher correctement l'état du moteur dans l'UI
 
----
+### Étape 3 — brancher un premier moteur réel
 
-## 3. Actions impactantes pour le designer
+Objectif : prouver la promesse produit avec un seul provider réel avant de généraliser.
 
-### Objectif
+- [x] choisir une cible initiale unique (`codex-cli`)
+- [x] définir le mode d'invocation local du provider choisi
+- [x] envoyer un contexte scène minimal au provider
+- [x] récupérer `summary`, `actions`, `warnings`, `requiresNewComponent`
+- [x] normaliser les sorties du provider choisi
+- [ ] tester le flux sur de vrais composants du projet
+- [x] documenter les limites du premier provider réel
 
-Permettre au designer d'avoir un effet réel sur l'interface, même sans édition vectorielle complète.
+### Étape 4 — durcir les contraintes système et la réutilisation
 
-### Édition directe minimale à garder
+Objectif : empêcher le cerveau de produire des propositions impressionnantes mais hors système.
 
-- [ ] move
-- [ ] resize
-- [ ] duplicate
-- [ ] delete
-- [ ] notes
-- [ ] réagencement simple
+- [x] envoyer la registry composants/pages réellement disponibles
+- [x] envoyer les métadonnées JSON exposées par les blocs
+- [x] envoyer les tokens ou catégories de tokens disponibles
+- [x] envoyer les identifiants logiques d'includes/templates quand disponibles
+- [x] encoder la règle "reuse before invention" dans le contexte envoyé
+- [x] interdire les sorties silencieusement hors système
+- [x] exploiter `requiresNewComponent` comme signal produit explicite
+- [x] rendre les warnings et limitations lisibles dans le preview
+- [ ] tester plusieurs intents designers et mesurer les dérives
 
-### Transformations à rendre possibles rapidement
+### Étape 5 — valider la boucle produit dans la scène
 
-- [ ] changement de tokens CSS perceptibles
-- [ ] agencement des blocs
-- [ ] variation de structure de section
-- [ ] changement de hiérarchie visuelle
-- [ ] duplication de variantes de scène
+Objectif : obtenir un flux crédible de bout en bout avant de toucher au repo réel.
 
-### Livrables
+- [ ] générer un prompt final stable à partir de l'intent + contexte
+- [ ] valider les actions renvoyées avant preview
+- [ ] produire un preview lisible des changements proposés
+- [ ] permettre `apply`
+- [ ] permettre `reject`
+- [ ] préserver undo / redo / history
+- [ ] confirmer que l'apply modifie correctement le modèle de scène
+- [ ] tester plusieurs scénarios réels de transformation
 
-- [ ] panneau de tokens designer-friendly
-- [ ] édition de layout simple
-- [ ] duplication de scène / variation claire
-- [ ] mapping clair entre intention, preview et résultat
+### Étape 6 — renforcer le pouvoir d'action du designer
 
----
+Objectif : augmenter la valeur du canvas une fois le cerveau réel branché.
 
-## 4. Canvas UX essentielle
+- [ ] garder move
+- [ ] garder resize
+- [ ] garder duplicate
+- [ ] garder delete
+- [ ] garder notes
+- [ ] rendre les notes clairement distinctes des composants de prod
+- [ ] ajouter un réagencement simple
+- [ ] ajouter un panneau de tokens designer-friendly
+- [ ] ajouter des variations de scène plus claires
+- [ ] rendre le mapping intention → preview → résultat plus lisible
 
-### Objectif
+### Étape 7 — améliorer l'UX canvas essentielle
 
-Donner au designer le feeling minimum nécessaire pour explorer visuellement comme dans un outil de composition.
+Objectif : rendre l'exploration plus naturelle sans dériver vers un éditeur vectoriel généraliste.
 
-### Manques prioritaires
+- [ ] améliorer pan / zoom
+- [ ] clarifier boards / frames / structure de scène
+- [ ] rendre le drag des notes évident et fiable
+- [ ] ajouter multi-select
+- [ ] ajouter align / snap / guides
+- [ ] ajouter un z-order simple
+- [ ] évaluer lock si utile
+- [ ] améliorer la lecture des variantes de scène
+- [ ] polish save / load / duplicate / import
 
-- [ ] pan / zoom plus naturels
-- [ ] boards / frames / structure de scène plus lisibles
-- [ ] multi-select
-- [ ] align / snap / guides
-- [ ] z-order simple
-- [ ] lock éventuellement
+### Étape 8 — rapprocher la scène du repo réel
 
-### Livrables
+Objectif : préparer la projection vers l'implémentation sans brûler les étapes trop tôt.
 
-- [ ] navigation type Figma minimale
-- [ ] structure boards / scenes plus claire
-- [ ] outils de sélection multiples
-- [ ] guides de composition de base
-
----
-
-## 5. Bridge scène → implémentation / repo
-
-### Objectif
-
-Projeter le travail de scène vers le système réel et, à terme, vers git.
-
-### Enjeu
-
-Le repo est le socle réel du produit. Le Design Surface doit devenir une interface designer-friendly de cette vérité versionnée.
-
-### Livrables
-
-- [ ] mapping scène → composants/pages/includes/fichiers
-- [ ] diff sémantique robuste
-- [ ] projection de changements exploitables
-- [ ] compatibilité future avec workflows git / review / branchement
-
-### Questions ouvertes
-
-- [ ] jusqu'où pousser l'apply direct vs production d'un plan d'implémentation ?
-- [ ] comment représenter proprement les changements qui demandent du code neuf ?
-
----
-
-## 6. Token intelligence
-
-### Objectif
-
-Rendre les tokens compréhensibles et manipulables pour un designer sans exposer brutalement la technique.
-
-### Livrables
-
-- [ ] meilleur mapping composant → tokens
-- [ ] panel tokens plus fiable
-- [ ] catégories design-first (spacing, color role, radius, type…)
-- [ ] overrides locaux de scène
-- [ ] preview clair de l'impact d'un changement de tokens
+- [ ] définir un mapping scène → composants/pages/includes/fichiers
+- [ ] enrichir le diff sémantique
+- [ ] distinguer ce qui est applicable en scène de ce qui demande du code neuf
+- [ ] produire un plan d'implémentation quand l'apply direct ne suffit pas
+- [ ] préparer une projection vers des changements versionnables
+- [ ] préparer la compatibilité future avec review / branchement / git
 
 ---
 
-## 7. Scene manager / polish
+## Outil de dev interne
 
-### Objectif
-
-Rendre les scènes plus faciles à gérer et à explorer.
-
-### Livrables
-
-- [ ] rename scene
-- [ ] create scene file propre
-- [ ] save/load/delete/import polish
-- [ ] duplication / branching plus clairs
-- [ ] meilleure lecture des variantes de scène
-
----
-
-## Outil de dev interne (hors surface designer)
-
-Le contrat structuré et les outils techniques restent utiles pour construire le moteur, mais doivent rester derrière la surface principale.
-
-Peuvent rester en interne/dev :
+Ces éléments restent utiles pour construire le moteur, mais ne doivent pas dicter la surface produit côté designer.
 
 - [ ] schéma d'actions
 - [ ] validation
@@ -229,46 +163,7 @@ Peuvent rester en interne/dev :
 - [ ] preview / reject
 - [ ] diff sémantique
 - [ ] mode manuel JSON si utile aux devs
-
-Mais ces éléments ne doivent pas dicter la surface produit côté designer.
-
----
-
-## Prochaines étapes détaillées
-
-### Étape 1 — formaliser le contrat du cerveau
-- [x] définir le contexte scène minimal envoyé
-- [x] définir les contraintes système envoyées
-- [x] définir la sortie structurée attendue
-- [x] définir les cas de refus / dépassement du système
-
-### Étape 2 — choisir l'architecture du bridge CLI
-- [ ] appel direct CLI vs bridge local
-- [ ] abstraction provider/runtime
-- [ ] auth et lifecycle de connexion
-- [ ] retour d'état dans l'app
-
-### Étape 3 — brancher un premier moteur réel
-- [ ] choisir une cible initiale (Codex ou Claude Code)
-- [ ] envoyer un contexte simple
-- [ ] récupérer summary + actions
-- [ ] tester preview/apply sur vrais composants
-
-### Étape 4 — durcir la règle de réutilisation
-- [ ] enrichir le contexte avec les composants/includes existants
-- [ ] interdire les sorties hors-système silencieuses
-- [ ] tester plusieurs demandes designers et mesurer les dérives
-
-### Étape 5 — rendre le designer à nouveau capable d'agir fortement
-- [ ] tokens designer-friendly
-- [ ] agencement simple
-- [ ] variantes de scène
-- [ ] navigation canvas plus naturelle
-
-### Étape 6 — rapprocher le résultat du repo
-- [ ] mapping scène → implémentation
-- [ ] diff plus utile
-- [ ] projection vers changements versionnables
+- [ ] panneau agent technique masqué, simplifié ou remplacé dans la future UX designer
 
 ---
 

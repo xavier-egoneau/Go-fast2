@@ -1,53 +1,31 @@
-import { normalizeBrainOutput } from './brain-output.js'
 import { runAgentRequest } from './agent-api.js'
+import { normalizeAgentRunPayload, normalizeBrainOutput } from './brain-contract.js'
+import { fetchAgentProviders } from './agent-api.js'
+import { getAgentProvider, getDefaultAgentProviderId, getPreferredDesignerProviderId, listAgentProviders, setAgentProviders } from './agent-providers.js'
+import { auditBrainOutput } from './brain-audit.js'
 
-const PROVIDERS = [
-  {
-    id: 'manual-json',
-    label: 'Manual JSON',
-    description: 'Dev-only provider for manually pasting a normalized brain output JSON payload.',
-    mode: 'manual'
-  },
-  {
-    id: 'codex-cli',
-    label: 'Codex CLI',
-    description: 'Planned local CLI bridge for Codex. Runtime contract only for now.',
-    mode: 'external',
-    available: false,
-    reason: 'Bridge not implemented yet'
-  },
-  {
-    id: 'claude-code',
-    label: 'Claude Code',
-    description: 'Planned local CLI bridge for Claude Code. Runtime contract only for now.',
-    mode: 'external',
-    available: false,
-    reason: 'Bridge not implemented yet'
-  }
-]
+export { listAgentProviders, getAgentProvider, getDefaultAgentProviderId, getPreferredDesignerProviderId }
 
-export function listAgentProviders() {
-  return PROVIDERS.map(provider => ({ ...provider }))
-}
-
-export function getAgentProvider(providerId) {
-  return PROVIDERS.find(provider => provider.id === providerId) || PROVIDERS[0]
-}
-
-export function getDefaultAgentProviderId() {
-  return PROVIDERS[0].id
+export async function loadAgentProviders() {
+  const providers = await fetchAgentProviders()
+  setAgentProviders(providers)
+  return listAgentProviders()
 }
 
 export async function runAgentProvider(providerId, input) {
   const provider = getAgentProvider(providerId)
-
-  const response = await runAgentRequest({
+  const request = normalizeAgentRunPayload({
     providerId: provider.id,
     ...input
   })
 
+  const response = await runAgentRequest(request)
+
   return {
-    provider,
-    output: normalizeBrainOutput(response?.output || {})
+    provider: response?.provider ? { ...provider, ...response.provider } : provider,
+    output: auditBrainOutput(normalizeBrainOutput(response?.output || {}), {
+      intent: request.intent,
+      context: request.context
+    })
   }
 }

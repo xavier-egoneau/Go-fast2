@@ -46,6 +46,16 @@
       "label": "Message d'erreur",
       "type": "text",
       "default": "Veuillez sélectionner une option."
+    },
+    "options": {
+      "label": "Options",
+      "type": "array",
+      "default": [
+        { "value": "fr", "label": "France" },
+        { "value": "be", "label": "Belgique" },
+        { "value": "ch", "label": "Suisse" },
+        { "value": "ca", "label": "Canada" }
+      ]
     }
   }
 }

@@ -26,6 +26,24 @@
       "label": "Copyright",
       "type": "text",
       "default": "© 2025 MonSite. Tous droits réservés."
+    },
+    "columns": {
+      "label": "Colonnes de liens",
+      "type": "array",
+      "default": [
+        { "title": "Produit",    "links": [{ "label": "Fonctionnalités", "href": "#" }, { "label": "Tarifs", "href": "#" }] },
+        { "title": "Ressources", "links": [{ "label": "Documentation",   "href": "#" }, { "label": "Blog",   "href": "#" }] },
+        { "title": "Entreprise", "links": [{ "label": "À propos",        "href": "#" }, { "label": "Contact","href": "#" }] }
+      ]
+    },
+    "legalLinks": {
+      "label": "Liens légaux",
+      "type": "array",
+      "default": [
+        { "label": "Confidentialité",      "href": "#" },
+        { "label": "Conditions",           "href": "#" },
+        { "label": "Cookies",              "href": "#" }
+      ]
     }
   }
 }

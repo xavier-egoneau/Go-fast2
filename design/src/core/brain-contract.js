@@ -1,0 +1,85 @@
+import { ACTION_TYPES, createEmptyActionSet } from './action-schema.js'
+
+export const BRAIN_OUTPUT_KEYS = ['summary', 'actions', 'warnings', 'requiresNewComponent', 'unresolved']
+
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function normalizeWarnings(value) {
+  if (!Array.isArray(value)) return []
+  return value.map(item => String(item)).filter(Boolean)
+}
+
+function normalizeUnresolved(value) {
+  if (!Array.isArray(value)) return []
+  return value.map(item => {
+    if (typeof item === 'string') {
+      return { type: 'generic', message: item }
+    }
+    if (isPlainObject(item)) {
+      return {
+        type: String(item.type || 'generic'),
+        message: String(item.message || ''),
+        detail: item.detail ?? null
+      }
+    }
+    return { type: 'generic', message: String(item) }
+  })
+}
+
+function normalizeAction(action) {
+  if (!isPlainObject(action)) return null
+  if (!ACTION_TYPES.includes(action.type)) return null
+  return { ...action }
+}
+
+export function createEmptyBrainOutput() {
+  return {
+    ...createEmptyActionSet(),
+    warnings: [],
+    requiresNewComponent: false,
+    unresolved: []
+  }
+}
+
+export function normalizeBrainOutput(payload) {
+  if (!isPlainObject(payload)) {
+    return createEmptyBrainOutput()
+  }
+
+  const actions = Array.isArray(payload.actions)
+    ? payload.actions.map(normalizeAction).filter(Boolean)
+    : []
+
+  return {
+    summary: String(payload.summary || ''),
+    actions,
+    warnings: normalizeWarnings(payload.warnings),
+    requiresNewComponent: Boolean(payload.requiresNewComponent),
+    unresolved: normalizeUnresolved(payload.unresolved)
+  }
+}
+
+export function createEmptyAgentRunPayload() {
+  return {
+    providerId: 'manual-json',
+    intent: '',
+    prompt: '',
+    context: null,
+    manualJson: ''
+  }
+}
+
+export function normalizeAgentRunPayload(payload) {
+  const base = createEmptyAgentRunPayload()
+  if (!isPlainObject(payload)) return base
+
+  return {
+    providerId: String(payload.providerId || base.providerId),
+    intent: String(payload.intent || ''),
+    prompt: String(payload.prompt || ''),
+    context: isPlainObject(payload.context) ? payload.context : null,
+    manualJson: typeof payload.manualJson === 'string' ? payload.manualJson : ''
+  }
+}

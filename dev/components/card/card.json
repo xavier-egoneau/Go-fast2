@@ -24,6 +24,18 @@
       "label": "Avec bouton",
       "type": "checkbox",
       "default": true
+    },
+    "ctaVariant": {
+      "label": "Variante du bouton",
+      "type": "select",
+      "default": "outline",
+      "options": ["primary", "secondary", "outline", "ghost", "danger"]
+    },
+    "ctaSize": {
+      "label": "Taille du bouton",
+      "type": "select",
+      "default": "sm",
+      "options": ["sm", "md", "lg"]
     }
   },
   "content": {
@@ -41,6 +53,21 @@
       "label": "Texte du bouton",
       "type": "text",
       "default": "En savoir plus"
+    },
+    "tag": {
+      "label": "Tag de la carte",
+      "type": "text",
+      "default": ""
+    },
+    "imageUrl": {
+      "label": "Image (URL)",
+      "type": "text",
+      "default": "https://placehold.co/600x400"
+    },
+    "imageAlt": {
+      "label": "Alt de l'image",
+      "type": "text",
+      "default": ""
     }
   }
 }

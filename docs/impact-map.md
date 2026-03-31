@@ -130,6 +130,27 @@ npm run setup-agentic -- --tool codex     # si .codex/ est actif
 
 ---
 
+## `design/src/app.js`
+
+**Impacts directs :**
+- `design/README.md` → section "Disponible" et "Raccourcis clavier" — mettre à jour si une feature canvas change de comportement
+- `design/ROADMAP.md` → cocher les items au fur et à mesure de l'implémentation
+- `design/src/styles/design.scss` → chaque nouveau bloc rendu nécessite ses styles BEM
+- `design/src/core/render-url.js` → si le format de sérialisation des params URL change
+
+## `design/src/core/render-url.js`
+
+**Impacts directs :**
+- `vite.config.js` → le middleware Twig désérialise les params — les deux doivent rester synchronisés sur le format (JSON pour arrays/objects)
+- `GUIDELINES_AI.md` → section 3 "Types de contrôles disponibles" — si un nouveau type de contrôle est ajouté
+
+## `design/src/styles/design.scss`
+
+**Impacts directs :**
+- `design/src/app.js` → toute classe BEM ajoutée dans le JS doit avoir son pendant SCSS ici
+
+---
+
 ## `docs/impact-map.md` (ce fichier)
 
 **Impacts directs :**

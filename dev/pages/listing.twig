@@ -1,4 +1,6 @@
 {% set gridCols = gridCols|default('3') %}
+{% set header = header|default({}) %}
+{% set footer = footer|default({}) %}
 
 <!DOCTYPE html>
 <html lang="fr">
@@ -10,18 +12,7 @@
 </head>
 <body>
 
-  {% include 'dev/components/header-nav/header-nav.twig' with {
-    variant: 'light',
-    sticky: true,
-    logoText: 'MonSite',
-    ctaText: 'Commencer',
-    links: [
-      { label: 'Accueil',  href: '#' },
-      { label: 'Articles', href: '#', active: true },
-      { label: 'Tarifs',   href: '#' },
-      { label: 'Contact',  href: '#' }
-    ]
-  } %}
+  {% include 'dev/components/header-nav/header-nav.twig' with header %}
 
   <main class="listing-page" id="main-content">
 
@@ -113,12 +104,7 @@
 
   </main>
 
-  {% include 'dev/components/footer/footer.twig' with {
-    variant: 'dark',
-    logoText: 'MonSite',
-    tagline: 'Construisons quelque chose de grand.',
-    copyright: '© 2025 MonSite. Tous droits réservés.'
-  } %}
+  {% include 'dev/components/footer/footer.twig' with footer %}
 
 </body>
 </html>

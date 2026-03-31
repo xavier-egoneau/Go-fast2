@@ -2,6 +2,8 @@
 {% set horizontal = horizontal|default(false) %}
 {% set hasImage   = hasImage|default(true) %}
 {% set hasCta     = hasCta|default(true) %}
+{% set ctaVariant = ctaVariant|default('outline') %}
+{% set ctaSize    = ctaSize|default('sm') %}
 {% set title      = title|default('Titre de la carte') %}
 {% set text       = text|default('Courte description du contenu de la carte.') %}
 {% set ctaText    = ctaText|default('En savoir plus') %}
@@ -35,8 +37,8 @@
       <div class="card__footer">
         {% include 'dev/components/button/button.twig' with {
           text: ctaText,
-          variant: 'outline',
-          size: 'sm'
+          variant: ctaVariant,
+          size: ctaSize
         } %}
       </div>
     {% endif %}

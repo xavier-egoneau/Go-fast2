@@ -9,5 +9,29 @@
       "default": "3",
       "options": ["1", "2", "3"]
     }
+  },
+  "content": {
+    "header": {
+      "label": "Header",
+      "type": "component-params",
+      "ref": "header-nav",
+      "default": {
+        "variant": "light",
+        "sticky": true,
+        "logoText": "MonSite",
+        "ctaText": "Commencer"
+      }
+    },
+    "footer": {
+      "label": "Footer",
+      "type": "component-params",
+      "ref": "footer",
+      "default": {
+        "variant": "dark",
+        "logoText": "MonSite",
+        "tagline": "Construisons quelque chose de grand.",
+        "copyright": "© 2025 MonSite. Tous droits réservés."
+      }
+    }
   }
 }

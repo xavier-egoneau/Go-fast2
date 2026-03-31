@@ -5,10 +5,28 @@
   "description": "Conteneur CSS Grid configurable. Gère colonnes, gap et alignement pour toute mise en page.",
   "variants": {
     "cols": {
-      "label": "Colonnes",
+      "label": "Colonnes (défaut)",
       "type": "select",
       "default": "3",
       "options": ["1", "2", "3", "4", "6", "12", "auto"]
+    },
+    "colsSm": {
+      "label": "Colonnes (sm)",
+      "type": "select",
+      "default": "",
+      "options": ["", "1", "2", "3", "4", "6", "12", "auto"]
+    },
+    "colsMd": {
+      "label": "Colonnes (md)",
+      "type": "select",
+      "default": "",
+      "options": ["", "1", "2", "3", "4", "6", "12", "auto"]
+    },
+    "colsLg": {
+      "label": "Colonnes (lg)",
+      "type": "select",
+      "default": "",
+      "options": ["", "1", "2", "3", "4", "6", "12", "auto"]
     },
     "gap": {
       "label": "Gap",
@@ -21,6 +39,13 @@
       "type": "select",
       "default": "stretch",
       "options": ["stretch", "start", "center", "end"]
+    }
+  },
+  "content": {
+    "tag": {
+      "label": "Élément HTML",
+      "type": "text",
+      "default": "div"
     }
   }
 }

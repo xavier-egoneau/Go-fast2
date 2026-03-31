@@ -10,6 +10,18 @@
       "default": "light",
       "options": ["light", "dark"]
     },
+    "ctaVariant": {
+      "label": "Variante du CTA",
+      "type": "select",
+      "default": "auto",
+      "options": ["auto", "primary", "secondary", "outline", "ghost", "danger"]
+    },
+    "ctaSize": {
+      "label": "Taille du CTA",
+      "type": "select",
+      "default": "sm",
+      "options": ["sm", "md", "lg"]
+    },
     "sticky": {
       "label": "Sticky",
       "type": "checkbox",
@@ -26,6 +38,16 @@
       "label": "Texte du bouton",
       "type": "text",
       "default": "Commencer"
+    },
+    "links": {
+      "label": "Liens de navigation",
+      "type": "array",
+      "default": [
+        { "label": "Accueil",  "href": "#" },
+        { "label": "Produits", "href": "#" },
+        { "label": "Tarifs",   "href": "#" },
+        { "label": "Contact",  "href": "#" }
+      ]
     }
   }
 }

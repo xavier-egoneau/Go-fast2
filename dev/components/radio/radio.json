@@ -30,6 +30,15 @@
       "label": "Message d'erreur",
       "type": "text",
       "default": "Veuillez choisir une option."
+    },
+    "options": {
+      "label": "Options",
+      "type": "array",
+      "default": [
+        { "value": "starter", "label": "Starter" },
+        { "value": "pro",     "label": "Pro" },
+        { "value": "enterprise", "label": "Enterprise" }
+      ]
     }
   }
 }

@@ -7,6 +7,8 @@
     "init": "node scripts/init-project.js",
     "setup-agentic": "node scripts/setup-agentic.js",
     "dev": "vite",
+    "design": "vite --open /design/",
+    "design:dev": "vite --open /design/",
     "build": "vite build",
     "preview": "vite preview",
     "reset": "node scripts/reset-project.js",

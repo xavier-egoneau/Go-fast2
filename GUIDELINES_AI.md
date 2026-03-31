@@ -111,6 +111,8 @@ dev/assets/scss/components/_[nom].scss
 - `text` → `{ type, label, default: string }`
 - `color` → `{ type, label, default: "#hexcode" }`
 - `number` → `{ type, label, default: number }`
+- `array` → `{ type, label, default: [] }` — tableau d'objets (ex: liens, options, colonnes). Rendu comme une textarea JSON dans l'inspector. Sérialisé en JSON dans l'URL, désérialisé côté middleware Vite avant injection Twig.
+- `component-params` → `{ type, label, ref: "component-id", default: {} }` — expose les params d'un sous-composant depuis une page ou organism. `ref` = ID de la registry (dossier kebab-case, ex: `"header-nav"`). La valeur est stockée comme objet JSON dans l'URL. Le template Twig reçoit la variable comme objet et la spread dans le `{% include %}` avec `with variable`. **Uniquement dans `content`.**
 
 **`variants`** = contrôles qui modifient l'apparence (classes CSS, états)
 **`content`** = contrôles qui modifient le contenu textuel ou les données

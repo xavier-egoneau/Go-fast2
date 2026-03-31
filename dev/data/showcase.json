@@ -81,6 +81,28 @@
           "label": "Avec bouton",
           "type": "checkbox",
           "default": true
+        },
+        "ctaVariant": {
+          "label": "Variante du bouton",
+          "type": "select",
+          "default": "outline",
+          "options": [
+            "primary",
+            "secondary",
+            "outline",
+            "ghost",
+            "danger"
+          ]
+        },
+        "ctaSize": {
+          "label": "Taille du bouton",
+          "type": "select",
+          "default": "sm",
+          "options": [
+            "sm",
+            "md",
+            "lg"
+          ]
         }
       },
       "content": {
@@ -98,6 +120,21 @@
           "label": "Texte du bouton",
           "type": "text",
           "default": "En savoir plus"
+        },
+        "tag": {
+          "label": "Tag de la carte",
+          "type": "text",
+          "default": ""
+        },
+        "imageUrl": {
+          "label": "Image (URL)",
+          "type": "text",
+          "default": "https://placehold.co/600x400"
+        },
+        "imageAlt": {
+          "label": "Alt de l'image",
+          "type": "text",
+          "default": ""
         }
       }
     },
@@ -171,6 +208,69 @@
           "label": "Copyright",
           "type": "text",
           "default": "© 2025 MonSite. Tous droits réservés."
+        },
+        "columns": {
+          "label": "Colonnes de liens",
+          "type": "array",
+          "default": [
+            {
+              "title": "Produit",
+              "links": [
+                {
+                  "label": "Fonctionnalités",
+                  "href": "#"
+                },
+                {
+                  "label": "Tarifs",
+                  "href": "#"
+                }
+              ]
+            },
+            {
+              "title": "Ressources",
+              "links": [
+                {
+                  "label": "Documentation",
+                  "href": "#"
+                },
+                {
+                  "label": "Blog",
+                  "href": "#"
+                }
+              ]
+            },
+            {
+              "title": "Entreprise",
+              "links": [
+                {
+                  "label": "À propos",
+                  "href": "#"
+                },
+                {
+                  "label": "Contact",
+                  "href": "#"
+                }
+              ]
+            }
+          ]
+        },
+        "legalLinks": {
+          "label": "Liens légaux",
+          "type": "array",
+          "default": [
+            {
+              "label": "Confidentialité",
+              "href": "#"
+            },
+            {
+              "label": "Conditions",
+              "href": "#"
+            },
+            {
+              "label": "Cookies",
+              "href": "#"
+            }
+          ]
         }
       }
     },
@@ -183,10 +283,55 @@
       "description": "Conteneur CSS Grid configurable. Gère colonnes, gap et alignement pour toute mise en page.",
       "variants": {
         "cols": {
-          "label": "Colonnes",
+          "label": "Colonnes (défaut)",
           "type": "select",
           "default": "3",
           "options": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "6",
+            "12",
+            "auto"
+          ]
+        },
+        "colsSm": {
+          "label": "Colonnes (sm)",
+          "type": "select",
+          "default": "",
+          "options": [
+            "",
+            "1",
+            "2",
+            "3",
+            "4",
+            "6",
+            "12",
+            "auto"
+          ]
+        },
+        "colsMd": {
+          "label": "Colonnes (md)",
+          "type": "select",
+          "default": "",
+          "options": [
+            "",
+            "1",
+            "2",
+            "3",
+            "4",
+            "6",
+            "12",
+            "auto"
+          ]
+        },
+        "colsLg": {
+          "label": "Colonnes (lg)",
+          "type": "select",
+          "default": "",
+          "options": [
+            "",
             "1",
             "2",
             "3",
@@ -221,7 +366,13 @@
           ]
         }
       },
-      "content": {}
+      "content": {
+        "tag": {
+          "label": "Élément HTML",
+          "type": "text",
+          "default": "div"
+        }
+      }
     },
     {
       "id": "header-nav",
@@ -240,6 +391,29 @@
             "dark"
           ]
         },
+        "ctaVariant": {
+          "label": "Variante du CTA",
+          "type": "select",
+          "default": "auto",
+          "options": [
+            "auto",
+            "primary",
+            "secondary",
+            "outline",
+            "ghost",
+            "danger"
+          ]
+        },
+        "ctaSize": {
+          "label": "Taille du CTA",
+          "type": "select",
+          "default": "sm",
+          "options": [
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
         "sticky": {
           "label": "Sticky",
           "type": "checkbox",
@@ -256,6 +430,28 @@
           "label": "Texte du bouton",
           "type": "text",
           "default": "Commencer"
+        },
+        "links": {
+          "label": "Liens de navigation",
+          "type": "array",
+          "default": [
+            {
+              "label": "Accueil",
+              "href": "#"
+            },
+            {
+              "label": "Produits",
+              "href": "#"
+            },
+            {
+              "label": "Tarifs",
+              "href": "#"
+            },
+            {
+              "label": "Contact",
+              "href": "#"
+            }
+          ]
         }
       }
     },
@@ -364,6 +560,24 @@
           "label": "Message d'erreur",
           "type": "text",
           "default": "Veuillez choisir une option."
+        },
+        "options": {
+          "label": "Options",
+          "type": "array",
+          "default": [
+            {
+              "value": "starter",
+              "label": "Starter"
+            },
+            {
+              "value": "pro",
+              "label": "Pro"
+            },
+            {
+              "value": "enterprise",
+              "label": "Enterprise"
+            }
+          ]
         }
       }
     },
@@ -421,6 +635,28 @@
           "label": "Message d'erreur",
           "type": "text",
           "default": "Veuillez sélectionner une option."
+        },
+        "options": {
+          "label": "Options",
+          "type": "array",
+          "default": [
+            {
+              "value": "fr",
+              "label": "France"
+            },
+            {
+              "value": "be",
+              "label": "Belgique"
+            },
+            {
+              "value": "ch",
+              "label": "Suisse"
+            },
+            {
+              "value": "ca",
+              "label": "Canada"
+            }
+          ]
         }
       }
     },
@@ -481,7 +717,30 @@
       "category": "Pages",
       "description": "Page de création de compte avec tous les composants de formulaire, header et footer.",
       "variants": {},
-      "content": {}
+      "content": {
+        "header": {
+          "label": "Header",
+          "type": "component-params",
+          "ref": "header-nav",
+          "default": {
+            "variant": "light",
+            "sticky": true,
+            "logoText": "MonSite",
+            "ctaText": "Commencer"
+          }
+        },
+        "footer": {
+          "label": "Footer",
+          "type": "component-params",
+          "ref": "footer",
+          "default": {
+            "variant": "dark",
+            "logoText": "MonSite",
+            "tagline": "Construisons quelque chose de grand.",
+            "copyright": "© 2025 MonSite. Tous droits réservés."
+          }
+        }
+      }
     },
     {
       "id": "listing",
@@ -502,7 +761,30 @@
           ]
         }
       },
-      "content": {}
+      "content": {
+        "header": {
+          "label": "Header",
+          "type": "component-params",
+          "ref": "header-nav",
+          "default": {
+            "variant": "light",
+            "sticky": true,
+            "logoText": "MonSite",
+            "ctaText": "Commencer"
+          }
+        },
+        "footer": {
+          "label": "Footer",
+          "type": "component-params",
+          "ref": "footer",
+          "default": {
+            "variant": "dark",
+            "logoText": "MonSite",
+            "tagline": "Construisons quelque chose de grand.",
+            "copyright": "© 2025 MonSite. Tous droits réservés."
+          }
+        }
+      }
     }
   ]
 }

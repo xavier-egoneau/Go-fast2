@@ -17,3 +17,14 @@ export async function deleteSceneFile(fileName) {
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }
+
+export async function scaffoldComponent({ name, level, category, description }) {
+  const res = await fetch('/__design_api/scaffold', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, level, category, description })
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Erreur scaffold')
+  return data
+}

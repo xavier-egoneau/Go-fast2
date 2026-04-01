@@ -1,23 +1,13 @@
-## Sprint 1 — UX canvas de base
+- [x] impossible d'écrire une annotation a cause d'un rechargement a chaque frappe dans l'input
+- [x] impossible de supprimer la note
+- [x] impossible d'ouvrir  la note
+- [x] la fonctionnalité ajouter une note devrait plutot être placée sur les élément dans le canvas et non présenter comme un élément de la librairie( ce qu'elle n'est pas)
 
-- [x] quand je clic sur un composant je veux qu'il passe au premier plan
-- [x] tout composant doit pourvoir etre supprimé de la scène ( et pas du projet)
-- [x] incohérence sur ce que sont les éléments dans la scène par rapport a ceux dans la nav gauche. on devrait afficher tous les éléments présents dans la nav gauche sur le canvas. la nav gauche n'est qu'un raccourci vers les composants existants pour quand on créé une nouvelle page ou une molécule et qu'on voudrait les drag and drop dans une nouvelle page
-- [x] proposer un alignement auto par defaut type bento dans un ordre atomique ( les tokens, les atomes, les molécules,les organismes, les pages)
-- [x] les notes prennent trop de place. elles doivent être de simples points toujours au dessus d'un élément et lié a lui. Elles s'ouvrent quand on les clique.
-- [x] quand je clic sur un élément il faut que ça soit automatiquement en contexte que je fais reference a cet élément pour les demandes IA a l'agent.
-- [x] quand je modifie actuellement la position d'un élément tout est reload
-- [x] gérer les alertes post traitement agent pour qu'on puisse les fermer
+- [ ] je ne vois pas a quoi servent les élément dans le menu scène, ni workspace ( si inutile on supprime tout ça et les fonctions inutiles > refacto propre) . rappel la scène contient tous les éléments(atomes,molécules,organismes et pages. supprimer un élément de la scène c'est le supprimer du projet - mettre une alerte pour sensibiliser l'utilisateur a ce principe si il clic sur supprimer)
+- [x] je ne vois pas a quoi servent les éléments dans le menu canvas a part réorganiser(bento). garder juste le bouton réorganiser(bento) et faire un gros menage des fonctions inutiles.
+- [x] le sidebar menu de gauche n'est pas utile tout le temps  - permettre de l'ouvrir et de le fermer.
 
-## Sprint 2 — Inspector et variables
-
-- [x] clic sur un item du canvas ne sélectionnait pas (iframes bloquaient les events pointer) → pointer-events:none sur les iframes par défaut
-- [x] nav gauche nettoyée : suppression des boutons "Ajouter au canvas" et "Tout afficher", ajout placeholder "Créer un composant/page"
-- [x] message empty state du canvas — texte mis à jour
-- [x] bouton "Réorganiser" dans la topbar — re-déclenche le bento layout sur demande
-- [x] type "component-params" dans l'inspector — expose les params d'un sous-composant (ex: header, footer) depuis la fiche d'une page
-- [x] listing.json — header et footer déclarés comme component-params
-- [x] listing.twig — header/footer consomment les params reçus via `with variable`
-- [x] form.json — header et footer déclarés comme component-params
-- [x] form.twig — header/footer consomment les params reçus via `with variable`
-- [x] GUIDELINES_AI.md — type "component-params" documenté
+- [x] panel inspector a droite ne va pas - je voudrais qu'il s'ouvre a gauche a la place de la librairie de composants plutot
+- [x] defaut scène et le mode desktop/tablet/mobile dans la nav top je n'en vois pas l'interet. on a deja la possibilité de changer le mode desktop/tablet/mobile sur les composants dans le canvas et c'est plus logique car la scène ne change pas c le composant qu'on resize pour voir comment il se comporte en responsive.
+- [ ] desktop/tablet/mobile : les tailles associées a ce changement de taille de la fenêtre n'ont pas a être renseignées a chaque fois dans l'inspector c'est une variable commune a tout le projet. (mettre des variables dans les token pour les points de ruptures globale et se fixer dessus )
+- [x] agent : il répond trop souvant non — ajout du support params sur duplicate-item, renforcement du prompt avec instructions de création de variantes, hint de contexte quand 1 seul item dans la scène

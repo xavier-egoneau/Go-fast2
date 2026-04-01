@@ -16,8 +16,9 @@ const SUPPORTED_ACTIONS = [
   },
   {
     type: 'duplicate-item',
-    purpose: 'Duplicate an existing item with an optional offset.',
-    requiresExistingItem: true
+    purpose: 'Duplicate an existing item, optionally overriding Twig params to create a variant. Use this to create page or component variants with different content, states (e.g. disabled inputs), titles, etc. Supports: targetId (required), offset.x/y (optional), params (optional object of Twig params to override).',
+    requiresExistingItem: true,
+    supportsParams: true
   },
   {
     type: 'add-item',
@@ -110,7 +111,7 @@ function buildTokenSummary(tokens) {
   }
 }
 
-function buildInteractionGuidance(selectedItem, selectedNote) {
+function buildInteractionGuidance(selectedItem, selectedNote, sceneItems = []) {
   if (selectedItem) {
     return {
       focus: 'selected-item',
@@ -129,9 +130,12 @@ function buildInteractionGuidance(selectedItem, selectedNote) {
     }
   }
 
+  const singleItem = sceneItems.length === 1 ? sceneItems[0] : null
   return {
     focus: 'canvas',
-    designerIntentHint: 'When nothing is selected, treat the request as scene-level. If the designer asks for a page, a new page, or a page variant, interpret it as a scene or page-level change rather than a component edit.',
+    designerIntentHint: singleItem
+      ? `Nothing is selected but the scene has exactly one item (id: ${singleItem.id}, ref: ${singleItem.ref}). Use this item as the implicit target for duplicate-item or update-params/update-item actions when the request is about that element.`
+      : 'When nothing is selected, treat the request as scene-level. If the designer asks for a page, a new page, or a page variant, use duplicate-item with params on the relevant scene item.',
     selectedKind: null,
     selectedRef: null
   }
@@ -167,7 +171,7 @@ export function buildAIContext(state, getEntryById) {
             note: serializeSceneNote(selectedNote)
           }
         : null,
-    interaction: buildInteractionGuidance(selectedItem, selectedNote),
+    interaction: buildInteractionGuidance(selectedItem, selectedNote, scene.items || []),
     system: {
       registry,
       registrySummary: buildRegistrySummary(registry),

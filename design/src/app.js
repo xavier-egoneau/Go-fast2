@@ -1,8 +1,8 @@
 import { loadRegistry, searchEntries, getEntryById, getDefaultParams } from './core/registry.js'
 import { buildRenderUrl } from './core/render-url.js'
-import { loadTokens, getTokenSummaryForEntry } from './core/tokens.js'
+import { loadTokens, getTokens, getTokenSummaryForEntry } from './core/tokens.js'
 import { listSceneFiles, loadSceneFile } from './core/scene-file.js'
-import { saveSceneFile, deleteSceneFile } from './core/scene-api.js'
+import { saveSceneFile, deleteSceneFile, scaffoldComponent } from './core/scene-api.js'
 import { diffScenes } from './core/diff.js'
 import { validateActionSet } from './core/action-validate.js'
 import { applyActionSetToScene } from './core/action-apply.js'
@@ -37,7 +37,11 @@ let historyMuted = false
 let frameInteractivityDisabled = false
 let openNoteId = null
 let lastDragEndTime = 0
+let lastDragDidMove = false
 let spacePressed = false
+let libraryOpen = true
+let inspectorOpen = true
+let newComponentFormOpen = false
 let panState = null
 let zoomLevel = 1
 
@@ -62,9 +66,21 @@ function getItemDimensions(entry, viewport) {
   return { width: Math.min(420, vp.width), height: 260 }
 }
 
+let autoSaveTimer = null
+function scheduleAutoSave() {
+  clearTimeout(autoSaveTimer)
+  autoSaveTimer = setTimeout(async () => {
+    try {
+      const { scene, activeSceneFile } = getState()
+      await saveSceneFile(activeSceneFile || 'default.scene.json', scene)
+    } catch {}
+  }, 2000)
+}
+
 function commitSceneHistory() {
   if (historyMuted) return
   pushHistory(getState().scene)
+  scheduleAutoSave()
 }
 
 function addItem(entry) {
@@ -245,7 +261,7 @@ async function deleteCurrentSceneFile() {
     alert('La scène par défaut ne peut pas être supprimée.')
     return
   }
-  const ok = confirm(`Supprimer ${activeSceneFile} ?`)
+  const ok = confirm(`Supprimer le fichier scène "${activeSceneFile}" ?\n\nCette action supprime définitivement ce fichier du projet. Les composants qu'il contient ne seront plus accessibles via cette scène.`)
   if (!ok) return
   await deleteSceneFile(activeSceneFile)
   await refreshSceneFiles()
@@ -311,6 +327,8 @@ function importSceneFromFile(event) {
 }
 
 const LEVEL_ORDER = ['atom', 'molecule', 'organism', 'template', 'page']
+
+const TOKEN_BENTO_HEIGHT = 520 // hauteur estimée du bento tokens en px
 
 function autoArrangeAll() {
   const entries = searchEntries('')
@@ -646,15 +664,24 @@ function renderLibrary() {
         <p class="ds-panel__subtitle">Palette de composition</p>
       </div>
       <div class="ds-panel__body">
-        <button class="ds-btn" style="width:100%;margin-bottom:10px;" data-action="create-component" disabled title="Bientôt disponible">+ Nouveau composant / page</button>
+        <button class="ds-btn${newComponentFormOpen ? ' ds-btn--active' : ''}" style="width:100%;margin-bottom:10px;" data-action="toggle-new-component">+ Nouveau composant / page</button>
+        ${newComponentFormOpen ? `
+          <form class="ds-new-component-form" data-action="new-component-form">
+            <input class="ds-field__input" name="name" placeholder="Nom (kebab-case)" required autocomplete="off">
+            <select class="ds-field__select" name="level">
+              <option value="atom">Atom</option>
+              <option value="molecule">Molecule</option>
+              <option value="organism">Organism</option>
+              <option value="page">Page</option>
+            </select>
+            <input class="ds-field__input" name="category" placeholder="Catégorie (ex: Forms)" autocomplete="off">
+            <input class="ds-field__input" name="description" placeholder="Description courte" autocomplete="off">
+            <button type="submit" class="ds-btn ds-btn--primary" style="width:100%;">Créer</button>
+            <div class="ds-new-component-form__status" data-new-component-status></div>
+          </form>
+        ` : ''}
         <input class="ds-search" id="ds-search" type="search" placeholder="Rechercher…" value="${escapeAttr(query)}">
         <div class="ds-library-list" style="margin-top: 16px;">
-          <article class="ds-card">
-            <div class="ds-card__top"><div class="ds-card__name">Annotation</div><span class="ds-badge">note</span></div>
-            <div class="ds-card__meta">collaboration · canvas</div>
-            <p class="ds-card__desc">Ajoute une note libre sur le canvas.</p>
-            <div class="ds-card__actions"><button class="ds-btn" data-action="add-note">Ajouter une note</button></div>
-          </article>
           ${entries.map(entry => `
             <article class="ds-card">
               <div class="ds-card__top"><div class="ds-card__name">${escapeHtml(entry.name)}</div><span class="ds-badge">${escapeHtml(entry.kind)}</span></div>
@@ -759,42 +786,183 @@ function renderCanvas() {
   return `
     <main class="ds-canvas-wrap">
       ${renderPreviewStatus()}
-      <div style="min-width:${scaledW}px;min-height:${scaledH}px;">
-      <div class="ds-canvas" id="ds-canvas" style="transform:scale(${zoomLevel});transform-origin:0 0;min-width:${CANVAS_MIN_W}px;min-height:${CANVAS_MIN_H}px;">
-        ${renderFrames(scene)}
-        ${scene.items.length === 0 && notes.length === 0 ? '<div class="ds-empty">Canvas vide — utilise "Réorganiser" pour recharger tous les composants, ou ajoute une note.</div>' : ''}
-        ${notes.map(note => `
-          <div class="ds-note-pin ${selectedItemId === note.id ? 'ds-note-pin--selected' : ''} ${openNoteId === note.id ? 'ds-note-pin--open' : ''}" data-note-id="${note.id}" style="left:${note.x}px;top:${note.y}px;">
-            <div class="ds-note-pin__dot" data-note-drag-handle="${note.id}"></div>
-            <div class="ds-note-pin__popup">
-              <textarea class="ds-note-pin__input" rows="3" data-action="note-text" data-note-id="${note.id}">${escapeHtml(note.text)}</textarea>
-            </div>
-          </div>
-        `).join('')}
-        ${scene.items.map(item => {
-          const entry = getEntryById(item.ref, item.kind)
-          if (!entry) return ''
-          const url = buildRenderUrl(entry, item.params)
-          const agentOpen = getAgentState().open
-          return `
-            <section class="ds-item ${selectedItemId === item.id ? 'ds-item--selected' : ''}" data-item-id="${item.id}" style="left:${item.x}px;top:${item.y}px;width:${item.width}px;height:${item.height}px;">
-              <div class="ds-item__toolbar" data-drag-handle="${item.id}">
-                <div><div class="ds-item__title">${escapeHtml(entry.name)}</div><div class="ds-item__meta">${escapeHtml(item.viewport || 'desktop')} · ${escapeHtml(entry.kind)} · ${escapeHtml(entry.level || '')}</div></div>
-                <div style="display:flex;gap:6px;align-items:center;">
-                  ${agentOpen && selectedItemId === item.id ? `<span class="ds-item__ai-badge" title="Contexte IA actif">IA</span>` : ''}
-                  <a class="ds-badge" href="${escapeAttr(url)}" target="_blank" rel="noreferrer">ouvrir</a>
-                  <button class="ds-item__delete" data-action="remove-item" data-item-id="${item.id}" title="Supprimer du canvas">×</button>
+      <div class="ds-canvas-stack" style="min-width:${scaledW}px;">
+        <div class="ds-canvas" id="ds-canvas" style="transform:scale(${zoomLevel});transform-origin:0 0;min-width:${CANVAS_MIN_W}px;">
+          ${renderTokenBento()}
+          <div class="ds-canvas-stage" style="min-width:${CANVAS_MIN_W}px;min-height:${CANVAS_MIN_H}px;">
+            ${renderFrames(scene)}
+            ${scene.items.length === 0 && notes.length === 0 ? '<div class="ds-empty">Canvas vide — utilise "Réorganiser" pour recharger tous les composants, ou ajoute une note.</div>' : ''}
+            ${notes.map(note => `
+              <div class="ds-note-pin ${selectedItemId === note.id ? 'ds-note-pin--selected' : ''} ${openNoteId === note.id ? 'ds-note-pin--open' : ''}" data-note-id="${note.id}" style="left:${note.x}px;top:${note.y}px;">
+                <div class="ds-note-pin__dot" data-note-drag-handle="${note.id}"></div>
+                <div class="ds-note-pin__popup">
+                  <textarea class="ds-note-pin__input" rows="3" data-action="note-text" data-note-id="${note.id}">${escapeHtml(note.text)}</textarea>
+                  <button class="ds-note-pin__delete" data-action="note-delete-popup" data-note-id="${note.id}" title="Supprimer cette note">×</button>
                 </div>
               </div>
-              <iframe class="ds-item__frame" src="${escapeAttr(url)}" title="${escapeAttr(entry.name)}" style="height: calc(100% - 41px);"></iframe>
-              <div class="ds-item__resize" data-resize-handle="${item.id}" title="Redimensionner"></div>
-            </section>
-          `
-        }).join('')}
-      </div>
+            `).join('')}
+            ${scene.items.map(item => {
+              const entry = getEntryById(item.ref, item.kind)
+              if (!entry) return ''
+              const url = buildRenderUrl(entry, item.params)
+              const agentOpen = getAgentState().open
+              return `
+                <section class="ds-item ${selectedItemId === item.id ? 'ds-item--selected' : ''}" data-item-id="${item.id}" style="left:${item.x}px;top:${item.y}px;width:${item.width}px;height:${item.height}px;">
+                  <div class="ds-item__toolbar" data-drag-handle="${item.id}">
+                    <div><div class="ds-item__title">${escapeHtml(entry.name)}</div><div class="ds-item__meta">${escapeHtml(item.viewport || 'desktop')} · ${escapeHtml(entry.kind)} · ${escapeHtml(entry.level || '')}</div></div>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                      ${agentOpen && selectedItemId === item.id ? `<span class="ds-item__ai-badge" title="Contexte IA actif">IA</span>` : ''}
+                      <a class="ds-badge" href="${escapeAttr(url)}" target="_blank" rel="noreferrer">ouvrir</a>
+                      <button class="ds-item__delete" data-action="remove-item" data-item-id="${item.id}" title="Supprimer du canvas">×</button>
+                    </div>
+                  </div>
+                  <iframe class="ds-item__frame" src="${escapeAttr(url)}" title="${escapeAttr(entry.name)}" style="height: calc(100% - 41px);"></iframe>
+                  <div class="ds-item__resize" data-resize-handle="${item.id}" title="Redimensionner"></div>
+                </section>
+              `
+            }).join('')}
+          </div>
+        </div>
       </div>
     </main>
   `
+}
+
+function renderTokenBento() {
+  const tokens = getTokens()
+
+  const hasTokens = tokens.length > 0
+  if (!hasTokens) return ''
+
+  const isHex = v => /^#[0-9a-fA-F]{3,8}$/.test(v.trim())
+  const pickEvenly = (items, limit) => {
+    if (!items.length) return []
+    if (items.length <= limit) return items
+    const step = (items.length - 1) / Math.max(limit - 1, 1)
+    return Array.from({ length: limit }, (_, index) => items[Math.round(index * step)]).filter(Boolean)
+  }
+
+  let tokensSection = ''
+  if (hasTokens) {
+    const byCategory = {}
+    tokens.forEach(t => {
+      if (!byCategory[t.category]) byCategory[t.category] = []
+      byCategory[t.category].push(t)
+    })
+    const findTokenByVar = scssVar => tokens.find(token => token.scssVar === scssVar) || null
+
+    const colorTokens = byCategory['color'] || []
+    const colorDots = pickEvenly(colorTokens, 12).map(t => {
+      const val = t.value.trim()
+      const hex = isHex(val) ? val : null
+      if (!hex) return ''
+      return `<span class="ds-frieze__dot" style="background:${hex};" title="${escapeHtml(t.id)}"></span>`
+    }).join('')
+
+    const fontSizes = byCategory['font-size'] || []
+    const typeSamples = pickEvenly(fontSizes, 4)
+      .map(t => `<span class="ds-frieze__type-sample" style="font-size:${t.value.trim()}" title="${escapeHtml(t.id)}">Aa</span>`)
+      .join('')
+
+    const spacings = pickEvenly(byCategory['spacing'] || [], 5).map(t => {
+      const px = Math.min(parseFloat(t.value) * 16, 40)
+      return `<span class="ds-frieze__space-bar" style="width:${Math.max(px, 3)}px;" title="${escapeHtml(t.id)}"></span>`
+    }).join('')
+
+    const radii = pickEvenly(byCategory['radius'] || [], 4).map(t => {
+      const val = t.value.trim()
+      return `<span class="ds-frieze__radius-box" style="border-radius:${val};" title="${escapeHtml(t.id)}"></span>`
+    }).join('')
+
+    const tokenHighlights = [
+      { label: 'Couleurs', value: colorTokens.length },
+      { label: 'Typo', value: fontSizes.length },
+      { label: 'Espaces', value: (byCategory['spacing'] || []).length },
+      { label: 'Breakpoints', value: (byCategory['breakpoint'] || []).length }
+    ].filter(item => item.value > 0)
+
+    const usageExamples = [
+      {
+        token: findTokenByVar('$color-primary'),
+        title: 'Couleur primaire',
+        valuePreview: 'swatch',
+        usages: ['`.btn--primary` background', '`.card__tag` background']
+      },
+      {
+        token: findTokenByVar('$spacing-md'),
+        title: 'Espacement moyen',
+        valuePreview: 'space',
+        usages: ['`.btn--md` padding', '`.input--lg` padding']
+      },
+      {
+        token: findTokenByVar('$radius-md'),
+        title: 'Rayon standard',
+        valuePreview: 'radius',
+        usages: ['`.btn` border-radius', 'champs et contrôles']
+      },
+      {
+        token: findTokenByVar('$font-size-base'),
+        title: 'Corps de texte',
+        valuePreview: 'type',
+        usages: ['`.btn` font-size', '`.card__text` font-size']
+      },
+      {
+        token: findTokenByVar('$shadow-md'),
+        title: 'Ombre intermédiaire',
+        valuePreview: 'shadow',
+        usages: ['`.card--default:hover` shadow', 'relief de cartes']
+      },
+      {
+        token: findTokenByVar('$color-danger'),
+        title: 'Couleur danger',
+        valuePreview: 'swatch',
+        usages: ['`.btn--danger` background', '`.input--error` border']
+      }
+    ].filter(example => example.token)
+
+    tokensSection = `
+      <section class="ds-frieze__section ds-frieze__section--tokens">
+        <div class="ds-frieze__step">
+          <span class="ds-frieze__index">01</span>
+          <div>
+            <div class="ds-frieze__eyebrow">Fondation</div>
+            <div class="ds-frieze__label">Tokens</div>
+          </div>
+        </div>
+        <p class="ds-frieze__intro">Palette, rythme, typo et points de rupture pour tout le système.</p>
+        <div class="ds-frieze__metrics">
+          ${tokenHighlights.map(item => `<span class="ds-frieze__metric">${escapeHtml(item.label)} <strong>${item.value}</strong></span>`).join('')}
+        </div>
+        <div class="ds-frieze__practice">
+          ${usageExamples.map(example => `
+            <article class="ds-frieze__usage">
+              <div class="ds-frieze__usage-top">
+                <div>
+                  <div class="ds-frieze__usage-title">${escapeHtml(example.title)}</div>
+                  <div class="ds-frieze__usage-token">${escapeHtml(example.token.scssVar || example.token.id)}</div>
+                </div>
+                <div class="ds-frieze__usage-preview ds-frieze__usage-preview--${escapeAttr(example.valuePreview)}"${example.valuePreview === 'swatch' ? ` style="--usage-color:${escapeAttr(example.token.value)}"` : ''}${example.valuePreview === 'space' ? ` style="--usage-space:${escapeAttr(example.token.value)}"` : ''}${example.valuePreview === 'radius' ? ` style="--usage-radius:${escapeAttr(example.token.value)}"` : ''}${example.valuePreview === 'type' ? ` style="--usage-font-size:${escapeAttr(example.token.value)}"` : ''}${example.valuePreview === 'shadow' ? ` style="--usage-shadow:${escapeAttr(example.token.value)}"` : ''}></div>
+              </div>
+              <div class="ds-frieze__usage-value">${escapeHtml(String(example.token.value))}</div>
+              <div class="ds-frieze__usage-list">
+                ${example.usages.map(usage => `<span>${escapeHtml(usage)}</span>`).join('')}
+              </div>
+            </article>
+          `).join('')}
+        </div>
+        <div class="ds-frieze__body">
+          ${colorDots ? `<div class="ds-frieze__dots">${colorDots}</div>` : ''}
+          ${typeSamples ? `<div class="ds-frieze__types">${typeSamples}</div>` : ''}
+          ${spacings ? `<div class="ds-frieze__spaces">${spacings}</div>` : ''}
+          ${radii ? `<div class="ds-frieze__radii">${radii}</div>` : ''}
+        </div>
+      </section>`
+  }
+
+  return `
+    <div class="ds-token-bento">
+      ${tokensSection}
+    </div>`
 }
 
 function renderDiffPanel() {
@@ -853,8 +1021,8 @@ function renderInspector() {
             <h3 class="ds-inspector-group__title">Note</h3>
             <label class="ds-field"><span class="ds-field__label">Texte</span><textarea class="ds-field__input" rows="8" data-action="note-text" data-note-id="${selectedNote.id}">${escapeHtml(selectedNote.text)}</textarea></label>
             <p class="ds-muted">Position : ${selectedNote.x}px × ${selectedNote.y}px</p>
+            <button class="ds-btn ds-btn--danger" style="margin-top:8px;width:100%;" data-action="remove-note" data-note-id="${selectedNote.id}">Supprimer la note</button>
           </div>
-          ${renderDiffPanel()}
         </div>
       </aside>
     `
@@ -865,7 +1033,7 @@ function renderInspector() {
     return `
       <aside class="ds-panel">
         <div class="ds-panel__header"><h2 class="ds-panel__title">Inspector</h2><p class="ds-panel__subtitle">Sélectionne un item du canvas</p></div>
-        <div class="ds-panel__body"><p class="ds-muted">Aucun élément sélectionné.</p>${renderDiffPanel()}</div>
+        <div class="ds-panel__body"><p class="ds-muted">Aucun élément sélectionné.</p></div>
       </aside>
     `
   }
@@ -938,7 +1106,6 @@ function renderInspector() {
         ${variants.length ? `<div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Variantes</h3>${variants.map(([key, ctrl]) => renderControl(key, ctrl)).join('')}</div>` : ''}
         ${content.length ? `<div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Contenu</h3>${content.map(([key, ctrl]) => renderControl(key, ctrl)).join('')}</div>` : ''}
         <div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Tokens suggérés</h3><div class="ds-token-list">${suggestedTokens.map(token => `<div class="ds-token"><div class="ds-token__top"><div class="ds-token__name">${escapeHtml(token.scssVar)}</div><span class="ds-badge">${escapeHtml(token.category)}</span></div><div class="ds-token__value">${escapeHtml(token.value)}</div></div>`).join('') || '<p class="ds-muted">Aucun token suggéré.</p>'}</div></div>
-        ${renderDiffPanel()}
       </div>
     </aside>
   `
@@ -955,6 +1122,12 @@ function renderTopbarMenu(label, items = [], options = {}) {
           if (item.type === 'file') {
             return `<label class="ds-menu__item">${escapeHtml(item.label)}<input type="file" accept="application/json,.json" data-action="${escapeAttr(item.action)}" hidden></label>`
           }
+          if (item.type === 'select') {
+            return `<div class="ds-menu__item ds-menu__item--select"><span>${escapeHtml(item.label)}</span><select class="ds-field__select" data-action="${escapeAttr(item.action)}">${(item.options || []).map(opt => `<option value="${escapeAttr(opt.value)}"${opt.selected ? ' selected' : ''}>${escapeHtml(opt.label)}</option>`).join('')}</select></div>`
+          }
+          if (item.disabled) {
+            return `<div class="ds-menu__item ds-menu__item--info">${escapeHtml(item.label)}</div>`
+          }
           return `<button class="ds-menu__item${item.danger ? ' ds-menu__item--danger' : ''}" data-action="${escapeAttr(item.action)}">${escapeHtml(item.label)}</button>`
         }).join('')}
       </div>
@@ -963,7 +1136,7 @@ function renderTopbarMenu(label, items = [], options = {}) {
 }
 
 function renderTopbar() {
-  const { scene, tokensLoaded, history, historyIndex, sceneFiles, activeSceneFile } = getState()
+  const { scene, tokensLoaded, history, historyIndex } = getState()
   const agent = getAgentState()
   return `
     <header class="ds-topbar">
@@ -972,12 +1145,6 @@ function renderTopbar() {
         <div class="ds-topbar__meta">${escapeHtml(scene.name)} · ${scene.items.length} item(s) · ${(scene.notes || []).length} note(s) · viewport ${escapeHtml(scene.viewport || 'desktop')} · tokens ${tokensLoaded ? 'chargés' : 'indisponibles'}</div>
       </div>
       <div class="ds-topbar__actions">
-        <select class="ds-field__select" data-action="scene-file" style="width: 180px;">
-          ${(sceneFiles || []).map(file => `<option value="${escapeAttr(file.file)}"${file.file === activeSceneFile ? ' selected' : ''}>${escapeHtml(file.name)}</option>`).join('')}
-        </select>
-        <select class="ds-field__select" data-action="scene-viewport" style="width: 140px;">
-          ${Object.entries(VIEWPORTS).map(([key, vp]) => `<option value="${key}"${key === (scene.viewport || 'desktop') ? ' selected' : ''}>${escapeHtml(vp.label)}</option>`).join('')}
-        </select>
         <div class="ds-history">
           <button class="ds-btn" data-action="undo" ${historyIndex <= 0 ? 'disabled' : ''}>Undo</button>
           <button class="ds-btn" data-action="redo" ${historyIndex >= history.length - 1 ? 'disabled' : ''}>Redo</button>
@@ -987,27 +1154,12 @@ function renderTopbar() {
           <span class="ds-muted" style="font-size:12px;min-width:38px;text-align:center;">${Math.round(zoomLevel * 100)}%</span>
           <button class="ds-btn" data-action="zoom-in" title="Ctrl++">+</button>
         </div>
-        ${renderTopbarMenu('Scene', [
-          { label: 'Exporter', action: 'export-scene' },
-          { label: 'Save scene file', action: 'save-scene-file' },
-          { label: 'Save scene as…', action: 'save-scene-as' },
-          { label: 'Import scene', action: 'import-scene', type: 'file' },
-          { label: 'Delete scene file', action: 'delete-scene-file', danger: true }
-        ])}
-        ${renderTopbarMenu('Workspace', [
-          { label: 'Save current as base', action: 'save-as-base' },
-          { label: 'Reset to base', action: 'reset-to-base' },
-          { label: 'New working scene', action: 'new-working-scene' },
-          { label: 'Duplicate scene', action: 'duplicate-scene' },
-          { label: 'Reset local', action: 'reset-storage', danger: true }
-        ])}
         ${renderTopbarMenu('Canvas', [
           { label: 'Réorganiser (bento)', action: 'auto-arrange' },
-          { label: 'Ajouter une note', action: 'add-note' },
-          { label: 'Appliquer à la sélection', action: 'apply-viewport-selected' },
-          { label: 'Vider la scène', action: 'clear-scene', danger: true },
-          { label: 'Supprimer la sélection', action: 'remove-selected', danger: true }
-        ], { danger: false })}
+          { label: 'Ajouter une note', action: 'add-note' }
+        ])}
+        <button class="ds-btn ${libraryOpen ? 'ds-btn--active' : ''}" data-action="toggle-library" title="Librairie">☰</button>
+        <button class="ds-btn ${inspectorOpen ? 'ds-btn--active' : ''}" data-action="toggle-inspector" title="Inspector">⊞</button>
         <button class="ds-btn ${agent.open ? 'ds-btn--active' : ''}" data-action="toggle-agent">Agent</button>
       </div>
     </header>
@@ -1016,8 +1168,17 @@ function renderTopbar() {
 
 function renderLayout() {
   const agent = getAgentState()
-  const content = `${renderLibrary()}${renderCanvas()}${renderInspector()}${renderAgentPanel({ selectionHint: getAgentSelectionHint() })}`
-  return `<div class="ds-app">${renderTopbar()}<div class="ds-layout${agent.open ? ' ds-layout--with-agent' : ''}">${content}</div></div>`
+  const state = getState()
+  const hasSelection = !!state.selectedItemId
+  const showInspector = inspectorOpen && hasSelection
+  const layoutClasses = [
+    'ds-layout',
+    !libraryOpen ? 'ds-layout--no-library' : '',
+    !showInspector ? 'ds-layout--no-inspector' : '',
+    agent.open ? 'ds-layout--with-agent' : ''
+  ].filter(Boolean).join(' ')
+  const content = `${libraryOpen ? renderLibrary() : ''}${renderCanvas()}${showInspector ? renderInspector() : ''}${agent.open ? renderAgentPanel({ selectionHint: getAgentSelectionHint() }) : ''}`
+  return `<div class="ds-app">${renderTopbar()}<div class="${layoutClasses}">${content}</div></div>`
 }
 
 function setFramesInteractive(interactive) {
@@ -1097,10 +1258,12 @@ function onDragMove(event) {
 }
 
 function stopDrag() {
-  const patch = dragState ? { x: dragState.lastX ?? dragState.startX, y: dragState.lastY ?? dragState.startY } : null
+  const didMove = dragState?.didMove ?? false
+  const patch = didMove ? { x: dragState.lastX, y: dragState.lastY } : null
   const targetId = dragState?.targetId
   const kind = dragState?.kind
   lastDragEndTime = Date.now()
+  lastDragDidMove = didMove
   dragState = null
   dragPointerId = null
   if (!resizeState) setFramesInteractive(true)
@@ -1109,9 +1272,10 @@ function stopDrag() {
   if (patch && targetId) {
     if (kind === 'note') updateNote(targetId, patch)
     else updateItem(targetId, patch)
-  } else {
+  } else if (!targetId) {
     render()
   }
+  // Si pas de mouvement : pas de re-render → click event fire sur l'élément vivant
 }
 
 function startResize(itemId, event) {
@@ -1201,7 +1365,30 @@ function bindTopbarMenus() {
 
 function bindEvents() {
   rootEl.querySelector('#ds-search')?.addEventListener('input', event => setQuery(event.target.value))
+  rootEl.querySelector('[data-action="toggle-new-component"]')?.addEventListener('click', () => { newComponentFormOpen = !newComponentFormOpen; render() })
+  rootEl.querySelector('[data-action="new-component-form"]')?.addEventListener('submit', async event => {
+    event.preventDefault()
+    const form = event.target
+    const status = form.querySelector('[data-new-component-status]')
+    const btn = form.querySelector('[type="submit"]')
+    const data = { name: form.name.value, level: form.level.value, category: form.category.value, description: form.description.value }
+    btn.disabled = true
+    status.textContent = 'Création en cours…'
+    try {
+      const result = await scaffoldComponent(data)
+      await loadRegistry()
+      status.textContent = `✓ "${result.name}" créé avec succès.`
+      form.reset()
+      setTimeout(() => { newComponentFormOpen = false; render() }, 1200)
+    } catch (error) {
+      status.textContent = `Erreur : ${error.message}`
+      btn.disabled = false
+    }
+  })
   rootEl.querySelector('[data-action="auto-arrange"]')?.addEventListener('click', autoArrangeAll)
+  rootEl.querySelector('#ds-canvas')?.addEventListener('click', event => {
+    if (event.target === event.currentTarget) patchState({ selectedItemId: null })
+  })
   rootEl.querySelector('.ds-canvas-wrap')?.addEventListener('pointerdown', event => {
     if (spacePressed && !dragState && !resizeState) {
       event.preventDefault()
@@ -1220,8 +1407,16 @@ function bindEvents() {
   }))
   rootEl.querySelectorAll('[data-action="add-note"]').forEach(button => button.addEventListener('click', addNote))
   rootEl.querySelectorAll('.ds-item').forEach(element => element.addEventListener('click', () => { if (element.dataset.itemId) selectItem(element.dataset.itemId) }))
+  rootEl.querySelectorAll('[data-action="remove-note"]').forEach(btn => btn.addEventListener('click', () => {
+    if (confirm('Supprimer cette note de la scène ?')) removeItemById(btn.dataset.noteId)
+  }))
+  rootEl.querySelectorAll('[data-action="note-delete-popup"]').forEach(btn => btn.addEventListener('click', event => {
+    event.stopPropagation()
+    if (confirm('Supprimer cette note ?')) removeItemById(btn.dataset.noteId)
+  }))
   rootEl.querySelectorAll('[data-action="remove-item"]').forEach(btn => btn.addEventListener('click', event => {
     event.stopPropagation()
+    if (!confirm('Supprimer cet élément de la scène ?\n\nAttention : supprimer un élément de la scène le retire définitivement du projet. Cette action est réversible via Undo.')) return
     removeItemById(btn.dataset.itemId)
   }))
   rootEl.querySelectorAll('.ds-note-pin').forEach(element => element.addEventListener('click', () => { if (element.dataset.noteId) selectItem(element.dataset.noteId) }))
@@ -1229,7 +1424,7 @@ function bindEvents() {
   rootEl.querySelectorAll('[data-note-drag-handle]').forEach(handle => {
     handle.addEventListener('pointerdown', event => { event.preventDefault(); startDrag('note', handle.dataset.noteDragHandle, event) })
     handle.addEventListener('click', () => {
-      if (Date.now() - lastDragEndTime > 200) toggleNoteOpen(handle.dataset.noteDragHandle)
+      if (!lastDragDidMove) toggleNoteOpen(handle.dataset.noteDragHandle)
     })
   })
   rootEl.querySelectorAll('[data-resize-handle]').forEach(handle => handle.addEventListener('pointerdown', event => { event.preventDefault(); event.stopPropagation(); startResize(handle.dataset.resizeHandle, event) }))
@@ -1282,7 +1477,7 @@ function bindEvents() {
     const dimensions = getItemDimensions(entry, viewport)
     updateItem(select.dataset.itemId, { viewport, width: dimensions.width, height: dimensions.height })
   }))
-  rootEl.querySelectorAll('[data-action="note-text"]').forEach(textarea => textarea.addEventListener('input', () => updateNote(textarea.dataset.noteId, { text: textarea.value })))
+  rootEl.querySelectorAll('[data-action="note-text"]').forEach(textarea => textarea.addEventListener('blur', () => updateNote(textarea.dataset.noteId, { text: textarea.value })))
   rootEl.querySelector('[data-action="scene-viewport"]')?.addEventListener('change', event => setSceneViewport(event.target.value))
   rootEl.querySelector('[data-action="scene-file"]')?.addEventListener('change', event => loadSceneFromFile(event.target.value))
   rootEl.querySelector('[data-action="apply-viewport-selected"]')?.addEventListener('click', applyViewportToSelected)
@@ -1302,6 +1497,8 @@ function bindEvents() {
   rootEl.querySelector('[data-action="remove-selected"]')?.addEventListener('click', removeSelectedItem)
   rootEl.querySelector('[data-action="clear-scene"]')?.addEventListener('click', clearScene)
   rootEl.querySelector('[data-action="reset-storage"]')?.addEventListener('click', () => resetState())
+  rootEl.querySelector('[data-action="toggle-library"]')?.addEventListener('click', () => { libraryOpen = !libraryOpen; render() })
+  rootEl.querySelector('[data-action="toggle-inspector"]')?.addEventListener('click', () => { inspectorOpen = !inspectorOpen; render() })
   rootEl.querySelector('[data-action="toggle-agent"]')?.addEventListener('click', toggleAgentPanel)
   bindTopbarMenus()
   bindAgentEvents()

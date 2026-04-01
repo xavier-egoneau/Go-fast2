@@ -1,5 +1,3 @@
-const TOKENS_PATH = '/dev/assets/scss/base/_variables.scss'
-
 let tokensCache = []
 
 function inferCategory(name) {
@@ -18,27 +16,10 @@ function inferCategory(name) {
 }
 
 export async function loadTokens() {
-  const res = await fetch(TOKENS_PATH)
-  if (!res.ok) throw new Error(`Impossible de charger ${TOKENS_PATH}`)
-  const source = await res.text()
-
-  tokensCache = source
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line.startsWith('$') && line.includes(':'))
-    .map(line => {
-      const match = line.match(/^\$([a-zA-Z0-9-]+)\s*:\s*(.+);$/)
-      if (!match) return null
-      const [, name, value] = match
-      return {
-        id: name,
-        scssVar: `$${name}`,
-        value: value.trim(),
-        category: inferCategory(name)
-      }
-    })
-    .filter(Boolean)
-
+  const res = await fetch('/__design_api/tokens')
+  if (!res.ok) throw new Error('Impossible de charger les tokens')
+  const { tokens } = await res.json()
+  tokensCache = tokens
   return tokensCache
 }
 

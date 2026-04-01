@@ -95,10 +95,69 @@ async function getCodexProviderState() {
   }
 }
 
+function extractJsonFromText(text) {
+  const codeBlock = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+  if (codeBlock) {
+    try { return JSON.parse(codeBlock[1]) } catch {}
+  }
+  const raw = text.match(/\{[\s\S]*\}/)
+  if (raw) {
+    try { return JSON.parse(raw[0]) } catch {}
+  }
+  return {}
+}
+
+async function getClaudeCodeProviderState() {
+  const base = getProviderBase('claude-code')
+  try {
+    const result = await spawnCommand('npx', ['--yes', '@anthropic-ai/claude-code', '--version'], { timeoutMs: 15000 })
+    const available = result.code === 0 || /Claude Code/i.test(result.stdout + result.stderr)
+    return {
+      ...base,
+      available,
+      connected: available,
+      authRequired: false,
+      reason: available ? '' : 'Claude Code CLI not available via npx'
+    }
+  } catch {
+    return { ...base, available: false, connected: false, authRequired: false, reason: 'Claude Code CLI not found' }
+  }
+}
+
+async function runClaudeCodeProvider(payload) {
+  const provider = await getClaudeCodeProviderState()
+  if (!provider.available) throw new Error(provider.reason || 'Claude Code CLI is unavailable')
+
+  const prompt = payload.prompt || payload.intent || ''
+  const result = await spawnCommand('npx', [
+    '@anthropic-ai/claude-code',
+    '-p',
+    '--output-format', 'json',
+    '--model', 'haiku',
+    '--no-session-persistence',
+    '--dangerously-skip-permissions',
+    '--bare'
+  ], { cwd: ROOT, input: prompt, timeoutMs: 90000 })
+
+  if (result.code !== 0 && !result.stdout.includes('"type":"result"')) {
+    throw new Error(result.stderr.trim() || result.stdout.trim() || 'Claude Code CLI failed')
+  }
+
+  const outer = JSON.parse(result.stdout.trim())
+  if (outer.is_error) throw new Error(String(outer.result || 'Claude Code returned an error'))
+
+  const text = typeof outer.result === 'string' ? outer.result : ''
+  return {
+    provider: { ...provider, connected: true, reason: '' },
+    output: normalizeBrainOutput(extractJsonFromText(text))
+  }
+}
+
 async function getRuntimeProviders() {
   const defaults = listAgentProviders()
   const providers = await Promise.all(defaults.map(async provider => {
     if (provider.id === 'codex-cli') return getCodexProviderState()
+    if (provider.id === 'claude-code') return getClaudeCodeProviderState()
     return provider
   }))
   return providers
@@ -323,6 +382,121 @@ function goFastPlugin() {
         })
       })
 
+      server.middlewares.use('/__design_api/tokens', (req, res, next) => {
+        if (req.method !== 'GET') return next()
+        try {
+          const tokensPath = path.join(ROOT, 'dev', 'assets', 'scss', 'base', '_variables.scss')
+          const source = fs.readFileSync(tokensPath, 'utf8')
+          const tokens = source
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line.startsWith('$') && line.includes(':'))
+            .map(line => {
+              const match = line.match(/^\$([a-zA-Z0-9-]+)\s*:\s*(.+);$/)
+              if (!match) return null
+              const [, name, value] = match
+              const inferCategory = n => {
+                if (n.startsWith('color-')) return 'color'
+                if (n.startsWith('font-size-')) return 'font-size'
+                if (n.startsWith('font-weight-')) return 'font-weight'
+                if (n.startsWith('line-height-')) return 'line-height'
+                if (n.startsWith('font-family-')) return 'font-family'
+                if (n.startsWith('spacing-')) return 'spacing'
+                if (n.startsWith('radius-')) return 'radius'
+                if (n.startsWith('shadow-')) return 'shadow'
+                if (n.startsWith('transition-')) return 'transition'
+                if (n.startsWith('breakpoint-')) return 'breakpoint'
+                if (n.startsWith('z-')) return 'z-index'
+                return 'other'
+              }
+              return { id: name, scssVar: `$${name}`, value: value.trim(), category: inferCategory(name) }
+            })
+            .filter(Boolean)
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({ ok: true, tokens }))
+        } catch (error) {
+          res.statusCode = 500
+          res.end(JSON.stringify({ error: error.message }))
+        }
+      })
+
+      server.middlewares.use('/__design_api/scaffold', async (req, res, next) => {
+        if (req.method !== 'POST') return next()
+        let body = ''
+        req.on('data', chunk => { body += chunk })
+        req.on('end', async () => {
+          try {
+            const { name, level, category, description } = JSON.parse(body || '{}')
+            if (!name || !level) throw new Error('name et level sont requis')
+
+            const kebab = name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+            if (!kebab) throw new Error('Nom invalide')
+
+            const isPage = level === 'page'
+            const compDir = isPage
+              ? path.join(ROOT, 'dev', 'pages')
+              : path.join(ROOT, 'dev', 'components', kebab)
+            const scssDir = path.join(ROOT, 'dev', 'assets', 'scss', 'components')
+            const styleEntry = path.join(ROOT, 'dev', 'assets', 'scss', 'style.scss')
+
+            if (!isPage && fs.existsSync(compDir)) throw new Error(`Le composant "${kebab}" existe déjà`)
+
+            const displayName = kebab.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+            const cat = category || 'Layout'
+            const desc = description || `Composant ${displayName}`
+
+            if (!isPage) {
+              fs.mkdirSync(compDir, { recursive: true })
+
+              // JSON metadata
+              const jsonContent = JSON.stringify({
+                name: displayName,
+                level,
+                category: cat,
+                description: desc,
+                variants: {},
+                content: { text: { label: 'Texte', type: 'text', default: displayName } }
+              }, null, 2)
+              fs.writeFileSync(path.join(compDir, `${kebab}.json`), jsonContent, 'utf8')
+
+              // Twig template
+              const twigContent = `{% set text = text|default('${displayName}') %}\n\n<div class="${kebab}">\n  {{ text }}\n</div>\n`
+              fs.writeFileSync(path.join(compDir, `${kebab}.twig`), twigContent, 'utf8')
+
+              // SCSS (si activé)
+              if (config.scss) {
+                fs.mkdirSync(scssDir, { recursive: true })
+                const scssContent = `@use '../base/variables' as *;\n@use '../base/mixins' as *;\n\n.${kebab} {\n}\n`
+                fs.writeFileSync(path.join(scssDir, `_${kebab}.scss`), scssContent, 'utf8')
+
+                if (fs.existsSync(styleEntry)) {
+                  const styleContent = fs.readFileSync(styleEntry, 'utf8')
+                  if (!styleContent.includes(`components/${kebab}`)) {
+                    fs.appendFileSync(styleEntry, `@use 'components/${kebab}';\n`, 'utf8')
+                  }
+                }
+              }
+            } else {
+              // Page : fichier twig dans dev/pages/
+              fs.mkdirSync(compDir, { recursive: true })
+              const twigContent = `{% extends 'dev/layouts/base.twig' %}\n\n{% block content %}\n<main class="${kebab}-page">\n  <h1>${displayName}</h1>\n</main>\n{% endblock %}\n`
+              fs.writeFileSync(path.join(compDir, `${kebab}.twig`), twigContent, 'utf8')
+            }
+
+            // Régénère showcase.json
+            const { generateShowcase } = await import('./scripts/generate-showcase.js')
+            await generateShowcase()
+
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ ok: true, name: displayName, level, category: cat, kebab }))
+          } catch (error) {
+            res.statusCode = 400
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ error: error.message }))
+          }
+        })
+      })
+
       server.middlewares.use('/__design_api/agent/run', async (req, res, next) => {
         if (req.method !== 'POST') return next()
         let body = ''
@@ -346,6 +520,17 @@ function goFastPlugin() {
 
             if (provider.id === 'codex-cli') {
               const result = await runCodexProvider(payload)
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({
+                ok: true,
+                provider: result.provider,
+                output: result.output
+              }))
+              return
+            }
+
+            if (provider.id === 'claude-code') {
+              const result = await runClaudeCodeProvider(payload)
               res.setHeader('Content-Type', 'application/json')
               res.end(JSON.stringify({
                 ok: true,

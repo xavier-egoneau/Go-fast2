@@ -103,6 +103,9 @@ export function validateActionSet(actionSet, state, getEntryById) {
       if (isPlainObject(action.offset)) {
         validateCoordinates(action.offset, index, errors)
       }
+      if (action.params !== undefined && !isPlainObject(action.params)) {
+        errors.push(`Action ${index}: params invalide`)
+      }
     }
 
     if (action.type === 'add-item') {

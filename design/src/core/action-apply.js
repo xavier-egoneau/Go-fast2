@@ -22,7 +22,8 @@ export function applyActionSetToScene(scene, actionSet) {
           ...source,
           id: uid('item'),
           x: source.x + (action.offset?.x ?? 40),
-          y: source.y + (action.offset?.y ?? 40)
+          y: source.y + (action.offset?.y ?? 40),
+          params: action.params ? { ...source.params, ...action.params } : { ...source.params }
         })
         break
       }

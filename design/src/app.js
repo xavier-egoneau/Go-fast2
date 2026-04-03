@@ -1,4 +1,4 @@
-import { loadRegistry, searchEntries, getEntryById, getDefaultParams } from './core/registry.js'
+import { loadRegistry, searchEntries, getEntryById, getDefaultParams, listEntries } from './core/registry.js'
 import { buildRenderUrl } from './core/render-url.js'
 import { loadTokens, getTokenSummaryForEntry } from './core/tokens.js'
 import { listSceneFiles, loadSceneFile } from './core/scene-file.js'
@@ -23,7 +23,8 @@ import {
   hasWorkingScene,
   replaceWorkingScene,
   promoteSceneToBase,
-  addSceneFile
+  addSceneFile,
+  setPersistMuted
 } from './state/store.js'
 import { getAgentState, patchAgentState, subscribeAgentState } from './state/agent-store.js'
 import { renderAgentPanel } from './ui/agent-panel.js'
@@ -57,40 +58,230 @@ function getItemDimensions(entry, viewport) {
   return { width: Math.min(420, vp.width), height: 260 }
 }
 
+function getEntryRank(entry) {
+  if (entry.kind === 'page') return 4
+  const level = entry.level || ''
+  if (level === 'template') return 3
+  if (level === 'organism') return 2
+  if (level === 'molecule') return 1
+  return 0
+}
+
+function getLaneConfig(entry) {
+  const rank = getEntryRank(entry)
+  const lanes = [
+    { key: 'atom', label: 'Atoms', x: 96, y: 120, contentY: 188, minWidth: 260, height: 1400, columns: 1 },
+    { key: 'molecule', label: 'Molecules', x: 0, y: 120, contentY: 188, minWidth: 420, height: 1400, columns: 1 },
+    { key: 'organism', label: 'Organisms', x: 0, y: 120, contentY: 188, minWidth: 640, height: 1400, columns: 1 },
+    { key: 'template', label: 'Templates & Pages', x: 0, y: 120, contentY: 188, minWidth: 1280, height: 1400, columns: 1 }
+  ]
+
+  if (rank === 0) return { ...lanes[0] }
+  if (rank === 1) return { ...lanes[1] }
+  if (rank === 2) return { ...lanes[2] }
+  return { ...lanes[3] }
+}
+
+function buildLaneLayout(scene) {
+  const orderedLaneKeys = ['atom', 'molecule', 'organism', 'template']
+  const laneMap = new Map()
+  let cursorX = 96
+  const gap = 32
+
+  for (const laneKey of orderedLaneKeys) {
+    const sampleEntry = (scene.items || [])
+      .map(item => getEntryById(item.ref, item.kind))
+      .find(entry => entry && getLaneConfig(entry).key === laneKey)
+
+    const baseLane = sampleEntry
+      ? getLaneConfig(sampleEntry)
+      : getLaneConfig({ kind: laneKey === 'template' ? 'page' : 'component', level: laneKey === 'atom' ? 'atom' : laneKey === 'molecule' ? 'molecule' : laneKey === 'organism' ? 'organism' : 'template' })
+
+    const laneItems = (scene.items || []).filter(item => {
+      const entry = getEntryById(item.ref, item.kind)
+      return entry && getLaneConfig(entry).key === laneKey
+    })
+
+    const widest = laneItems.reduce((max, item) => Math.max(max, item.width || 0), 0)
+    const width = Math.max(baseLane.minWidth, widest + 32)
+    laneMap.set(laneKey, {
+      ...baseLane,
+      key: laneKey,
+      x: cursorX,
+      width
+    })
+    cursorX += width + gap
+  }
+
+  return laneMap
+}
+
+function computeAutoPlacement(scene, entry, dimensions) {
+  const lane = buildLaneLayout(scene).get(getLaneConfig(entry).key) || getLaneConfig(entry)
+  const sameLaneItems = (scene.items || [])
+    .filter(item => {
+      const itemEntry = getEntryById(item.ref, item.kind)
+      if (!itemEntry) return false
+      const itemLane = getLaneConfig(itemEntry)
+      return itemLane.key === lane.key
+    })
+    .sort((a, b) => a.y - b.y)
+
+  const gap = 32
+  const last = sameLaneItems[sameLaneItems.length - 1]
+  const x = lane.x
+  const y = last ? snapToGrid(last.y + last.height + gap) : lane.contentY
+
+  return { x: snapToGrid(x), y: snapToGrid(y), lane }
+}
+
+function reflowSceneItems(items, targetLaneKey = null) {
+  const nextItems = JSON.parse(JSON.stringify(items || []))
+  const laneKeys = targetLaneKey ? [targetLaneKey] : ['atom', 'molecule', 'organism', 'template']
+  const gap = 32
+  const laneLayout = buildLaneLayout({ items: nextItems })
+
+  for (const laneKey of laneKeys) {
+    const laneItems = nextItems
+      .filter(item => {
+        const entry = getEntryById(item.ref, item.kind)
+        if (!entry) return false
+        return getLaneConfig(entry).key === laneKey
+      })
+      .sort((a, b) => (a.y - b.y) || (a.x - b.x))
+
+    if (!laneItems.length) continue
+    const lane = laneLayout.get(laneKey) || getLaneConfig(getEntryById(laneItems[0].ref, laneItems[0].kind))
+
+    laneItems.forEach((item, index) => {
+      item.x = snapToGrid(lane.x)
+      item.y = snapToGrid(lane.contentY + (index * (Math.max(item.height, 220) + gap)))
+    })
+  }
+
+  return nextItems
+}
+
+function organizeSelectedLane() {
+  const selectedItem = getSelectedSceneItem()
+  if (!selectedItem) return
+  const entry = getEntryById(selectedItem.ref, selectedItem.kind)
+  if (!entry) return
+  const lane = getLaneConfig(entry)
+  setState(prev => ({
+    ...prev,
+    scene: {
+      ...prev.scene,
+      items: reflowSceneItems(prev.scene.items, lane.key)
+    }
+  }))
+  commitSceneHistory()
+}
+
+function organizeCanvas() {
+  setState(prev => ({
+    ...prev,
+    scene: {
+      ...prev.scene,
+      items: reflowSceneItems(prev.scene.items)
+    }
+  }))
+  commitSceneHistory()
+}
+
 function commitSceneHistory() {
   if (historyMuted) return
   pushHistory(getState().scene)
 }
 
-function addItem(entry) {
-  const state = getState()
-  const viewport = state.scene.viewport || 'desktop'
-  const offset = state.scene.items.length * 24
+function createSceneItemFromEntry(entry, scene) {
+  const viewport = scene.viewport || 'desktop'
   const dimensions = getItemDimensions(entry, viewport)
-  const item = {
+  const placement = computeAutoPlacement(scene, entry, dimensions)
+  return {
     id: uid(),
     kind: entry.kind,
     ref: entry.id,
     viewport,
-    x: 80 + offset,
-    y: 80 + offset,
+    x: placement.x,
+    y: placement.y,
     width: dimensions.width,
     height: dimensions.height,
     params: getDefaultParams(entry)
   }
+}
 
-  setState(prev => ({
-    ...prev,
-    selectedItemId: item.id,
-    scene: { ...prev.scene, items: [...prev.scene.items, item] }
-  }))
+function hydrateSceneWithRegistry(scene) {
+  const baseScene = {
+    ...scene,
+    items: [...(scene.items || [])],
+    notes: scene.notes || []
+  }
+
+  const existingRefs = new Set(baseScene.items.map(item => `${item.kind}:${item.ref}`))
+  const orderedEntries = [...listEntries()].sort((a, b) => {
+    const rankDiff = getEntryRank(a) - getEntryRank(b)
+    if (rankDiff !== 0) return rankDiff
+    return String(a.name || a.id).localeCompare(String(b.name || b.id))
+  })
+
+  for (const entry of orderedEntries) {
+    const key = `${entry.kind}:${entry.id}`
+    if (existingRefs.has(key)) continue
+    const item = createSceneItemFromEntry(entry, baseScene)
+    baseScene.items.push(item)
+    existingRefs.add(key)
+  }
+
+  baseScene.items = reflowSceneItems(baseScene.items)
+  return baseScene
+}
+
+function addItem(entry) {
+  setState(prev => {
+    const item = createSceneItemFromEntry(entry, prev.scene)
+    return {
+      ...prev,
+      selectedItemId: item.id,
+      scene: { ...prev.scene, items: reflowSceneItems([...prev.scene.items, item]) }
+    }
+  })
   commitSceneHistory()
 }
 
-function addNote() {
+function getSelectedSceneItem() {
   const state = getState()
-  const offset = (state.scene.notes || []).length * 20
-  const note = { id: uid('note'), x: 120 + offset, y: 120 + offset, text: 'Nouvelle note…' }
+  return state.scene.items.find(item => item.id === state.selectedItemId) || null
+}
+
+function bringItemToFront(itemId) {
+  setState(prev => {
+    const index = prev.scene.items.findIndex(item => item.id === itemId)
+    if (index === -1) return prev
+    const item = prev.scene.items[index]
+    const remaining = prev.scene.items.filter(candidate => candidate.id !== itemId)
+    return {
+      ...prev,
+      scene: {
+        ...prev.scene,
+        items: [...remaining, item]
+      }
+    }
+  })
+}
+
+function addNote(targetItemId = null) {
+  const selectedItem = targetItemId
+    ? getState().scene.items.find(item => item.id === targetItemId) || null
+    : getSelectedSceneItem()
+  const note = {
+    id: uid('note'),
+    targetId: selectedItem?.id || null,
+    x: selectedItem ? selectedItem.x + Math.max(16, selectedItem.width - 24) : 120,
+    y: selectedItem ? Math.max(24, selectedItem.y - 12) : 120,
+    text: 'Nouvelle note…',
+    open: true
+  }
 
   setState(prev => ({
     ...prev,
@@ -142,6 +333,19 @@ function removeSelectedItem() {
   commitSceneHistory()
 }
 
+function removeNote(noteId) {
+  if (!noteId) return
+  setState(prev => ({
+    ...prev,
+    selectedItemId: prev.selectedItemId === noteId ? null : prev.selectedItemId,
+    scene: {
+      ...prev.scene,
+      notes: (prev.scene.notes || []).filter(note => note.id !== noteId)
+    }
+  }))
+  commitSceneHistory()
+}
+
 function clearScene() {
   setState(prev => ({
     ...prev,
@@ -155,8 +359,28 @@ function setQuery(query) {
   patchState({ query })
 }
 
+function refreshSelectionUI() {
+  if (!rootEl) return
+  const { selectedItemId } = getState()
+
+  rootEl.querySelectorAll('.ds-item[data-item-id]').forEach(element => {
+    element.classList.toggle('ds-item--selected', element.dataset.itemId === selectedItemId)
+  })
+  rootEl.querySelectorAll('.ds-note[data-note-id]').forEach(element => {
+    element.classList.toggle('ds-note--selected', element.dataset.noteId === selectedItemId)
+  })
+
+  const inspectorHost = rootEl.querySelector('[data-ui-region="inspector"]')
+  if (inspectorHost) inspectorHost.outerHTML = renderInspectorWrapped()
+  bindSelectionDependentEvents()
+}
+
 function selectItem(itemId) {
-  patchState({ selectedItemId: itemId })
+  const item = getState().scene.items.find(candidate => candidate.id === itemId)
+  if (item) bringItemToFront(itemId)
+  const state = getState()
+  state.selectedItemId = itemId
+  refreshSelectionUI()
 }
 
 function setSceneViewport(viewport) {
@@ -181,14 +405,15 @@ async function loadSceneFromFile(fileName, options = {}) {
     const scene = await loadSceneFile(fileName)
     const normalized = { ...scene, notes: scene.notes || [], items: scene.items || [] }
     const keepWorkingScene = options.keepWorkingScene ?? false
+    const hydrated = hydrateSceneWithRegistry(normalized)
 
     setState(prev => ({
       ...prev,
       selectedItemId: null,
       activeSceneFile: fileName,
-      baseScene: normalized,
-      scene: keepWorkingScene ? prev.scene : normalized,
-      history: keepWorkingScene ? prev.history : [normalized],
+      baseScene: hydrated,
+      scene: keepWorkingScene ? hydrateSceneWithRegistry(prev.scene) : hydrated,
+      history: keepWorkingScene ? prev.history : [hydrated],
       historyIndex: keepWorkingScene ? prev.historyIndex : 0
     }))
   } finally {
@@ -309,6 +534,12 @@ function toggleAgentPanel() {
   render()
 }
 
+function toggleNavigatorPanel() {
+  const agent = getAgentState()
+  patchAgentState({ navigatorOpen: !agent.navigatorOpen })
+  render()
+}
+
 function stringifyAgentJson(value) {
   return JSON.stringify(value, null, 2)
 }
@@ -347,6 +578,7 @@ function resetAgentFeedback() {
     requiresNewComponent: false,
     unresolved: [],
     previewScene: null,
+    feedbackDismissed: false,
     promptPreview: buildAgentPromptPreview(),
     selectionHint: getAgentSelectionHint()
   })
@@ -387,6 +619,7 @@ async function handleAgentSubmit() {
       lastWarnings: output.warnings || [],
       requiresNewComponent: output.requiresNewComponent || false,
       unresolved: output.unresolved || [],
+      feedbackDismissed: false,
       selectionHint: getAgentSelectionHint()
     }
 
@@ -400,13 +633,12 @@ async function handleAgentSubmit() {
     }
 
     const previewScene = applyActionSetToScene(state.scene, validation.normalized)
-    replaceWorkingScene(previewScene)
     patchAgentState({
       ...nextPatch,
-      previewScene: null
+      previewScene
     })
   } catch (error) {
-    patchAgentState({ runtimeError: error.message || 'Runtime error' })
+    patchAgentState({ runtimeError: error.message || 'Runtime error', feedbackDismissed: false })
   }
   render()
 }
@@ -425,6 +657,7 @@ function handleAgentValidate() {
       requiresNewComponent: result.normalized?.requiresNewComponent || false,
       unresolved: result.normalized?.unresolved || [],
       previewScene: null,
+      feedbackDismissed: false,
       promptPreview: buildAgentPromptPreview()
     })
   } catch (error) {
@@ -435,6 +668,7 @@ function handleAgentValidate() {
       requiresNewComponent: false,
       unresolved: [],
       previewScene: null,
+      feedbackDismissed: false,
       promptPreview: buildAgentPromptPreview()
     })
   }
@@ -448,7 +682,7 @@ function handleAgentPreview() {
     const parsed = JSON.parse(agent.actionJson || '{}')
     const result = validateActionSet(parsed, state, getEntryById)
     if (!result.valid) {
-      patchAgentState({ validationErrors: result.errors, runtimeError: '', previewScene: null, promptPreview: buildAgentPromptPreview() })
+      patchAgentState({ validationErrors: result.errors, runtimeError: '', previewScene: null, feedbackDismissed: false, promptPreview: buildAgentPromptPreview() })
       render()
       return
     }
@@ -461,6 +695,7 @@ function handleAgentPreview() {
       requiresNewComponent: result.normalized.requiresNewComponent || false,
       unresolved: result.normalized.unresolved || [],
       previewScene,
+      feedbackDismissed: false,
       promptPreview: buildAgentPromptPreview()
     })
     render()
@@ -507,32 +742,28 @@ function getRenderedScene() {
 }
 
 function renderLibrary() {
-  const { query } = getState()
+  const { query, scene } = getState()
   const entries = searchEntries(query)
 
   return `
     <aside class="ds-panel">
       <div class="ds-panel__header">
-        <h2 class="ds-panel__title">Library</h2>
-        <p class="ds-panel__subtitle">Composants et pages exposés par le showcase</p>
+        <h2 class="ds-panel__title">Navigator</h2>
+        <p class="ds-panel__subtitle">Recherche, filtre et focus dans le système déjà présent sur le canvas.</p>
       </div>
       <div class="ds-panel__body">
         <input class="ds-search" id="ds-search" type="search" placeholder="Rechercher un composant ou une page" value="${escapeAttr(query)}">
         <div class="ds-library-list" style="margin-top: 16px;">
-          <article class="ds-card">
-            <div class="ds-card__top"><div class="ds-card__name">Annotation</div><span class="ds-badge">note</span></div>
-            <div class="ds-card__meta">collaboration · canvas</div>
-            <p class="ds-card__desc">Ajoute une note libre sur le canvas.</p>
-            <div class="ds-card__actions"><button class="ds-btn" data-action="add-note">Ajouter une note</button></div>
-          </article>
-          ${entries.map(entry => `
+          ${entries.map(entry => {
+            const sceneItem = (scene.items || []).find(item => item.ref === entry.id && item.kind === entry.kind)
+            return `
             <article class="ds-card">
               <div class="ds-card__top"><div class="ds-card__name">${escapeHtml(entry.name)}</div><span class="ds-badge">${escapeHtml(entry.kind)}</span></div>
               <div class="ds-card__meta">${escapeHtml(entry.level || '')} · ${escapeHtml(entry.category || '')}</div>
               <p class="ds-card__desc">${escapeHtml(entry.description || 'Sans description')}</p>
-              <div class="ds-card__actions"><button class="ds-btn" data-action="add-item" data-kind="${entry.kind}" data-id="${entry.id}">Ajouter au canvas</button></div>
+              <div class="ds-card__actions"><button class="ds-btn" data-action="focus-item" data-kind="${entry.kind}" data-id="${entry.id}" ${sceneItem ? '' : 'disabled'}>Focus on canvas</button></div>
             </article>
-          `).join('') || `<p class="ds-muted">Aucun résultat.</p>`}
+          `}).join('') || `<p class="ds-muted">Aucun résultat.</p>`}
         </div>
       </div>
     </aside>
@@ -542,7 +773,15 @@ function renderLibrary() {
 function renderFrames(scene) {
   const viewport = scene.viewport || 'desktop'
   const vp = getViewportConfig(viewport)
-  return `<div class="ds-frame" style="left:64px;top:64px;width:${vp.width + 32}px;height:${vp.height + 72}px;"><div class="ds-frame__label"><span>${escapeHtml(vp.label)}</span><span class="ds-badge">${vp.width} × ${vp.height}</span></div></div>`
+  const lanes = [...buildLaneLayout(scene).values()].map(lane => ({
+    ...lane,
+    height: Math.max(880, vp.height)
+  }))
+
+  return `
+    <div class="ds-frame" style="left:64px;top:64px;width:${Math.max(vp.width + 32, (lanes[lanes.length - 1]?.x || 0) + (lanes[lanes.length - 1]?.width || 0) - 64)}px;height:${vp.height + 72}px;"><div class="ds-frame__label"><span>${escapeHtml(vp.label)}</span><span class="ds-badge">${vp.width} × ${vp.height}</span></div></div>
+    ${lanes.map(lane => `<div class="ds-lane" style="left:${lane.x}px;top:${lane.y}px;width:${lane.width}px;height:${lane.height}px;"><div class="ds-lane__label">${escapeHtml(lane.label)}</div></div>`).join('')}
+  `
 }
 
 function buildAgentFeedbackModel() {
@@ -593,7 +832,7 @@ function renderPreviewStatus() {
   const validationErrors = agent.validationErrors || []
   const hasContent = agent.previewScene || agent.lastSummary || warnings.length || unresolved.length || validationErrors.length || agent.requiresNewComponent
 
-  if (!hasContent) return ''
+  if (!hasContent || agent.feedbackDismissed) return ''
 
   const feedback = buildAgentFeedbackModel()
 
@@ -607,7 +846,7 @@ function renderPreviewStatus() {
         <div class="ds-preview-banner__actions">
           <button class="ds-btn" data-agent-action="preview">Preview</button>
           <button class="ds-btn" data-agent-action="apply" ${agent.previewScene ? '' : 'disabled'}>Apply</button>
-          <button class="ds-btn ds-btn--danger" data-agent-action="clear-preview">Clear</button>
+          <button class="ds-btn ds-btn--danger" data-agent-action="clear-preview">Dismiss</button>
         </div>
       </div>
       ${!agent.previewScene ? `<div class="ds-preview-banner__callout${feedback.tone === 'warn' ? ' ds-preview-banner__callout--warn' : ''}${feedback.tone === 'error' ? ' ds-preview-banner__callout--error' : ''}">${escapeHtml(feedback.lead)}</div>` : ''}
@@ -627,12 +866,16 @@ function renderCanvas() {
       <div class="ds-canvas" id="ds-canvas">
         ${renderFrames(scene)}
         ${scene.items.length === 0 && notes.length === 0 ? '<div class="ds-empty">Ajoute un composant, une page ou une note depuis la library.</div>' : ''}
-        ${notes.map(note => `
-          <section class="ds-note ${selectedItemId === note.id ? 'ds-note--selected' : ''}" data-note-id="${note.id}" style="left:${note.x}px;top:${note.y}px;">
-            <div class="ds-note__title" data-note-drag-handle="${note.id}">Annotation</div>
-            <div class="ds-note__text">${escapeHtml(note.text)}</div>
+        ${notes.map(note => {
+          const attachedItem = note.targetId ? scene.items.find(item => item.id === note.targetId) : null
+          const noteX = attachedItem ? attachedItem.x + Math.max(16, attachedItem.width - 24) : note.x
+          const noteY = attachedItem ? Math.max(24, attachedItem.y - 12) : note.y
+          return `
+          <section class="ds-note ${selectedItemId === note.id ? 'ds-note--selected' : ''}${note.open ? ' ds-note--open' : ''}" data-note-id="${note.id}" style="left:${noteX}px;top:${noteY}px;">
+            <button class="ds-note__pin" data-note-drag-handle="${note.id}" data-action="toggle-note" data-note-id="${note.id}" title="Ouvrir ou fermer la note"></button>
+            ${note.open ? `<div class="ds-note__popover"><div class="ds-note__title">Annotation</div><button class="ds-note__delete" data-action="delete-note-inline" data-note-id="${note.id}" title="Supprimer la note">×</button><div class="ds-note__text">${escapeHtml(note.text)}</div></div>` : ''}
           </section>
-        `).join('')}
+        `}).join('')}
         ${scene.items.map(item => {
           const entry = getEntryById(item.ref, item.kind)
           if (!entry) return ''
@@ -641,7 +884,7 @@ function renderCanvas() {
             <section class="ds-item ${selectedItemId === item.id ? 'ds-item--selected' : ''}" data-item-id="${item.id}" style="left:${item.x}px;top:${item.y}px;width:${item.width}px;height:${item.height}px;">
               <div class="ds-item__toolbar" data-drag-handle="${item.id}">
                 <div><div class="ds-item__title">${escapeHtml(entry.name)}</div><div class="ds-item__meta">${escapeHtml(item.viewport || 'desktop')} · ${escapeHtml(entry.kind)} · ${escapeHtml(entry.level || '')}</div></div>
-                <a class="ds-badge" href="${escapeAttr(url)}" target="_blank" rel="noreferrer">ouvrir</a>
+                <div class="ds-item__toolbar-actions"><button class="ds-badge ds-badge--button" data-action="add-note-to-item" data-item-id="${item.id}">note</button><a class="ds-badge" href="${escapeAttr(url)}" target="_blank" rel="noreferrer">ouvrir</a></div>
               </div>
               <iframe class="ds-item__frame" src="${escapeAttr(url)}" title="${escapeAttr(entry.name)}" style="height: calc(100% - 41px);"></iframe>
               <div class="ds-item__resize" data-resize-handle="${item.id}" title="Redimensionner"></div>
@@ -696,6 +939,10 @@ function renderDiffPanel() {
   `
 }
 
+function renderInspectorWrapped() {
+  return `<div data-ui-region="inspector">${renderInspector()}</div>`
+}
+
 function renderInspector() {
   const state = getState()
   const scene = getRenderedScene()
@@ -703,12 +950,15 @@ function renderInspector() {
   if (selectedNote) {
     return `
       <aside class="ds-panel">
-        <div class="ds-panel__header"><h2 class="ds-panel__title">Inspector</h2><p class="ds-panel__subtitle">Annotation</p></div>
+        <div class="ds-panel__header"><h2 class="ds-panel__title">Inspector</h2><p class="ds-panel__subtitle">Annotation liée au canvas</p></div>
         <div class="ds-panel__body">
           <div class="ds-inspector-group">
             <h3 class="ds-inspector-group__title">Note</h3>
             <label class="ds-field"><span class="ds-field__label">Texte</span><textarea class="ds-field__input" rows="8" data-action="note-text" data-note-id="${selectedNote.id}">${escapeHtml(selectedNote.text)}</textarea></label>
-            <p class="ds-muted">Position : ${selectedNote.x}px × ${selectedNote.y}px</p>
+            <label class="ds-field__checkbox"><input type="checkbox" ${selectedNote.open ? 'checked' : ''} data-action="note-open" data-note-id="${selectedNote.id}"><span>Note ouverte</span></label>
+            <label class="ds-field__checkbox"><input type="checkbox" ${selectedNote.targetId ? 'checked' : ''} data-action="note-attach-selected" data-note-id="${selectedNote.id}"><span>Lier à l’élément sélectionné si possible</span></label>
+            <button class="ds-btn ds-btn--danger" data-action="delete-note" data-note-id="${selectedNote.id}">Supprimer la note</button>
+            <p class="ds-muted">Position : ${selectedNote.x}px × ${selectedNote.y}px${selectedNote.targetId ? ` · liée à ${escapeHtml(selectedNote.targetId)}` : ''}</p>
           </div>
           ${renderDiffPanel()}
         </div>
@@ -765,34 +1015,17 @@ function renderInspector() {
   `
 }
 
-function renderTopbarMenu(label, items = [], options = {}) {
-  const danger = options.danger ? ' ds-menu__button--danger' : ''
-  const active = options.active ? ' ds-menu__button--active' : ''
-  return `
-    <details class="ds-menu">
-      <summary class="ds-btn ds-menu__button${danger}${active}">${escapeHtml(label)}</summary>
-      <div class="ds-menu__content">
-        ${items.map(item => {
-          if (item.type === 'file') {
-            return `<label class="ds-menu__item">${escapeHtml(item.label)}<input type="file" accept="application/json,.json" data-action="${escapeAttr(item.action)}" hidden></label>`
-          }
-          return `<button class="ds-menu__item${item.danger ? ' ds-menu__item--danger' : ''}" data-action="${escapeAttr(item.action)}">${escapeHtml(item.label)}</button>`
-        }).join('')}
-      </div>
-    </details>
-  `
-}
-
 function renderTopbar() {
-  const { scene, tokensLoaded, history, historyIndex, sceneFiles, activeSceneFile } = getState()
+  const { scene, history, historyIndex, sceneFiles, activeSceneFile } = getState()
   const agent = getAgentState()
   return `
     <header class="ds-topbar">
       <div>
         <div class="ds-topbar__title">Design Surface</div>
-        <div class="ds-topbar__meta">${escapeHtml(scene.name)} · ${scene.items.length} item(s) · ${(scene.notes || []).length} note(s) · viewport ${escapeHtml(scene.viewport || 'desktop')} · tokens ${tokensLoaded ? 'chargés' : 'indisponibles'}</div>
+        <div class="ds-topbar__meta">${escapeHtml(scene.name)} · ${scene.items.length} item(s) · ${(scene.notes || []).length} note(s) · viewport ${escapeHtml(scene.viewport || 'desktop')}</div>
       </div>
       <div class="ds-topbar__actions">
+        <button class="ds-btn ${agent.navigatorOpen ? 'ds-btn--active' : ''}" data-action="toggle-navigator">Navigator</button>
         <select class="ds-field__select" data-action="scene-file" style="width: 180px;">
           ${(sceneFiles || []).map(file => `<option value="${escapeAttr(file.file)}"${file.file === activeSceneFile ? ' selected' : ''}>${escapeHtml(file.name)}</option>`).join('')}
         </select>
@@ -803,26 +1036,7 @@ function renderTopbar() {
           <button class="ds-btn" data-action="undo" ${historyIndex <= 0 ? 'disabled' : ''}>Undo</button>
           <button class="ds-btn" data-action="redo" ${historyIndex >= history.length - 1 ? 'disabled' : ''}>Redo</button>
         </div>
-        ${renderTopbarMenu('Scene', [
-          { label: 'Exporter', action: 'export-scene' },
-          { label: 'Save scene file', action: 'save-scene-file' },
-          { label: 'Save scene as…', action: 'save-scene-as' },
-          { label: 'Import scene', action: 'import-scene', type: 'file' },
-          { label: 'Delete scene file', action: 'delete-scene-file', danger: true }
-        ])}
-        ${renderTopbarMenu('Workspace', [
-          { label: 'Save current as base', action: 'save-as-base' },
-          { label: 'Reset to base', action: 'reset-to-base' },
-          { label: 'New working scene', action: 'new-working-scene' },
-          { label: 'Duplicate scene', action: 'duplicate-scene' },
-          { label: 'Reset local', action: 'reset-storage', danger: true }
-        ])}
-        ${renderTopbarMenu('Canvas', [
-          { label: 'Ajouter une note', action: 'add-note' },
-          { label: 'Appliquer à la sélection', action: 'apply-viewport-selected' },
-          { label: 'Vider la scène', action: 'clear-scene', danger: true },
-          { label: 'Supprimer la sélection', action: 'remove-selected', danger: true }
-        ], { danger: false })}
+        <button class="ds-btn" data-action="organize-canvas">Organize canvas</button>
         <button class="ds-btn ${agent.open ? 'ds-btn--active' : ''}" data-action="toggle-agent">Agent</button>
       </div>
     </header>
@@ -831,8 +1045,9 @@ function renderTopbar() {
 
 function renderLayout() {
   const agent = getAgentState()
-  const content = `${renderLibrary()}${renderCanvas()}${renderInspector()}${renderAgentPanel({ selectionHint: getAgentSelectionHint() })}`
-  return `<div class="ds-app">${renderTopbar()}<div class="ds-layout${agent.open ? ' ds-layout--with-agent' : ''}">${content}</div></div>`
+  const navigator = agent.navigatorOpen ? renderLibrary() : ''
+  const content = `${navigator}${renderCanvas()}${renderInspectorWrapped()}${renderAgentPanel({ selectionHint: getAgentSelectionHint() })}`
+  return `<div class="ds-app">${renderTopbar()}<div class="ds-layout${agent.open ? ' ds-layout--with-agent' : ''}${!agent.navigatorOpen ? ' ds-layout--no-nav' : ''}">${content}</div></div>`
 }
 
 function setFramesInteractive(interactive) {
@@ -885,6 +1100,7 @@ function startDrag(kind, targetId, event) {
   }
 
   selectItem(targetId)
+  setPersistMuted(true)
   setFramesInteractive(false)
   document.body.style.cursor = 'grabbing'
   try {
@@ -893,12 +1109,38 @@ function startDrag(kind, targetId, event) {
   bindGlobalPointerCleanup()
 }
 
+function snapToGrid(value, size = 24) {
+  return Math.round(value / size) * size
+}
+
+function clampItemToLane(item, x, y) {
+  const entry = getEntryById(item.ref, item.kind)
+  if (!entry) return { x, y }
+  const lane = buildLaneLayout(getRenderedScene()).get(getLaneConfig(entry).key) || getLaneConfig(entry)
+  const maxX = lane.x + lane.width - item.width
+  const maxY = lane.y + lane.height - Math.min(item.height, lane.height)
+  return {
+    x: Math.min(Math.max(x, lane.x), Math.max(lane.x, maxX)),
+    y: Math.min(Math.max(y, lane.contentY), Math.max(lane.contentY, maxY))
+  }
+}
+
 function onDragMove(event) {
   if (!dragState?.targetEl) return
   const deltaX = event.clientX - dragState.startMouseX
   const deltaY = event.clientY - dragState.startMouseY
-  const x = Math.max(0, Math.round(dragState.startX + deltaX))
-  const y = Math.max(0, Math.round(dragState.startY + deltaY))
+  let x = Math.max(0, snapToGrid(dragState.startX + deltaX))
+  let y = Math.max(0, snapToGrid(dragState.startY + deltaY))
+
+  if (dragState.kind === 'item') {
+    const item = getRenderedScene().items.find(candidate => candidate.id === dragState.targetId)
+    if (item) {
+      const clamped = clampItemToLane(item, x, y)
+      x = clamped.x
+      y = clamped.y
+    }
+  }
+
   dragState.lastX = x
   dragState.lastY = y
   dragState.targetEl.style.left = `${x}px`
@@ -911,9 +1153,10 @@ function stopDrag() {
       x: dragState.lastX ?? dragState.startX,
       y: dragState.lastY ?? dragState.startY
     }
-    if (dragState.kind === 'note') updateNote(dragState.targetId, patch)
+    if (dragState.kind === 'note') updateNote(dragState.targetId, { ...patch, targetId: null })
     else updateItem(dragState.targetId, patch)
   }
+  setPersistMuted(false)
   dragState = null
   dragPointerId = null
   if (!resizeState) setFramesInteractive(true)
@@ -1000,29 +1243,16 @@ function bindTopbarMenus() {
   })
 }
 
-function bindEvents() {
-  rootEl.querySelector('#ds-search')?.addEventListener('input', event => setQuery(event.target.value))
-  rootEl.querySelectorAll('[data-action="add-item"]').forEach(button => button.addEventListener('click', () => {
-    const entry = getEntryById(button.dataset.id, button.dataset.kind)
-    if (entry) addItem(entry)
-  }))
-  rootEl.querySelectorAll('[data-action="add-note"]').forEach(button => button.addEventListener('click', addNote))
-  rootEl.querySelectorAll('.ds-item').forEach(element => element.addEventListener('click', () => { if (element.dataset.itemId) selectItem(element.dataset.itemId) }))
-  rootEl.querySelectorAll('.ds-note').forEach(element => element.addEventListener('click', () => { if (element.dataset.noteId) selectItem(element.dataset.noteId) }))
-  rootEl.querySelectorAll('[data-drag-handle]').forEach(handle => handle.addEventListener('pointerdown', event => { event.preventDefault(); startDrag('item', handle.dataset.dragHandle, event) }))
-  rootEl.querySelectorAll('[data-note-drag-handle]').forEach(handle => handle.addEventListener('pointerdown', event => { event.preventDefault(); startDrag('note', handle.dataset.noteDragHandle, event) }))
-  rootEl.querySelectorAll('[data-resize-handle]').forEach(handle => handle.addEventListener('pointerdown', event => { event.preventDefault(); event.stopPropagation(); startResize(handle.dataset.resizeHandle, event) }))
-  rootEl.querySelectorAll('[data-action="param-change"]').forEach(input => {
-    const handler = () => {
-      const value = input.type === 'checkbox' ? input.checked : input.value
-      updateItemParams(input.dataset.itemId, { [input.dataset.key]: value })
-    }
-    input.addEventListener(input.tagName === 'SELECT' ? 'change' : 'input', handler)
-    if (input.type === 'checkbox') input.addEventListener('change', handler)
+function bindSelectionDependentEvents() {
+  rootEl.querySelectorAll('[data-action="note-text"]').forEach(textarea => {
+    textarea.addEventListener('change', () => updateNote(textarea.dataset.noteId, { text: textarea.value }))
+    textarea.addEventListener('blur', () => updateNote(textarea.dataset.noteId, { text: textarea.value }))
   })
-  rootEl.querySelectorAll('[data-action="item-prop"]').forEach(input => input.addEventListener('input', () => {
-    const value = Number(input.value)
-    if (Number.isFinite(value) && value > 0) updateItem(input.dataset.itemId, { [input.dataset.key]: value })
+  rootEl.querySelectorAll('[data-action="note-open"]').forEach(input => input.addEventListener('change', () => updateNote(input.dataset.noteId, { open: input.checked })))
+  rootEl.querySelectorAll('[data-action="delete-note"]').forEach(button => button.addEventListener('click', () => removeNote(button.dataset.noteId)))
+  rootEl.querySelectorAll('[data-action="note-attach-selected"]').forEach(input => input.addEventListener('change', () => {
+    const selectedItem = getSelectedSceneItem()
+    updateNote(input.dataset.noteId, { targetId: input.checked ? (selectedItem?.id || null) : null })
   }))
   rootEl.querySelectorAll('[data-action="item-viewport"]').forEach(select => select.addEventListener('change', () => {
     const item = getRenderedScene().items.find(candidate => candidate.id === select.dataset.itemId)
@@ -1033,25 +1263,61 @@ function bindEvents() {
     const dimensions = getItemDimensions(entry, viewport)
     updateItem(select.dataset.itemId, { viewport, width: dimensions.width, height: dimensions.height })
   }))
-  rootEl.querySelectorAll('[data-action="note-text"]').forEach(textarea => textarea.addEventListener('input', () => updateNote(textarea.dataset.noteId, { text: textarea.value })))
+  rootEl.querySelectorAll('[data-action="item-prop"]').forEach(input => input.addEventListener('input', () => {
+    const value = Number(input.value)
+    if (Number.isFinite(value) && value > 0) updateItem(input.dataset.itemId, { [input.dataset.key]: value })
+  }))
+  rootEl.querySelectorAll('[data-action="param-change"]').forEach(input => {
+    const handler = () => {
+      const value = input.type === 'checkbox' ? input.checked : input.value
+      updateItemParams(input.dataset.itemId, { [input.dataset.key]: value })
+    }
+    input.addEventListener(input.tagName === 'SELECT' ? 'change' : 'input', handler)
+    if (input.type === 'checkbox') input.addEventListener('change', handler)
+  })
+}
+
+function bindEvents() {
+  rootEl.querySelector('#ds-search')?.addEventListener('input', event => setQuery(event.target.value))
+  rootEl.querySelectorAll('[data-action="focus-item"]').forEach(button => button.addEventListener('click', () => {
+    const { scene } = getState()
+    const item = (scene.items || []).find(candidate => candidate.ref === button.dataset.id && candidate.kind === button.dataset.kind)
+    if (!item) return
+    selectItem(item.id)
+    const canvas = rootEl.querySelector('.ds-canvas-wrap')
+    const top = Math.max(0, item.y - 120)
+    const left = Math.max(0, item.x - 120)
+    canvas?.scrollTo({ top, left, behavior: 'smooth' })
+  }))
+  rootEl.querySelectorAll('[data-action="add-note"]').forEach(button => button.addEventListener('click', () => addNote()))
+  rootEl.querySelectorAll('[data-action="add-note-to-item"]').forEach(button => button.addEventListener('click', event => {
+    event.stopPropagation()
+    addNote(button.dataset.itemId)
+  }))
+  rootEl.querySelectorAll('.ds-item').forEach(element => element.addEventListener('click', () => { if (element.dataset.itemId) selectItem(element.dataset.itemId) }))
+  rootEl.querySelectorAll('.ds-note').forEach(element => element.addEventListener('click', () => { if (element.dataset.noteId) selectItem(element.dataset.noteId) }))
+  rootEl.querySelectorAll('[data-action="toggle-note"]').forEach(button => button.addEventListener('click', event => {
+    event.stopPropagation()
+    const noteId = button.dataset.noteId
+    const note = getRenderedScene().notes?.find(candidate => candidate.id === noteId)
+    if (!note) return
+    updateNote(noteId, { open: !note.open })
+  }))
+  rootEl.querySelectorAll('[data-action="delete-note-inline"]').forEach(button => button.addEventListener('click', event => {
+    event.stopPropagation()
+    removeNote(button.dataset.noteId)
+  }))
+  rootEl.querySelectorAll('[data-drag-handle]').forEach(handle => handle.addEventListener('pointerdown', event => { event.preventDefault(); startDrag('item', handle.dataset.dragHandle, event) }))
+  rootEl.querySelectorAll('[data-note-drag-handle]').forEach(handle => handle.addEventListener('pointerdown', event => { event.preventDefault(); startDrag('note', handle.dataset.noteDragHandle, event) }))
+  rootEl.querySelectorAll('[data-resize-handle]').forEach(handle => handle.addEventListener('pointerdown', event => { event.preventDefault(); event.stopPropagation(); startResize(handle.dataset.resizeHandle, event) }))
+  bindSelectionDependentEvents()
   rootEl.querySelector('[data-action="scene-viewport"]')?.addEventListener('change', event => setSceneViewport(event.target.value))
   rootEl.querySelector('[data-action="scene-file"]')?.addEventListener('change', event => loadSceneFromFile(event.target.value))
-  rootEl.querySelector('[data-action="apply-viewport-selected"]')?.addEventListener('click', applyViewportToSelected)
   rootEl.querySelector('[data-action="undo"]')?.addEventListener('click', undoHistory)
   rootEl.querySelector('[data-action="redo"]')?.addEventListener('click', redoHistory)
-  rootEl.querySelector('[data-action="export-scene"]')?.addEventListener('click', exportCurrentScene)
-  rootEl.querySelector('[data-action="save-scene-file"]')?.addEventListener('click', () => { saveCurrentSceneToFile().catch(error => alert(error.message)) })
-  rootEl.querySelector('[data-action="save-scene-as"]')?.addEventListener('click', () => { saveCurrentSceneAsNewFile().catch(error => alert(error.message)) })
-  rootEl.querySelector('[data-action="delete-scene-file"]')?.addEventListener('click', () => { deleteCurrentSceneFile().catch(error => alert(error.message)) })
-  rootEl.querySelector('[data-action="save-as-base"]')?.addEventListener('click', saveCurrentAsBase)
-  rootEl.querySelector('[data-action="reset-to-base"]')?.addEventListener('click', resetToBaseScene)
-  rootEl.querySelector('[data-action="new-working-scene"]')?.addEventListener('click', createNewWorkingScene)
-  rootEl.querySelector('[data-action="duplicate-scene"]')?.addEventListener('click', duplicateCurrentScene)
-  rootEl.querySelectorAll('[data-action="import-scene"]').forEach(input => input.addEventListener('change', importSceneFromFile))
-  rootEl.querySelector('[data-action="remove-selected"]')?.addEventListener('click', removeSelectedItem)
-  rootEl.querySelector('[data-action="clear-scene"]')?.addEventListener('click', clearScene)
-  rootEl.querySelector('[data-action="reset-storage"]')?.addEventListener('click', () => resetState())
+  rootEl.querySelector('[data-action="organize-canvas"]')?.addEventListener('click', organizeCanvas)
   rootEl.querySelector('[data-action="toggle-agent"]')?.addEventListener('click', toggleAgentPanel)
+  rootEl.querySelector('[data-action="toggle-navigator"]')?.addEventListener('click', toggleNavigatorPanel)
   bindTopbarMenus()
   bindAgentEvents()
 }
@@ -1189,6 +1455,10 @@ export async function renderApp(root) {
     subscribe(render)
     subscribeAgentState(() => render())
     await loadSceneFromFile('default.scene.json', { keepWorkingScene: hasWorkingScene() })
+    if (!hasWorkingScene()) {
+      const hydrated = hydrateSceneWithRegistry(getState().scene)
+      replaceWorkingScene(hydrated)
+    }
     render()
   } catch (error) {
     console.error('[design-surface]', error)

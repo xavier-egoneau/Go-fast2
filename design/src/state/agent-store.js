@@ -4,6 +4,7 @@ const EMPTY_ACTION_JSON = JSON.stringify(createEmptyBrainOutput(), null, 2)
 
 let agentState = {
   open: false,
+  navigatorOpen: true,
   providerId: 'manual-json',
   input: '',
   promptPreview: '',
@@ -15,7 +16,8 @@ let agentState = {
   lastWarnings: [],
   requiresNewComponent: false,
   unresolved: [],
-  previewScene: null
+  previewScene: null,
+  feedbackDismissed: false
 }
 
 const listeners = new Set()

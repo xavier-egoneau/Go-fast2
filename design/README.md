@@ -46,18 +46,19 @@ Puis ouvrir :
 ### Disponible
 
 - library alimentée par `dev/data/showcase.json`
-- canvas simple
+- canvas simple de scène de travail
 - rendu réel via iframes Twig
 - inspector auto-généré depuis les métadonnées JSON
 - persistance locale via `localStorage`
 - scènes JSON locales
 - drag / resize basiques
-- notes sur canvas
+- notes compactes sur canvas, pouvant se lier à un élément sélectionné
 - contrat canvas ↔ brain déjà cadré dans `design/specs/canvas-brain-contract.md`
 - abstraction frontend de providers déjà en place
 - génération de prompt et normalisation de sortie déjà amorcées
 - premier provider réel branché : `codex-cli`
 - contexte brain enrichi avec registry, contrôles, tokens, règles et actions supportées
+- flow agent centré sur `proposition -> preview -> apply`, sans mutation implicite au submit
 
 ### Encore incomplet
 
@@ -259,6 +260,13 @@ La priorité est de prouver qu'un vrai cerveau peut transformer une scène sans 
 - remplacement total de Figma
 - outil de chat purement technique exposé au designer
 - appel direct d'un CLI externe depuis le browser
+
+## Modèle mental actuel
+
+- **Library** : catalogue du système réel exposé par le showcase
+- **Canvas** : scène de travail locale qui compose des instances de ces blocs
+- **Agent** : génère d'abord une proposition structurée, puis un preview, puis un apply explicite
+- **Notes** : annotations de canvas, distinctes des composants de prod
 
 ## Résumé
 

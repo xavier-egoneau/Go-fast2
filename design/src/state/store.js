@@ -28,12 +28,14 @@ function createInitialState() {
 
 let state = normalizeState(loadState()) || createInitialState()
 const listeners = new Set()
+let persistMuted = false
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value))
 }
 
 function persist() {
+  if (persistMuted) return
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
 }
 
@@ -149,6 +151,10 @@ export function replaceScene(scene) {
 export function resetState() {
   state = createInitialState()
   emit()
+}
+
+export function setPersistMuted(value) {
+  persistMuted = Boolean(value)
 }
 
 export function rehydrateState() {

@@ -1,26 +1,56 @@
 ---
 name: review
-description: Perform a structured code review focused on correctness, consistency, maintainability, and impact. Use when evaluating code quality, detecting issues, or validating changes before completion.
+description: Perform a structured review focused on correctness, consistency, maintainability, and impact. Use when evaluating code quality, detecting issues, or validating changes before completion. Also applies to plans, decisions, and technical documents. Can be used standalone or orchestrated by autopilot.
 ---
 
 # Review
 
-Analyze code critically, not superficially.
+Analyze critically, not superficially.
 
 ---
 
 ## Mission
 
-Evaluate code quality, correctness, and impact.
+Evaluate quality, correctness, and impact.
 
 The goal of this skill is to:
 - detect issues and risks
 - evaluate consistency with the project
-- identify dead or unnecessary code
-- assess impact beyond the local file
+- identify dead or unnecessary content
+- assess impact beyond the local scope
 - provide actionable feedback
 
-This skill must not blindly refactor or rewrite code.
+This skill must not blindly refactor or rewrite what it reviews.
+
+---
+
+## Standalone vs orchestrated
+
+This skill works in two contexts:
+
+**Standalone** — the user calls it directly without autopilot.
+- The skill runs its full workflow independently.
+- It produces a self-contained review output with findings and a recommended next step.
+- It does not require project memory files to operate.
+- If project files exist, it may read them for context to better evaluate consistency and conventions.
+
+**Orchestrated** — autopilot delegates to this skill.
+- The skill receives a specific scope from autopilot.
+- It returns structured findings for autopilot to act on.
+- It may suggest updates to project memory files.
+
+---
+
+## What can be reviewed
+
+This skill applies to:
+
+- **Code** — implementation files, functions, components, modules
+- **Plans** — PLAN.md, task lists, execution strategies
+- **Decisions** — DECISIONS.md entries, architectural choices
+- **Technical documents** — specs, API contracts, configuration files
+
+The review workflow adapts to the subject. Code reviews focus on logic and impact. Document reviews focus on clarity, completeness, and coherence.
 
 ---
 
@@ -28,27 +58,26 @@ This skill must not blindly refactor or rewrite code.
 
 Use `review` when:
 
-- code has been written or modified
-- a feature is considered "done"
+- code or a document has been written or modified
+- a feature or task is considered done
 - before validation or delivery
 - potential issues or inconsistencies are suspected
-- code quality needs to be assessed
-- after a complex implementation
+- quality needs to be assessed
+- after a complex implementation or planning session
 
 ---
 
 ## Do not use this skill when
 
-- no code exists yet
-- the task is purely conceptual
-- the change is trivial and fully verified
+- nothing exists yet to review
 - understanding is missing → use `research` first
+- the change is trivial and fully verified
 
 ---
 
 ## Core principles
 
-- Review behavior, not just syntax
+- Review behavior and intent, not just syntax
 - Evaluate impact, not just local correctness
 - Prefer evidence over intuition
 - Stay proportional to the scope
@@ -62,31 +91,33 @@ Use `review` when:
 
 ### 1. Define review scope
 
-- What files are under review?
-- What was changed?
-- What is the intent of the change?
+- What is under review? (code, plan, decision, document)
+- What was changed or produced?
+- What is the intent?
 
 ---
 
 ### 2. Check understanding
 
-If unclear:
-- suggest using `research`
-- or perform lightweight reasoning based on available context
+If the intent or context is unclear:
+- use `research` to gather missing context
+- or perform lightweight reasoning based on available information
+
+Do not review blindly without understanding what the subject is meant to do.
 
 ---
 
 ### 3. Analyze locally
 
-For each file:
+For each file or section:
 
-- correctness of logic
+- correctness of logic or reasoning
 - clarity and readability
-- naming consistency
+- naming or terminology consistency
 - unnecessary complexity
 - duplication
-- unused variables / functions / imports
-- obvious bugs or edge cases
+- unused or dead elements
+- obvious issues or edge cases
 
 ---
 
@@ -94,14 +125,13 @@ For each file:
 
 When relevant, evaluate:
 
-- where this code is used
-- whether contracts changed
+- where this code or decision is consumed
+- whether contracts or interfaces changed
 - whether shared logic is affected
 - whether dependencies are impacted
-- potential regressions
+- potential regressions or side effects
 
-If impact is unclear:
-- recommend `research`
+If impact is unclear, recommend `research`.
 
 ---
 
@@ -113,28 +143,29 @@ Look for:
 - inconsistent patterns
 - misplaced responsibilities
 - unnecessary abstractions
-- missing abstractions when duplication exists
+- missing abstractions where duplication exists
+- incoherence between a plan and its decisions, or between decisions and the code
 
 ---
 
-### 6. Identify dead or risky code
+### 6. Identify dead or risky content
 
-- unused code
+- unused code, sections, or decisions
 - unreachable branches
 - redundant logic
-- temporary workarounds
-- fragile assumptions
+- temporary workarounds left in place
+- fragile or unverified assumptions
 
 ---
 
 ### 7. Classify findings
 
-Each finding should be categorized:
+Each finding must be categorized:
 
-- Critical → must fix (bug, regression risk)
-- Important → should fix (maintainability, clarity)
-- Minor → optional improvements
-- Note → observation or suggestion
+- **Critical** → must fix (bug, regression risk, blocking incoherence)
+- **Important** → should fix (maintainability, clarity, missing coverage)
+- **Minor** → optional improvement
+- **Note** → observation or suggestion without urgency
 
 ---
 
@@ -143,6 +174,7 @@ Each finding should be categorized:
 - propose minimal, safe improvements
 - avoid full rewrites unless necessary
 - avoid introducing new complexity
+- prefer targeted fixes over broad restructuring
 
 ---
 
@@ -150,7 +182,7 @@ Each finding should be categorized:
 
 ### Summary
 
-- Overall assessment (good / acceptable / problematic)
+- Overall assessment: good / acceptable / problematic
 - Main risks
 - Confidence level
 
@@ -161,14 +193,14 @@ Each finding should be categorized:
 For each issue:
 
 - Type: Critical / Important / Minor / Note
-- Location: file / function / component
-- Description:
-- Impact:
-- Suggested fix:
+- Location: file / function / section / component
+- Description
+- Impact
+- Suggested fix
 
 ---
 
-### Dead code / cleanup
+### Dead content / cleanup
 
 - list removable elements
 - explain why they are safe to remove
@@ -179,7 +211,7 @@ For each issue:
 
 - affected areas
 - possible regressions
-- contracts touched
+- contracts or interfaces touched
 
 ---
 
@@ -187,36 +219,21 @@ For each issue:
 
 - what could not be verified
 - what requires human validation
-- what requires runtime testing
+- what requires runtime testing or external confirmation
 
 ---
 
 ### Recommended next step
 
-- fix issues
+Every review output must end with a clear recommended next step:
+
+- fix critical issues before proceeding
 - run validation
-- trigger `research`
+- trigger `research` for unclear impact zones
 - update `PLAN.md`
 - update `DECISIONS.md`
 - proceed to completion
-
----
-
-## Integration with other skills
-
-### With `research`
-
-Use `research` when:
-- impact is unclear
-- usage patterns are unknown
-- behavior is complex or implicit
-
----
-
-### With `autopilot`
-
-- `review` provides feedback
-- `autopilot` decides what to do next
+- escalate to autopilot
 
 ---
 
@@ -224,23 +241,19 @@ Use `research` when:
 
 ### PLAN.md
 
-- suggest updates if new work appears
+- suggest updates if new work is uncovered
 - mark tasks as incomplete if issues remain
-
----
 
 ### DECISIONS.md
 
-- suggest updates if:
-  - a decision is violated
-  - a better approach is identified
-  - a workaround needs to be recorded
-
----
+- suggest updates if a decision is violated, revised, or missing
+- suggest recording workarounds when relevant
 
 ### MEMORY.md
 
-- update only if stable context changes (rare)
+- update only if stable project context changed (rare)
+
+In standalone mode, the skill suggests updates but does not apply them silently.
 
 ---
 
@@ -248,9 +261,9 @@ Use `research` when:
 
 This skill must NOT:
 
-- rewrite large parts of the code automatically
+- rewrite large parts of the reviewed content automatically
 - perform broad refactors
-- introduce new features
+- introduce new features or scope
 - make silent structural decisions
 
 This skill may:
@@ -267,7 +280,7 @@ This skill may:
 A good review is:
 
 - focused on real issues
-- aware of project context
+- aware of project context and intent
 - proportional to scope
 - actionable
 - explicit about uncertainty
@@ -278,11 +291,11 @@ A good review is:
 ## Failure modes to avoid
 
 - nitpicking without value
-- ignoring impact beyond the file
-- missing obvious bugs
+- ignoring impact beyond the local scope
+- missing obvious issues
 - proposing unnecessary rewrites
 - mixing opinion with fact
-- reviewing without understanding
+- reviewing without understanding the intent
 
 ---
 
@@ -293,3 +306,6 @@ A good review is:
 - "is this implementation safe?"
 - "find issues in this feature"
 - "validate before shipping"
+- "review this plan"
+- "check this decision"
+- "is this spec coherent?"

@@ -1,3 +1,8 @@
+---
+name: autopilot
+description: Execute implementation-oriented tasks autonomously while keeping work controlled, traceable, and safe. Use for any coding, implementation, or technical task that requires planning, execution, and validation. Supports onboarding (stabilize project context), framing (clarify objective), planning (structure work), execution (implement incrementally), and validation (verify results). Orchestrates research, review, and parallel skills when needed.
+---
+
 # AUTOPILOT SKILL
 
 ## Mission
@@ -37,6 +42,13 @@ The agent must always choose the lightest workflow that still produces a reliabl
 - Do not create unnecessary ceremony
 - Scale process with task complexity
 - Use specialized skills only when they provide real value
+
+Task complexity signals:
+- **Low** → single file, clear outcome, no shared dependencies → Mode A
+- **Medium** → multiple files, some uncertainty, dependencies to check → Mode B
+- **High** → architecture impact, sensitive areas, many unknowns, or large scope → Mode C
+
+When in doubt, treat the task as one level higher than it appears.
 
 ---
 
@@ -90,6 +102,120 @@ Behavior:
 - do not implement directly
 - produce framing, risks, decisions, and an execution plan
 - identify what needs human arbitration or validation
+
+---
+
+## Phase 0 — Onboarding
+
+Trigger: the user explicitly says `onboarding`.
+
+This phase is a one-time stabilization pass. Its goal is to align the agent's working context with the actual state of the project before any execution begins.
+
+The agent must not implement, plan, or execute during this phase.
+
+---
+
+### Step 1 — Read existing project files
+
+The agent must read every project memory file that exists:
+
+- `MEMORY.md`
+- `AGENTS.md`
+- `PLAN.md`
+- `DECISIONS.md`
+
+If a file does not exist, note it as absent. Do not create it yet.
+
+---
+
+### Step 2 — Evaluate what was found
+
+For each file found, the agent must assess:
+
+- Is the structure canonical (matches the expected format)?
+- Is the content complete or are sections missing?
+- Is the information coherent (no contradictions, no stale data)?
+- Is anything unclear, ambiguous, or underspecified?
+
+The agent must then produce a brief internal assessment:
+
+- what is clear and usable
+- what is incomplete or missing
+- what is structurally off
+- what critical information is absent
+
+---
+
+### Step 3 — Ask targeted questions if needed
+
+If critical information is missing or ambiguous, the agent must ask the user before proceeding.
+
+Rules:
+- group all questions in a single message
+- ask only what is truly blocking — not everything that could be useful
+- do not ask about information that can reasonably be inferred
+- do not begin rewriting files before receiving answers
+
+Critical information includes:
+- the project's main objective (if absent from MEMORY.md)
+- the current execution state (if PLAN.md is absent or stale)
+- architectural or stack choices that would affect execution (if absent from DECISIONS.md)
+
+If no critical information is missing, skip this step entirely.
+
+---
+
+### Step 4 — Rewrite project memory files
+
+The agent must rewrite each memory file using its canonical structure.
+
+Rules:
+- preserve all existing information — do not discard anything without reason
+- reorganize content into the correct sections
+- remove duplicate information across files (each file has its own responsibility)
+- fill in structure where it was missing
+- do not invent information that was not provided or inferable
+
+File responsibilities:
+- `MEMORY.md` — stable project context, objectives, constraints, non-goals
+- `AGENTS.md` — execution rules, code conventions, validation rules, output expectations
+- `PLAN.md` — current execution state, remaining tasks, phases
+- `DECISIONS.md` — meaningful past decisions with context and consequences
+
+If a file did not exist and enough information is available to create it, create it.
+If not enough information exists to populate a file meaningfully, note it as pending and explain what is missing.
+
+**On a blank project** (no files exist at all):
+- do not invent project context
+- ask the user for the minimum required to populate MEMORY.md: project goal, main constraints, and any known non-goals
+- create AGENTS.md with default execution rules
+- leave PLAN.md and DECISIONS.md as pending until framing produces content for them
+
+---
+
+### Step 5 — Confirm understanding
+
+After rewriting, the agent must produce a short onboarding summary:
+
+- Project: one-sentence description
+- Current state: what is done, what is in progress, what is next
+- Key constraints: the most important technical or product constraints
+- Open questions: anything that remains unclear and may need resolution before execution
+- Files written: list of files created or updated
+
+This summary is the handoff point. Once confirmed by the user, the agent is ready to execute.
+
+---
+
+### Onboarding rules
+
+- onboarding is only triggered by the explicit keyword `onboarding`
+- onboarding must complete fully before any execution begins
+- the agent must not silently skip steps
+- the agent must not invent information to fill gaps
+- the agent must not treat partial files as complete
+- rewriting files is not optional — even well-structured files must be reviewed and confirmed
+- the agent must not use onboarding as an excuse to refactor or change scope
 
 ---
 

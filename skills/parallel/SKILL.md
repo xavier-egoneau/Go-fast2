@@ -1,6 +1,6 @@
 ---
 name: parallel
-description: Execute work through clearly separated parallel lanes when the plan proves they are independent enough to reduce risk-free execution time. Use only after planning has established ownership, boundaries, and merge points.
+description: Execute work through clearly separated parallel lanes when the plan proves they are independent enough to reduce execution time without added risk. Use only after autopilot planning has established ownership, boundaries, and merge points. Not designed for standalone use.
 ---
 
 # Parallel
@@ -21,7 +21,7 @@ The goal of this skill is to:
 - avoid hidden conflicts between lanes
 - make merge points explicit
 - surface risks early
-- return a clean combined result
+- return a clean combined result to autopilot
 
 ---
 
@@ -35,9 +35,24 @@ Default to the safer option.
 
 ---
 
+## Relationship with autopilot
+
+This skill is designed to be orchestrated by `autopilot`. It is not intended for standalone use.
+
+`autopilot` decides whether work should be:
+- sequential
+- partially parallel
+- parallel
+
+`parallel` does not decide strategy by itself. It executes the parallel part once the lane split has been justified by planning.
+
+If lane independence becomes questionable during execution, `parallel` must surface the issue immediately and return control to `autopilot`.
+
+---
+
 ## Use this skill when
 
-Use `parallel` only when planning has already established that:
+Use `parallel` only when autopilot planning has already established that:
 
 - tasks are meaningfully independent
 - ownership per lane is clear
@@ -69,23 +84,9 @@ Do not use `parallel` when:
 
 ---
 
-## Relationship with autopilot
-
-`autopilot` decides whether work should be:
-- sequential
-- partially parallel
-- parallel
-
-`parallel` does not decide strategy by itself.
-`parallel` executes the parallel part once the lane split is justified.
-
-If lane independence is questionable during execution, `parallel` must surface the issue and suggest returning control to `autopilot`.
-
----
-
 ## Preconditions
 
-Before using this skill, the following should already be clear:
+Before using this skill, the following must already be clear:
 
 - overall objective
 - lane definitions
@@ -94,7 +95,7 @@ Before using this skill, the following should already be clear:
 - merge point
 - revalidation needs after merge
 
-If these are not clear, stop and return to planning.
+If these are not clear, stop and return to autopilot for planning.
 
 ---
 
@@ -148,7 +149,7 @@ Before execution:
 - restate merge point
 - restate known risks
 
-If one lane is not clearly separable, stop.
+If one lane is not clearly separable, stop and return to autopilot.
 
 ---
 
@@ -173,7 +174,7 @@ During execution, watch for:
 - invalidated merge strategy
 - one lane blocking another unexpectedly
 
-If these appear, surface the issue immediately.
+If these appear, surface the issue immediately and pause execution.
 
 ---
 
@@ -211,7 +212,7 @@ After merge:
 
 ## Lane output format
 
-Each lane should be summarized with:
+Each lane must be summarized with:
 
 - Lane name
 - Goal
@@ -235,22 +236,12 @@ Example:
 
 ---
 
-## Merge output format
+## Handoff output format
 
-The merged result should include:
-
-- lanes completed
-- lanes blocked
-- files touched by lane
-- merge conflicts or near-conflicts
-- revalidation performed
-- remaining risks
-- recommended next step
-
-Example:
+After merge and revalidation, the skill must return a structured handoff to autopilot:
 
 ~~~md
-## Parallel merge summary
+## Parallel handoff to autopilot
 - Lanes completed:
   - Lane A
   - Lane B
@@ -259,14 +250,19 @@ Example:
 - Files touched:
   - src/components/A.tsx
   - PLAN.md
-- Merge risks:
-  - shared type assumptions need revalidation
-- Revalidation:
+- Merge risks resolved:
+  - shared type assumptions verified — no conflict
+- Merge risks remaining:
+  - none
+- Revalidation performed:
   - import consistency checked
   - shared contract not modified
-- Next step:
-  - run review
+- Recommended next step for autopilot:
+  - run review on merged output
+  - continue with Phase 3 execution
 ~~~
+
+This handoff is mandatory. autopilot uses it to decide whether to continue, revalidate further, or escalate.
 
 ---
 
@@ -322,10 +318,10 @@ The skill must:
 - identify which lane failed
 - explain whether the failure is local or cross-lane
 - explain whether merge is still possible
+- return control to autopilot with a clear failure report
 - suggest whether to:
   - continue with partial results
   - downgrade to sequential execution
-  - return to `autopilot`
   - trigger `research`
   - trigger `review`
 
@@ -365,7 +361,7 @@ Parallel execution must not be used when the task touches:
 - database migrations
 - destructive bulk operations
 
-Unless `autopilot` explicitly frames a controlled and safe partial use case, parallel execution should be avoided in these areas.
+Unless autopilot explicitly frames a controlled and safe partial use case, parallel execution must be avoided in these areas.
 
 ---
 
@@ -378,7 +374,8 @@ This skill must NOT:
 - hide overlap or conflicts
 - silently rewrite lane boundaries
 - convert a risky task into a parallel task just for speed
-- override `autopilot` orchestration
+- override autopilot orchestration
+- operate without a structured handoff back to autopilot
 
 This skill may:
 
@@ -399,6 +396,7 @@ A good parallel run is:
 - honest about conflicts
 - careful at merge time
 - followed by proportionate revalidation
+- closed with a clean handoff to autopilot
 
 ---
 
@@ -411,6 +409,7 @@ A good parallel run is:
 - unsafe merges
 - using speed as the only reason for parallelization
 - losing overall coherence
+- returning to autopilot without a structured handoff
 
 ---
 

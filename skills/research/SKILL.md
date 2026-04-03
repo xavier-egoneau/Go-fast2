@@ -1,6 +1,6 @@
 ---
 name: research
-description: Investigate a codebase, feature, bug, or technical question and produce a structured, evidence-based synthesis. Use when understanding is required before planning, reviewing, or implementing.
+description: Investigate a codebase, feature, bug, or technical question and produce a structured, evidence-based synthesis. Use when understanding is required before planning, reviewing, or implementing. Can be used standalone or orchestrated by autopilot.
 ---
 
 # Research
@@ -14,12 +14,29 @@ Investigate deeply, then synthesize clearly.
 Understand before acting.
 
 The goal of this skill is to:
-- explore relevant parts of the codebase
+- explore relevant parts of the codebase or subject
 - identify how things actually work
 - separate facts from assumptions
 - produce a structured synthesis usable for decisions, planning, review, or implementation
 
 This skill must not drift into implementation.
+
+---
+
+## Standalone vs orchestrated
+
+This skill works in two contexts:
+
+**Standalone** — the user calls it directly without autopilot.
+- The skill runs its full workflow independently.
+- It produces a self-contained output with findings and a recommended next step.
+- It does not require project memory files to operate.
+- If project files exist, it may read them for context but must not modify them without noting it explicitly.
+
+**Orchestrated** — autopilot delegates to this skill.
+- The skill receives a specific question or scope from autopilot.
+- It returns structured findings for autopilot to use in planning or execution.
+- It may update project memory files as directed.
 
 ---
 
@@ -33,6 +50,7 @@ Use `research` when:
 - multiple files or dependencies are involved
 - a code review requires context beyond a single file
 - a decision depends on evidence rather than intuition
+- you want to understand how something works before touching it
 
 ---
 
@@ -66,6 +84,11 @@ Use `research` when:
 - What is unclear?
 - What needs to be proven or explained?
 
+Identify which investigation mode applies:
+- **System mapping** — understand how a system or feature is structured
+- **Bug or problem analysis** — find the cause of unexpected behavior
+- **Technical question** — understand how something works conceptually or in practice
+
 ---
 
 ### 2. Identify investigation scope
@@ -77,7 +100,7 @@ Use `research` when:
 
 ---
 
-### 3. Explore the codebase
+### 3. Explore the codebase or subject
 
 - Read relevant files
 - Follow imports and call chains
@@ -120,7 +143,7 @@ Example:
 
 ### 6. Synthesize findings
 
-Produce a clear, decision-ready output.
+Produce a clear, decision-ready output using the appropriate output structure below.
 
 ---
 
@@ -146,6 +169,16 @@ Produce a clear, decision-ready output.
 
 ---
 
+### When answering a technical question
+
+- Question restated precisely
+- Answer grounded in observed evidence
+- Key mechanisms or patterns identified
+- Caveats and remaining uncertainties
+- Suggested next step
+
+---
+
 ### Always include
 
 - concrete references (files, functions, components)
@@ -154,17 +187,16 @@ Produce a clear, decision-ready output.
 
 ---
 
-## Integration with autopilot
+## Recommended next step
 
-This skill must actively help the global workflow.
-
-### After research, suggest the next step:
+Every research output must end with a clear recommended next step:
 
 - proceed with implementation
-- switch to `plan`
-- trigger a code review
-- update `DECISIONS.md` if assumptions are invalidated
-- escalate to `autopilot` for orchestration
+- switch to planning
+- trigger a review
+- run a second research pass on a narrower question
+- escalate to autopilot for orchestration
+- ask the user for clarification
 
 ---
 
@@ -173,6 +205,7 @@ This skill must actively help the global workflow.
 ### If research reveals structural insights:
 
 - may update `MEMORY.md` (stable context only)
+- must note any update explicitly
 
 ### If research invalidates assumptions:
 
@@ -182,6 +215,8 @@ This skill must actively help the global workflow.
 
 - must suggest updating `PLAN.md`
 
+In standalone mode, the skill suggests updates but does not apply them silently.
+
 ---
 
 ## Boundaries
@@ -189,7 +224,7 @@ This skill must actively help the global workflow.
 This skill must NOT:
 
 - implement code
-- modify files directly
+- modify files directly without noting it
 - refactor
 - make silent decisions
 
@@ -206,7 +241,7 @@ This skill may:
 
 A good research output is:
 
-- grounded in actual code
+- grounded in actual code or evidence
 - cross-file when necessary
 - structured and readable
 - explicit about uncertainty
@@ -232,3 +267,5 @@ A good research output is:
 - "where is this function used?"
 - "why does this behavior happen?"
 - "analyze this part of the codebase before modifying it"
+- "how does X work in this project?"
+- "what would be impacted if I change Y?"

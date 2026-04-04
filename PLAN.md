@@ -104,3 +104,29 @@
 - [ ] Validate updated Design Surface interactions manually, especially inspector drawers on `header-nav` and `listing`
 - [x] Run relevant automated checks for impacted code
 - [ ] Review product coherence after the first feedback fixes
+
+## Phase 8 - Visual child exposure from parent previews
+- [ ] Define the exact product contract for hover-driven child exposure from a parent preview
+  - [ ] Distinguish "edit already-exposed child bindings" from "expose this child in the parent JSON"
+  - [x] Decide whether JSON authoring should happen only after an explicit "Expose and edit" action
+    - Decision recorded: parent JSON authoring is allowed automatically when the user edits an unexposed child from the preview flow
+- [ ] Define the preview DOM metadata contract needed to identify a child inside a parent render
+  - [ ] Standardize the minimum `data-*` metadata required to map a hovered DOM node back to a composable node candidate
+  - [ ] Decide where that metadata should live for pilot cases (`header-nav` -> `button`, `card` -> `button`)
+- [ ] Implement a pilot hover affordance in the Design Surface preview iframe
+  - [ ] Detect hovered child targets from the preview render
+  - [ ] Show a contextual action near the hovered child
+  - [ ] Route the action either to the existing drawer or to the new "Expose and edit" flow
+- [ ] Define and implement the MVP JSON authoring flow for undeclared single-child parts
+  - [ ] Restrict the first slice to simple `parts` cases, excluding collections and repeated structures
+  - [ ] Decide the generated node shape (`label`, `component`, `mode`, `autoBind`) for new parent `parts`
+  - [x] Decide the naming strategy for generated part ids and the corresponding parent binding keys
+    - Decision recorded: generated ids should default to the child component name, with a numeric suffix when several matching children exist (`button`, `button2`, `button3`, etc.)
+- [ ] Rebuild parent metadata after JSON authoring so the new drawer becomes immediately usable
+  - [ ] Validate the updated parent JSON
+  - [ ] Regenerate `showcase.json`
+  - [ ] Refresh Design Surface registry state and reopen the newly exposed child editor
+- [ ] Validate the pilot loop on simple composable entries
+  - [ ] Confirm the loop works on `header-nav` -> `button`
+  - [ ] Confirm the loop works on `card` -> `button`
+  - [ ] Capture unsupported cases explicitly before extending to `instances`, `families`, `layoutGroups`, or `collections`

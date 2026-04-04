@@ -388,6 +388,23 @@ button.ds-badge,
   background: rgba(248, 113, 113, 0.14);
 }
 
+.ds-preview-composable-action {
+  position: fixed;
+  z-index: 30;
+  border: 1px solid rgba(96, 165, 250, 0.45);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #fff;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.22);
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+
+.ds-preview-composable-action:hover {
+  border-color: rgba(147, 197, 253, 0.72);
+}
+
 .ds-canvas {
   position: relative;
   padding: 40px;
@@ -512,7 +529,7 @@ button.ds-badge,
   cursor: nwse-resize;
 }
 
-.ds-inspector-group { display: grid; gap: 12px; margin-bottom: 18px; }
+.ds-inspector-group { display: grid; gap: 8px; margin-bottom: 10px; }
 .ds-inspector-group__title { margin: 0 0 8px; font-size: 13px; color: var(--ds-text-muted); text-transform: uppercase; letter-spacing: .04em; }
 .ds-field { display: grid; gap: 6px; }
 .ds-field__label { font-size: 13px; }
@@ -617,3 +634,132 @@ button.ds-badge,
   cursor: pointer;
 }
 .ds-note__text { font-size: 13px; line-height: 1.45; white-space: pre-wrap; }
+
+.ds-grid-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 28;
+  pointer-events: none;
+}
+
+.ds-grid-cell {
+  position: fixed;
+  border: 1px dashed rgba(96, 165, 250, 0.3);
+  border-radius: 4px;
+  pointer-events: none;
+  transition: background .1s ease, border-color .1s ease;
+}
+
+.ds-grid-cell--hovered {
+  background: rgba(96, 165, 250, 0.06);
+  border-color: rgba(96, 165, 250, 0.65);
+  border-style: solid;
+}
+
+.ds-grid-cell__btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  pointer-events: auto;
+  border: 1px solid rgba(96, 165, 250, 0.5);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  background: rgba(15, 23, 42, 0.88);
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+}
+
+.ds-grid-cell__btn:hover {
+  border-color: rgba(147, 197, 253, 0.8);
+  background: rgba(15, 23, 42, 0.96);
+}
+
+.ds-composable-popover {
+  position: fixed;
+  z-index: 40;
+  width: 280px;
+  border: 1px solid var(--ds-line);
+  border-radius: 14px;
+  background: var(--ds-panel);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.36);
+  overflow: hidden;
+}
+
+.ds-composable-popover__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--ds-line);
+  background: var(--ds-panel-2);
+}
+
+.ds-composable-popover__title {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.ds-composable-popover__node {
+  font-size: 11px;
+  color: var(--ds-text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
+}
+
+.ds-composable-popover__close {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--ds-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.ds-composable-popover__close:hover {
+  background: rgba(148, 163, 184, 0.22);
+  color: var(--ds-text);
+}
+
+.ds-composable-popover__body {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  max-height: 360px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ds-line) transparent;
+}
+
+.ds-composable-popover__grid-info {
+  font-size: 11px;
+  color: #93c5fd;
+  background: rgba(96, 165, 250, 0.08);
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+
+.ds-composable-popover__group {
+  display: grid;
+  gap: 8px;
+}
+
+.ds-composable-popover__group-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ds-text-muted);
+}

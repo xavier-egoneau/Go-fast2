@@ -7,7 +7,11 @@
       "label": "Colonnes",
       "type": "select",
       "default": "3",
-      "options": ["1", "2", "3"]
+      "options": [
+        "1",
+        "2",
+        "3"
+      ]
     }
   },
   "content": {},
@@ -47,6 +51,12 @@
           "copyright": "© 2025 MonSite. Tous droits réservés."
         }
       }
+    },
+    "card": {
+      "label": "card",
+      "component": "card",
+      "mode": "single",
+      "autoBind": true
     }
   },
   "collections": {
@@ -67,8 +77,17 @@
         }
       },
       "exclude": {
-        "variants": ["horizontal", "ctaVariant", "ctaSize", "ctaFull", "ctaDisabled"],
-        "content": ["title", "text"]
+        "variants": [
+          "horizontal",
+          "ctaVariant",
+          "ctaSize",
+          "ctaFull",
+          "ctaDisabled"
+        ],
+        "content": [
+          "title",
+          "text"
+        ]
       }
     }
   }

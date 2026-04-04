@@ -639,6 +639,18 @@
               "copyright": "© 2025 MonSite. Tous droits reserves."
             }
           }
+        },
+        "input": {
+          "label": "input",
+          "component": "input",
+          "mode": "single",
+          "autoBind": true
+        },
+        "grid": {
+          "label": "grid",
+          "component": "grid",
+          "mode": "single",
+          "autoBind": true
         }
       },
       "collections": {},
@@ -1270,6 +1282,12 @@
               "copyright": "© 2025 MonSite. Tous droits réservés."
             }
           }
+        },
+        "card": {
+          "label": "card",
+          "component": "card",
+          "mode": "single",
+          "autoBind": true
         }
       },
       "collections": {

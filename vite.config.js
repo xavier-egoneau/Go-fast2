@@ -215,6 +215,90 @@ function createShowcaseEntryResolver(showcaseData = {}) {
   }
 }
 
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function sanitizeComposableNodeId(value = '') {
+  const compact = String(value || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]+/g, '')
+
+  return compact || 'part'
+}
+
+function formatComposableLabel(value = '') {
+  const words = String(value || '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+
+  return words.length
+    ? words.map(word => `${word.charAt(0).toUpperCase()}${word.slice(1)}`).join(' ')
+    : 'Part'
+}
+
+function createAvailableComposableNodeId(existingNodes = {}, preferredBase = 'part') {
+  const baseId = sanitizeComposableNodeId(preferredBase)
+  if (!existingNodes[baseId]) return baseId
+
+  let index = 2
+  while (existingNodes[`${baseId}${index}`]) {
+    index += 1
+  }
+
+  return `${baseId}${index}`
+}
+
+function resolveMetaFilePath(relativeMetaPath = '') {
+  const resolved = path.resolve(ROOT, relativeMetaPath)
+  const allowedRoots = [
+    path.join(ROOT, 'dev', 'components'),
+    path.join(ROOT, 'dev', 'pages')
+  ]
+
+  const isAllowed = allowedRoots.some(baseDir => resolved === baseDir || resolved.startsWith(`${baseDir}${path.sep}`))
+  if (!isAllowed) throw new Error('Meta path must stay inside dev/components or dev/pages')
+  if (!fs.existsSync(resolved)) throw new Error(`Meta file not found: ${relativeMetaPath}`)
+
+  return resolved
+}
+
+function exposeChildPartInMetaFile(relativeMetaPath, payload = {}) {
+  const absoluteMetaPath = resolveMetaFilePath(relativeMetaPath)
+  const raw = JSON.parse(fs.readFileSync(absoluteMetaPath, 'utf8'))
+  const next = isPlainObject(raw) ? { ...raw } : {}
+  const childComponent = String(payload.childComponent || '').trim()
+
+  if (!childComponent) throw new Error('childComponent is required')
+
+  const parts = isPlainObject(next.parts) ? { ...next.parts } : {}
+  const preferredId = sanitizeComposableNodeId(payload.preferredNodeId || childComponent)
+  const existingNode = parts[preferredId]
+
+  let nodeId = preferredId
+  if (existingNode && existingNode.component !== childComponent) {
+    nodeId = createAvailableComposableNodeId(parts, preferredId)
+  }
+
+  if (!parts[nodeId]) {
+    parts[nodeId] = {
+      label: String(payload.label || formatComposableLabel(nodeId)),
+      component: childComponent,
+      mode: 'single',
+      autoBind: true
+    }
+  }
+
+  next.parts = parts
+  fs.writeFileSync(absoluteMetaPath, JSON.stringify(next, null, 2), 'utf8')
+
+  return {
+    absoluteMetaPath,
+    nodeId
+  }
+}
+
 // Plugin principal : routage .html → .twig + génération showcase.json
 function goFastPlugin() {
   let isBuild = false
@@ -332,6 +416,39 @@ function goFastPlugin() {
           } catch (error) {
             res.statusCode = 500
             res.end(error.message)
+          }
+        })
+      })
+
+      server.middlewares.use('/__design_api/components/expose-child', async (req, res, next) => {
+        if (req.method !== 'POST') return next()
+        let body = ''
+        req.on('data', chunk => { body += chunk })
+        req.on('end', async () => {
+          try {
+            const payload = JSON.parse(body || '{}')
+            const result = exposeChildPartInMetaFile(payload.metaPath, payload)
+
+            if (result.absoluteMetaPath.includes(`${path.sep}dev${path.sep}components${path.sep}`)) {
+              const { validateComponentJson } = await import('./scripts/validate-json.js')
+              const errors = validateComponentJson(result.absoluteMetaPath)
+              if (errors.length) {
+                throw new Error(errors.map(entry => entry.error).join(' | '))
+              }
+            }
+
+            const { generateShowcase } = await import('./scripts/generate-showcase.js')
+            await generateShowcase()
+
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({
+              ok: true,
+              nodeId: result.nodeId
+            }))
+          } catch (error) {
+            res.statusCode = 500
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ error: error.message }))
           }
         })
       })

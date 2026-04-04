@@ -11,6 +11,7 @@ import { buildAIContext } from './core/ai-context.js'
 import { buildBrainPrompt } from './core/agent-prompt.js'
 import { getDefaultAgentProviderId, getPreferredDesignerProviderId, loadAgentProviders, runAgentProvider } from './core/agent-runtime.js'
 import { createEmptyBrainOutput } from './core/brain-contract.js'
+import { exposeComposableChildPart } from './core/composable-authoring.js'
 import {
   getState,
   patchState,
@@ -43,6 +44,14 @@ let canvasPanAbortController = null
 let keyboardAbortController = null
 let spacePanPressed = false
 let suppressNextClickUntil = 0
+let previewComposableTarget = null
+let pendingComposableDrawerFocus = null
+let activeComposableDrawer = null
+let previewComposableClearTimeout = null
+let previewComposableActionHovered = false
+let composablePopoverState = null
+let gridCellOverlayState = null
+let gridCellClearTimeout = null
 
 const VIEWPORT_SPECS = {
   mobile: { label: 'Mobile', breakpointId: 'breakpoint-sm', fallbackWidth: 640, height: 844 },
@@ -57,6 +66,8 @@ const INSPECTOR_NODE_DEFINITIONS = {
   instance: { stateKey: 'instancesState', actionName: 'instance-param-change', idAttr: 'dataInstanceId', stateMode: 'bucket' },
   layoutGroup: { stateKey: 'layoutGroupsState', actionName: 'layout-group-param-change', idAttr: 'dataLayoutGroupId', stateMode: 'bucket' }
 }
+
+const SUPPORTED_PREVIEW_NODE_TYPES = new Set(['part', 'collection', 'family', 'instance', 'layoutGroup'])
 
 function uid(prefix = 'item') {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`
@@ -585,14 +596,178 @@ function refreshSelectionUI() {
   const inspectorHost = rootEl.querySelector('[data-ui-region="inspector"]')
   if (inspectorHost) inspectorHost.outerHTML = renderInspectorWrapped()
   bindSelectionDependentEvents()
+  restorePendingComposableDrawerFocus()
 }
 
 function selectItem(itemId) {
   const item = getState().scene.items.find(candidate => candidate.id === itemId)
   if (item) bringItemToFront(itemId)
   const state = getState()
+  if (activeComposableDrawer?.itemId && activeComposableDrawer.itemId !== itemId) {
+    activeComposableDrawer = null
+  }
   state.selectedItemId = itemId
   refreshSelectionUI()
+}
+
+function isSamePreviewComposableTarget(left, right) {
+  if (!left && !right) return true
+  if (!left || !right) return false
+
+  return left.itemId === right.itemId &&
+    left.nodeType === right.nodeType &&
+    left.nodeId === right.nodeId &&
+    left.childComponent === right.childComponent &&
+    left.exposed === right.exposed
+}
+
+function setPreviewComposableTarget(target) {
+  const normalized = target ? {
+    ...target,
+    x: Math.round(target.x),
+    y: Math.round(target.y),
+    width: Math.round(target.width || 0),
+    height: Math.round(target.height || 0)
+  } : null
+
+  if (isSamePreviewComposableTarget(previewComposableTarget, normalized)) return
+  if (previewComposableClearTimeout) {
+    clearTimeout(previewComposableClearTimeout)
+    previewComposableClearTimeout = null
+  }
+  previewComposableTarget = normalized
+  updatePreviewComposableOverlay()
+}
+
+function clearPreviewComposableTarget() {
+  if (previewComposableActionHovered) return
+  if (!previewComposableTarget) return
+  if (previewComposableClearTimeout) {
+    clearTimeout(previewComposableClearTimeout)
+    previewComposableClearTimeout = null
+  }
+  previewComposableTarget = null
+  updatePreviewComposableOverlay()
+}
+
+function scheduleClearPreviewComposableTarget() {
+  if (previewComposableActionHovered) return
+  if (previewComposableClearTimeout) clearTimeout(previewComposableClearTimeout)
+  previewComposableClearTimeout = setTimeout(() => {
+    previewComposableClearTimeout = null
+    if (previewComposableActionHovered) return
+    clearPreviewComposableTarget()
+  }, 180)
+}
+
+function syncSceneItemsWithRegistry() {
+  setState(prev => ({
+    ...prev,
+    scene: {
+      ...prev.scene,
+      items: prev.scene.items.map(item => {
+        const entry = getEntryById(item.ref, item.kind)
+        return entry ? normalizeSceneItemState(item, entry, getEntryById) : item
+      })
+    }
+  }))
+}
+
+function buildComposableDrawerSelector(itemId, nodeType, nodeId) {
+  return `[data-composable-drawer="${nodeType}:${nodeId}"][data-item-id="${itemId}"]`
+}
+
+function findComposableDrawer(itemId, nodeType, nodeId) {
+  if (!rootEl) return null
+  const drawerKey = `${nodeType}:${nodeId}`
+  const drawers = [...rootEl.querySelectorAll('[data-composable-drawer][data-item-id]')]
+
+  return drawers.find(drawer =>
+    drawer.getAttribute('data-item-id') === String(itemId) &&
+    drawer.getAttribute('data-composable-drawer') === drawerKey
+  ) || drawers.find(drawer => drawer.getAttribute('data-composable-drawer') === drawerKey) || null
+}
+
+function restorePendingComposableDrawerFocus() {
+  if (!pendingComposableDrawerFocus || !rootEl) return
+  const { itemId, nodeType, nodeId } = pendingComposableDrawerFocus
+  const drawer = findComposableDrawer(itemId, nodeType, nodeId)
+  if (!drawer) return
+
+  drawer.setAttribute('open', '')
+  drawer.scrollIntoView({ block: 'nearest' })
+  drawer.querySelector('summary')?.focus?.({ preventScroll: true })
+  pendingComposableDrawerFocus = null
+}
+
+function openComposableDrawer(itemId, nodeType, nodeId) {
+  pendingComposableDrawerFocus = { itemId, nodeType, nodeId }
+  activeComposableDrawer = { itemId, nodeType, nodeId }
+  const item = getState().scene.items.find(candidate => candidate.id === itemId)
+  if (item) bringItemToFront(itemId)
+  getState().selectedItemId = itemId
+  render()
+  restorePendingComposableDrawerFocus()
+  window.requestAnimationFrame(() => restorePendingComposableDrawerFocus())
+}
+
+function ensurePreviewComposableOverlayElement() {
+  if (!rootEl) return null
+  let button = rootEl.querySelector('[data-preview-composable-overlay]')
+  if (button) return button
+
+  button = document.createElement('button')
+  button.type = 'button'
+  button.className = 'ds-preview-composable-action'
+  button.dataset.previewComposableOverlay = 'true'
+  button.hidden = true
+  const triggerPreviewComposableEdit = event => {
+    event.preventDefault()
+    event.stopPropagation()
+    handlePreviewComposableEdit().catch(error => {
+      console.error('[design-surface] preview composable edit failed', error)
+      window.alert(error?.message || "Impossible d'éditer ce sous-composant.")
+    })
+  }
+  button.addEventListener('pointerdown', triggerPreviewComposableEdit)
+  button.addEventListener('mouseenter', () => {
+    previewComposableActionHovered = true
+    if (previewComposableClearTimeout) {
+      clearTimeout(previewComposableClearTimeout)
+      previewComposableClearTimeout = null
+    }
+  })
+  button.addEventListener('mouseleave', () => {
+    previewComposableActionHovered = false
+    scheduleClearPreviewComposableTarget()
+  })
+  rootEl.appendChild(button)
+  return button
+}
+
+function updatePreviewComposableOverlay() {
+  const button = ensurePreviewComposableOverlayElement()
+  if (!button) return
+
+  if (!previewComposableTarget || dragState || resizeState || frameInteractivityDisabled) {
+    button.hidden = true
+    button.textContent = ''
+    return
+  }
+
+  const buttonLabel = previewComposableTarget.exposed
+    ? 'Modifier le composant'
+    : 'Modifier le composant'
+
+  button.hidden = false
+  button.textContent = buttonLabel
+  const viewportPadding = 12
+  const maxLeft = Math.max(viewportPadding, window.innerWidth - button.offsetWidth - viewportPadding)
+  const maxTop = Math.max(viewportPadding, window.innerHeight - button.offsetHeight - viewportPadding)
+  const nextLeft = Math.min(maxLeft, Math.max(viewportPadding, previewComposableTarget.x))
+  const nextTop = Math.min(maxTop, Math.max(viewportPadding, previewComposableTarget.y))
+  button.style.left = `${nextLeft}px`
+  button.style.top = `${nextTop}px`
 }
 
 function setSceneViewport(viewport) {
@@ -1001,7 +1176,7 @@ function buildAgentFeedbackModel() {
     return {
       tone: 'warn',
       title: 'La demande dépasse le système actuel',
-      lead: agent.lastSummary || unresolved[0]?.message || warnings[0] || 'Cette demande nécessite d’étendre les composants existants.',
+      lead: agent.lastSummary || unresolved[0]?.message || warnings[0] || "Cette demande nécessite d'étendre les composants existants.",
       details: [...warnings, ...unresolved.map(item => `${item.type} — ${item.message}`)]
     }
   }
@@ -1268,11 +1443,21 @@ function resolveBoundControls(item, parentEntry, childEntry, nodeType, nodeId, n
 function renderInspectorDrawer(item, parentEntry, nodeType, nodeId, node, label, childEntry, scopeId, emptyLabel) {
   const definition = INSPECTOR_NODE_DEFINITIONS[nodeType]
   if (!childEntry || !definition) return ''
+  const drawerAttrs = `data-composable-drawer="${escapeAttr(`${nodeType}:${nodeId}`)}" data-item-id="${escapeAttr(item.id)}"`
+  const shouldOpen = (
+    pendingComposableDrawerFocus?.itemId === item.id &&
+    pendingComposableDrawerFocus?.nodeType === nodeType &&
+    pendingComposableDrawerFocus?.nodeId === nodeId
+  ) || (
+    activeComposableDrawer?.itemId === item.id &&
+    activeComposableDrawer?.nodeType === nodeType &&
+    activeComposableDrawer?.nodeId === nodeId
+  )
   const variantControls = resolveBoundControls(item, parentEntry, childEntry, nodeType, nodeId, node, 'variants')
   const contentControls = resolveBoundControls(item, parentEntry, childEntry, nodeType, nodeId, node, 'content')
   if (!variantControls.length && !contentControls.length) {
     return `
-      <details class="ds-inspector-group">
+      <details class="ds-inspector-group" ${drawerAttrs}${shouldOpen ? ' open' : ''}>
         <summary class="ds-inspector-group__title">${escapeHtml(label)}</summary>
         <p class="ds-muted">${escapeHtml(emptyLabel)}</p>
       </details>
@@ -1280,7 +1465,7 @@ function renderInspectorDrawer(item, parentEntry, nodeType, nodeId, node, label,
   }
 
   return `
-    <details class="ds-inspector-group">
+    <details class="ds-inspector-group" ${drawerAttrs}${shouldOpen ? ' open' : ''}>
       <summary class="ds-inspector-group__title">${escapeHtml(label)} · ${escapeHtml(childEntry.name || childEntry.id)}</summary>
       ${variantControls.length ? `<div class="ds-inspector-group"><h4 class="ds-inspector-group__title">Variantes</h4>${variantControls.map(({ parentKey, ctrl, childKey, value }) => renderInspectorControl(item, parentKey, ctrl, {
         scope: scopeId,
@@ -1318,7 +1503,7 @@ function renderInspector() {
             <h3 class="ds-inspector-group__title">Note</h3>
             <label class="ds-field"><span class="ds-field__label">Texte</span><textarea class="ds-field__input" rows="8" data-action="note-text" data-note-id="${selectedNote.id}">${escapeHtml(selectedNote.text)}</textarea></label>
             <label class="ds-field__checkbox"><input type="checkbox" ${selectedNote.open ? 'checked' : ''} data-action="note-open" data-note-id="${selectedNote.id}"><span>Note ouverte</span></label>
-            <label class="ds-field__checkbox"><input type="checkbox" ${selectedNote.targetId ? 'checked' : ''} data-action="note-attach-selected" data-note-id="${selectedNote.id}"><span>Lier à l’élément sélectionné si possible</span></label>
+            <label class="ds-field__checkbox"><input type="checkbox" ${selectedNote.targetId ? 'checked' : ''} data-action="note-attach-selected" data-note-id="${selectedNote.id}"><span>Lier à l'élément sélectionné si possible</span></label>
             <button class="ds-btn ds-btn--danger" data-action="delete-note" data-note-id="${selectedNote.id}">Supprimer la note</button>
             <p class="ds-muted">Position : ${selectedNote.x}px × ${selectedNote.y}px${selectedNote.targetId ? ` · liée à ${escapeHtml(selectedNote.targetId)}` : ''}</p>
           </div>
@@ -1376,14 +1561,10 @@ function renderInspector() {
           <h3 class="ds-inspector-group__title">Instance</h3>
           <label class="ds-field"><span class="ds-field__label">Viewport</span><select class="ds-field__select" data-action="item-viewport" data-item-id="${item.id}">${Object.entries(getViewportDefinitions()).map(([key, vp]) => `<option value="${key}"${key === (item.viewport || 'desktop') ? ' selected' : ''}>${escapeHtml(vp.label)} · ${vp.breakpointValue} · ${escapeHtml(vp.breakpoint || '')}</option>`).join('')}</select></label>
           <p class="ds-muted">Format : ${item.width}px × ${item.height}px</p>
-          <p class="ds-muted">Position : ${item.x}px × ${item.y}px</p>
         </div>
         ${(variants.length || content.length) ? `<div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Props</h3>${variants.map(([key, ctrl]) => renderInspectorControl(item, key, ctrl)).join('')}${content.map(([key, ctrl]) => renderInspectorControl(item, key, ctrl)).join('')}</div>` : ''}
         ${parts.length ? `<div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Sous-composants</h3>${parts.map(([partKey, part]) => renderInspectorDrawer(item, entry, 'part', partKey, part, part.label || partKey, getEntryById(part.component, 'component'), `part-${partKey}`, 'Aucun champ editable mappe sur cette part.')).join('')}</div>` : ''}
         ${collections.length ? `<div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Collections</h3>${collections.map(([collectionKey, collection]) => renderInspectorDrawer(item, entry, 'collection', collectionKey, collection, collection.label || collectionKey, getEntryById(collection.itemComponent, 'component'), `collection-${collectionKey}`, 'Aucun champ bulk mappe sur cette collection.')).join('')}</div>` : ''}
-        ${families.length ? `<div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Familles</h3>${families.map(([familyKey, family]) => renderInspectorDrawer(item, entry, 'family', familyKey, family, family.label || familyKey, getEntryById(family.component, 'component'), `family-${familyKey}`, 'Aucun champ partage mappe sur cette famille.')).join('')}</div>` : ''}
-        ${instances.length ? `<div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Instances</h3>${instances.map(([instanceKey, instance]) => renderInspectorDrawer(item, entry, 'instance', instanceKey, instance, instance.label || instanceKey, getEntryById(instance.component, 'component'), `instance-${instanceKey}`, 'Aucun champ editable mappe sur cette instance.')).join('')}</div>` : ''}
-        ${layoutGroups.length ? `<div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Layout</h3>${layoutGroups.map(([groupKey, group]) => renderInspectorDrawer(item, entry, 'layoutGroup', groupKey, group, group.label || groupKey, getEntryById(group.component, 'component'), `layout-group-${groupKey}`, 'Aucun champ de layout mappe sur ce groupe.')).join('')}</div>` : ''}
         <div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Tokens suggérés</h3><div class="ds-token-list">${suggestedTokens.map(token => `<div class="ds-token"><div class="ds-token__top"><div class="ds-token__name">${escapeHtml(token.scssVar)}</div><span class="ds-badge">${escapeHtml(token.category)}</span></div><div class="ds-token__value">${escapeHtml(token.value)}</div></div>`).join('') || '<p class="ds-muted">Aucun token suggéré.</p>'}</div></div>
         ${renderDiffPanel()}
       </div>
@@ -1781,6 +1962,386 @@ function stopResize() {
   render()
 }
 
+function extractPreviewComposableTarget(frame, candidate, pointerEvent = null) {
+  const itemId = frame.closest('.ds-item')?.dataset.itemId
+  if (!itemId || !candidate) return null
+
+  const item = getRenderedScene().items.find(entry => entry.id === itemId)
+  const parentEntry = item ? getEntryById(item.ref, item.kind) : null
+  if (!parentEntry) return null
+
+  // Cas 1 : wrapper annoté explicitement par le parent (data-gf-child-component)
+  // Cas 2 : composant auto-détecté via son propre data-gf-component (pas de wrapper parent)
+  const isAutoDetected = !candidate.dataset.gfChildComponent && !!candidate.dataset.gfComponent
+  const nodeType = isAutoDetected ? 'part' : (candidate.dataset.gfNodeType || 'part')
+  const childComponent = isAutoDetected
+    ? candidate.dataset.gfComponent
+    : (candidate.dataset.gfChildComponent || '')
+
+  if (!SUPPORTED_PREVIEW_NODE_TYPES.has(nodeType) || !childComponent) return null
+
+  // Pour les composants auto-détectés, ignorer ceux qui correspondent au composant parent lui-même
+  if (isAutoDetected && childComponent === item.ref) return null
+
+  const frameRect = frame.getBoundingClientRect()
+  const candidateRect = candidate.getBoundingClientRect()
+  const scaleX = frame.clientWidth ? frameRect.width / frame.clientWidth : 1
+  const scaleY = frame.clientHeight ? frameRect.height / frame.clientHeight : 1
+  const pointerX = pointerEvent
+    ? (frameRect.left + (pointerEvent.clientX * scaleX))
+    : (frameRect.left + (candidateRect.left * scaleX))
+  const pointerY = pointerEvent
+    ? (frameRect.top + (pointerEvent.clientY * scaleY))
+    : (frameRect.top + (candidateRect.top * scaleY))
+
+  const closestGrid = candidate.parentElement?.closest?.('[data-gf-component="grid"]')
+  const gridCellEl = closestGrid
+    ? [...closestGrid.children].find(c => c === candidate || c.contains(candidate))
+    : null
+  const gridCellIndex = (gridCellEl && closestGrid)
+    ? [...closestGrid.children].indexOf(gridCellEl)
+    : null
+  const gridTotalCells = closestGrid ? closestGrid.children.length : null
+
+  return {
+    itemId,
+    nodeType,
+    nodeId: isAutoDetected ? null : (candidate.dataset.gfNodeId || null),
+    childComponent,
+    label: isAutoDetected ? childComponent : (candidate.dataset.gfNodeLabel || childComponent),
+    exposed: isAutoDetected ? false : (candidate.dataset.gfExposed !== 'false'),
+    metaPath: `${parentEntry.path}.json`,
+    x: pointerX + 12,
+    y: pointerY + 12,
+    width: candidateRect.width,
+    height: candidateRect.height,
+    gridCellIndex,
+    gridTotalCells
+  }
+}
+
+function bindPreviewComposableHoverDocument(frame) {
+  const doc = frame.contentDocument
+  if (!doc || doc.documentElement.dataset.gfComposableHoverBound === 'true') return
+
+  const onPointerMove = event => {
+    if (frameInteractivityDisabled) {
+      clearPreviewComposableTarget()
+      return
+    }
+
+    // Priorité 1 : wrapper annoté explicitement par le parent
+    let candidate = event.target?.closest?.('[data-gf-child-component]')
+
+    // Priorité 2 : composant auto-détecté via son propre attribut racine
+    if (!candidate) {
+      const componentRoot = event.target?.closest?.('[data-gf-component]')
+      if (componentRoot) {
+        // Si un wrapper parent annoté existe au-dessus, l'utiliser à la place
+        const parentWrapper = componentRoot.parentElement?.closest?.('[data-gf-child-component]')
+        candidate = parentWrapper || componentRoot
+      }
+    }
+
+    // Détection grille : cellule survolée dans un [data-gf-component="grid"]
+    const gridEl = event.target?.closest?.('[data-gf-component="grid"]')
+    if (gridEl && gridEl.children.length > 0) {
+      const children = [...gridEl.children]
+      const hoveredCell = children.find(c => c === event.target || c.contains(event.target))
+      const hoveredIndex = hoveredCell ? children.indexOf(hoveredCell) : 0
+      let needsUpdate = false
+      if (gridCellOverlayState?.gridEl !== gridEl) {
+        const frameRect = frame.getBoundingClientRect()
+        const scaleX = frame.clientWidth ? frameRect.width / frame.clientWidth : 1
+        const scaleY = frame.clientHeight ? frameRect.height / frame.clientHeight : 1
+        const itemId = frame.closest('.ds-item')?.dataset.itemId
+        const cells = children.map(child => {
+          const r = child.getBoundingClientRect()
+          return {
+            vLeft: Math.round(frameRect.left + r.left * scaleX),
+            vTop: Math.round(frameRect.top + r.top * scaleY),
+            vWidth: Math.round(r.width * scaleX),
+            vHeight: Math.round(r.height * scaleY),
+            childComponent: child.dataset.gfComponent || null
+          }
+        })
+        gridCellOverlayState = { gridEl, cells, hoveredIndex, itemId }
+        needsUpdate = true
+      } else if (gridCellOverlayState.hoveredIndex !== hoveredIndex) {
+        gridCellOverlayState = { ...gridCellOverlayState, hoveredIndex }
+        needsUpdate = true
+      }
+      if (needsUpdate) updateGridCellOverlay()
+      if (!candidate) return
+    } else if (gridCellOverlayState) {
+      clearGridCellOverlay()
+    }
+
+    if (!candidate) {
+      if (previewComposableTarget?.itemId === frame.closest('.ds-item')?.dataset.itemId) {
+        scheduleClearPreviewComposableTarget()
+      }
+      return
+    }
+
+    const target = extractPreviewComposableTarget(frame, candidate, event)
+    if (target) setPreviewComposableTarget(target)
+  }
+
+  const onPointerLeave = () => {
+    if (previewComposableTarget?.itemId === frame.closest('.ds-item')?.dataset.itemId) {
+      scheduleClearPreviewComposableTarget()
+    }
+    scheduleClearGridCellOverlay()
+  }
+
+  doc.addEventListener('pointermove', onPointerMove)
+  doc.addEventListener('pointerleave', onPointerLeave)
+  doc.documentElement.dataset.gfComposableHoverBound = 'true'
+}
+
+function bindPreviewComposableHoverEvents() {
+  rootEl.querySelectorAll('.ds-item__frame').forEach(frame => {
+    if (frame.dataset.gfComposableHoverFrameBound !== 'true') {
+      frame.addEventListener('load', () => {
+        bindPreviewComposableHoverDocument(frame)
+        const itemId = frame.closest('.ds-item')?.dataset.itemId
+        if (itemId) applyGridCellStyles(itemId)
+      })
+      frame.addEventListener('mouseleave', () => {
+        if (previewComposableTarget?.itemId === frame.closest('.ds-item')?.dataset.itemId) {
+          scheduleClearPreviewComposableTarget()
+        }
+        scheduleClearGridCellOverlay()
+      })
+      frame.dataset.gfComposableHoverFrameBound = 'true'
+    }
+
+    bindPreviewComposableHoverDocument(frame)
+  })
+}
+
+function applyGridCellStyles(itemId) {
+  const item = getState().scene.items.find(i => i.id === itemId)
+  if (!item) return
+  const gridCells = item.gridCells || {}
+  const frame = rootEl?.querySelector(`.ds-item[data-item-id="${CSS.escape(itemId)}"] .ds-item__frame`)
+  if (!frame?.contentDocument) return
+  frame.contentDocument.querySelectorAll('[data-gf-component="grid"]').forEach(gridEl => {
+    ;[...gridEl.children].forEach((child, index) => {
+      const span = gridCells[index]?.span
+      child.style.gridColumn = span ? `span ${span}` : ''
+    })
+  })
+}
+
+function updateGridCellSpan(itemId, cellIndex, span) {
+  setState(prev => ({
+    ...prev,
+    scene: {
+      ...prev.scene,
+      items: prev.scene.items.map(item => {
+        if (item.id !== itemId) return item
+        const gridCells = { ...(item.gridCells || {}) }
+        if (!span || span === 'auto') {
+          delete gridCells[cellIndex]
+        } else {
+          gridCells[cellIndex] = { span: parseInt(span, 10) }
+        }
+        return { ...item, gridCells }
+      })
+    }
+  }))
+  applyGridCellStyles(itemId)
+  commitSceneHistory()
+}
+
+function ensureGridOverlayEl() {
+  let el = document.getElementById('ds-grid-overlay')
+  if (el) return el
+  el = document.createElement('div')
+  el.id = 'ds-grid-overlay'
+  el.className = 'ds-grid-overlay'
+  el.hidden = true
+  document.body.appendChild(el)
+  return el
+}
+
+function clearGridCellOverlay() {
+  if (gridCellClearTimeout) { clearTimeout(gridCellClearTimeout); gridCellClearTimeout = null }
+  gridCellOverlayState = null
+  const el = document.getElementById('ds-grid-overlay')
+  if (el) el.hidden = true
+}
+
+function scheduleClearGridCellOverlay() {
+  if (gridCellClearTimeout) clearTimeout(gridCellClearTimeout)
+  gridCellClearTimeout = setTimeout(() => {
+    gridCellClearTimeout = null
+    clearGridCellOverlay()
+  }, 180)
+}
+
+function updateGridCellOverlay() {
+  if (!gridCellOverlayState) { clearGridCellOverlay(); return }
+  const { cells, hoveredIndex } = gridCellOverlayState
+  const el = ensureGridOverlayEl()
+
+  el.innerHTML = cells.map((cell, i) => {
+    const isHovered = i === hoveredIndex
+    const style = `left:${cell.vLeft}px;top:${cell.vTop}px;width:${cell.vWidth}px;height:${cell.vHeight}px`
+    return `<div class="ds-grid-cell${isHovered ? ' ds-grid-cell--hovered' : ''}" style="${style}"></div>`
+  }).join('')
+
+  el.hidden = false
+}
+
+function ensureComposablePopoverElement() {
+  let el = document.getElementById('ds-composable-popover')
+  if (el) return el
+  el = document.createElement('div')
+  el.id = 'ds-composable-popover'
+  el.className = 'ds-composable-popover'
+  el.hidden = true
+  document.body.appendChild(el)
+  return el
+}
+
+function closeComposablePopover() {
+  composablePopoverState = null
+  const el = document.getElementById('ds-composable-popover')
+  if (el) el.hidden = true
+}
+
+function openComposablePopover(itemId, nodeId, anchorX, anchorY, gridContext = null) {
+  const item = getState().scene.items.find(i => i.id === itemId)
+  const parentEntry = item ? getEntryById(item.ref, item.kind) : null
+  const node = parentEntry?.parts?.[nodeId]
+  const childEntry = node ? getEntryById(node.component, 'component') : null
+  if (!item || !parentEntry || !node || !childEntry) return
+
+  composablePopoverState = { itemId, nodeId, anchorX, anchorY, gridContext }
+  renderComposablePopover()
+}
+
+function renderComposablePopover() {
+  if (!composablePopoverState) { closeComposablePopover(); return }
+  const { itemId, nodeId, anchorX, anchorY, gridContext } = composablePopoverState
+  const item = getState().scene.items.find(i => i.id === itemId)
+  const parentEntry = item ? getEntryById(item.ref, item.kind) : null
+  const node = parentEntry?.parts?.[nodeId]
+  const childEntry = node ? getEntryById(node.component, 'component') : null
+  if (!item || !node || !childEntry) { closeComposablePopover(); return }
+
+  const el = ensureComposablePopoverElement()
+  const bucket = item.partsState?.[nodeId] || { variants: {}, content: {} }
+
+  const buildControl = (key, ctrl, section) => {
+    const value = bucket[section]?.[key] ?? ctrl.default ?? ''
+    const inputId = `ds-popover-${escapeAttr(nodeId)}-${section}-${key}`
+    const attrs = `data-action="composable-popover-change" data-item-id="${escapeAttr(itemId)}" data-node-id="${escapeAttr(nodeId)}" data-child-key="${escapeAttr(key)}" data-section="${section}"`
+    if (ctrl.type === 'select') {
+      return `<label class="ds-field" for="${inputId}"><span class="ds-field__label">${escapeHtml(ctrl.label)}</span><select class="ds-field__select" id="${inputId}" ${attrs}>${(ctrl.options || []).map(opt => `<option value="${escapeAttr(opt)}"${String(opt) === String(value) ? ' selected' : ''}>${escapeHtml(opt)}</option>`).join('')}</select></label>`
+    }
+    if (ctrl.type === 'checkbox') {
+      return `<label class="ds-field__checkbox"><input type="checkbox" ${value ? 'checked' : ''} ${attrs}><span>${escapeHtml(ctrl.label)}</span></label>`
+    }
+    return `<label class="ds-field" for="${inputId}"><span class="ds-field__label">${escapeHtml(ctrl.label)}</span><input class="ds-field__input" id="${inputId}" type="text" value="${escapeAttr(value ?? '')}" ${attrs}></label>`
+  }
+
+  const variantControls = Object.entries(childEntry.variants || {}).map(([key, ctrl]) => buildControl(key, ctrl, 'variants')).join('')
+  const contentControls = Object.entries(childEntry.content || {}).map(([key, ctrl]) => buildControl(key, ctrl, 'content')).join('')
+
+  const currentSpan = gridContext !== null
+    ? (item.gridCells?.[gridContext.cellIndex]?.span ?? 'auto')
+    : null
+  const spanOptions = ['auto', 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    .map(v => {
+      const label = v === 'auto' ? 'Auto' : `${v} / 12`
+      const selected = String(currentSpan) === String(v) ? ' selected' : ''
+      return `<option value="${v}"${selected}>${label}</option>`
+    }).join('')
+  const gridSection = gridContext !== null
+    ? `<div class="ds-composable-popover__group">
+        <h4 class="ds-composable-popover__group-title">Grille — cellule ${gridContext.cellIndex + 1} / ${gridContext.totalCells}</h4>
+        <label class="ds-field">
+          <span class="ds-field__label">Colonnes</span>
+          <select class="ds-field__select" data-action="grid-cell-span-change" data-item-id="${escapeAttr(itemId)}" data-cell-index="${gridContext.cellIndex}">${spanOptions}</select>
+        </label>
+       </div>`
+    : ''
+
+  el.innerHTML = `
+    <div class="ds-composable-popover__header">
+      <span class="ds-composable-popover__title">
+        ${escapeHtml(childEntry.name || node.component)}
+        <span class="ds-composable-popover__node">${escapeHtml(node.label || nodeId)}</span>
+      </span>
+      <button type="button" class="ds-composable-popover__close" aria-label="Fermer">✕</button>
+    </div>
+    <div class="ds-composable-popover__body">
+      ${gridSection}
+      ${variantControls ? `<div class="ds-composable-popover__group"><h4 class="ds-composable-popover__group-title">Variantes</h4>${variantControls}</div>` : ''}
+      ${contentControls ? `<div class="ds-composable-popover__group"><h4 class="ds-composable-popover__group-title">Contenu</h4>${contentControls}</div>` : ''}
+    </div>
+  `
+  el.hidden = false
+
+  const pad = 12
+  const elW = el.offsetWidth || 280
+  const elH = el.offsetHeight || 300
+  const left = Math.min(Math.max(pad, anchorX), window.innerWidth - elW - pad)
+  const top = Math.min(Math.max(pad, anchorY), window.innerHeight - elH - pad)
+  el.style.left = `${left}px`
+  el.style.top = `${top}px`
+
+  el.querySelectorAll('[data-action="composable-popover-change"]').forEach(input => {
+    const handler = () => {
+      const value = input.type === 'checkbox' ? input.checked : input.value
+      updatePartParams(input.dataset.itemId, input.dataset.nodeId, { [input.dataset.childKey]: value })
+    }
+    input.addEventListener(input.tagName === 'SELECT' ? 'change' : 'input', handler)
+    if (input.type === 'checkbox') input.addEventListener('change', handler)
+  })
+  el.querySelectorAll('[data-action="grid-cell-span-change"]').forEach(select => {
+    select.addEventListener('change', () => {
+      updateGridCellSpan(select.dataset.itemId, parseInt(select.dataset.cellIndex, 10), select.value)
+    })
+  })
+  el.querySelector('.ds-composable-popover__close')?.addEventListener('click', closeComposablePopover)
+}
+
+async function handlePreviewComposableEdit() {
+  const target = previewComposableTarget
+  if (!target) return
+
+  clearPreviewComposableTarget()
+
+  const gridContext = (target.gridCellIndex !== null && target.gridCellIndex !== undefined)
+    ? { cellIndex: target.gridCellIndex, totalCells: target.gridTotalCells }
+    : null
+
+  if (target.exposed && target.nodeId) {
+    openComposablePopover(target.itemId, target.nodeId, target.x, target.y, gridContext)
+    return
+  }
+
+  try {
+    const result = await exposeComposableChildPart({
+      metaPath: target.metaPath,
+      childComponent: target.childComponent,
+      preferredNodeId: target.childComponent,
+      label: target.label
+    })
+    await loadRegistry()
+    syncSceneItemsWithRegistry()
+    openComposablePopover(target.itemId, result.nodeId, target.x, target.y, gridContext)
+  } catch (error) {
+    console.error('[design-surface] preview child exposure failed', error)
+    window.alert(error?.message || 'Impossible d\'exposer ce sous-composant.')
+  }
+}
+
 function bindAgentEvents() {
   rootEl.querySelector('[data-agent-action="input"]')?.addEventListener('input', event => {
     patchAgentState({ input: event.target.value, runtimeError: '' }, { silent: true })
@@ -1938,10 +2499,30 @@ function bindEvents() {
   rootEl.querySelector('[data-action="redo"]')?.addEventListener('click', redoHistory)
   rootEl.querySelector('[data-action="organize-canvas"]')?.addEventListener('click', organizeCanvas)
   rootEl.querySelector('[data-action="toggle-agent"]')?.addEventListener('click', toggleAgentPanel)
+  rootEl.querySelector('[data-action="preview-composable-edit"]')?.addEventListener('click', event => {
+    event.preventDefault()
+    event.stopPropagation()
+    handlePreviewComposableEdit().catch(error => {
+      console.error('[design-surface] preview composable edit failed', error)
+      window.alert(error?.message || "Impossible d'éditer ce sous-composant.")
+    })
+  })
+  rootEl.querySelector('[data-action="preview-composable-edit"]')?.addEventListener('mouseenter', () => {
+    previewComposableActionHovered = true
+    if (previewComposableClearTimeout) {
+      clearTimeout(previewComposableClearTimeout)
+      previewComposableClearTimeout = null
+    }
+  })
+  rootEl.querySelector('[data-action="preview-composable-edit"]')?.addEventListener('mouseleave', () => {
+    previewComposableActionHovered = false
+    scheduleClearPreviewComposableTarget()
+  })
   bindTopbarMenus()
   bindAgentEvents()
   bindCanvasZoomInteractions()
   bindCanvasPanInteractions()
+  bindPreviewComposableHoverEvents()
 }
 
 function bindCanvasZoomInteractions() {
@@ -2110,8 +2691,11 @@ function render() {
   rootEl.innerHTML = renderLayout()
   restorePersistentFrames(renderState)
   bindEvents()
+  ensurePreviewComposableOverlayElement()
+  updatePreviewComposableOverlay()
   restoreCanvasScroll(renderState)
   restoreActiveControl(renderState)
+  restorePendingComposableDrawerFocus()
 }
 
 function escapeHtml(value) {

@@ -8,7 +8,7 @@
 {% set hasError     = hasError|default(false) %}
 {% set errorMessage = errorMessage|default('Ce champ est requis.') %}
 
-<div class="checkbox{% if disabled %} checkbox--disabled{% endif %}{% if hasError %} checkbox--error{% endif %}">
+<div class="checkbox{% if disabled %} checkbox--disabled{% endif %}{% if hasError %} checkbox--error{% endif %}" data-gf-component="checkbox">
 
   <label class="checkbox__label" for="{{ id }}">
     <input

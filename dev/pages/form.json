@@ -40,6 +40,18 @@
           "copyright": "© 2025 MonSite. Tous droits reserves."
         }
       }
+    },
+    "input": {
+      "label": "input",
+      "component": "input",
+      "mode": "single",
+      "autoBind": true
+    },
+    "grid": {
+      "label": "grid",
+      "component": "grid",
+      "mode": "single",
+      "autoBind": true
     }
   },
   "families": {
@@ -49,8 +61,16 @@
       "mode": "shared",
       "autoBind": true,
       "exclude": {
-        "variants": ["type", "required"],
-        "content": ["label", "placeholder", "helpText", "errorMessage"]
+        "variants": [
+          "type",
+          "required"
+        ],
+        "content": [
+          "label",
+          "placeholder",
+          "helpText",
+          "errorMessage"
+        ]
       },
       "defaults": {
         "variants": {
@@ -66,8 +86,15 @@
       "mode": "shared",
       "autoBind": true,
       "exclude": {
-        "variants": ["required"],
-        "content": ["label", "placeholder", "helpText", "errorMessage"]
+        "variants": [
+          "required"
+        ],
+        "content": [
+          "label",
+          "placeholder",
+          "helpText",
+          "errorMessage"
+        ]
       },
       "defaults": {
         "variants": {
@@ -83,7 +110,10 @@
       "mode": "shared",
       "autoBind": true,
       "exclude": {
-        "content": ["legend", "errorMessage"]
+        "content": [
+          "legend",
+          "errorMessage"
+        ]
       },
       "defaults": {
         "variants": {
@@ -99,8 +129,14 @@
       "mode": "shared",
       "autoBind": true,
       "exclude": {
-        "variants": ["checked"],
-        "content": ["label", "labelOn", "labelOff"]
+        "variants": [
+          "checked"
+        ],
+        "content": [
+          "label",
+          "labelOn",
+          "labelOff"
+        ]
       },
       "defaults": {
         "variants": {
@@ -115,8 +151,13 @@
       "mode": "shared",
       "autoBind": true,
       "exclude": {
-        "variants": ["checked"],
-        "content": ["label", "errorMessage"]
+        "variants": [
+          "checked"
+        ],
+        "content": [
+          "label",
+          "errorMessage"
+        ]
       },
       "defaults": {
         "variants": {
@@ -131,8 +172,13 @@
       "mode": "shared",
       "autoBind": true,
       "exclude": {
-        "variants": ["variant", "full"],
-        "content": ["text"]
+        "variants": [
+          "variant",
+          "full"
+        ],
+        "content": [
+          "text"
+        ]
       },
       "defaults": {
         "variants": {
@@ -455,7 +501,10 @@
       "component": "grid",
       "mode": "layout",
       "autoBind": true,
-      "children": ["firstName", "lastName"],
+      "children": [
+        "firstName",
+        "lastName"
+      ],
       "defaults": {
         "variants": {
           "cols": "1",
@@ -470,7 +519,10 @@
       "component": "grid",
       "mode": "layout",
       "autoBind": true,
-      "children": ["email", "phone"],
+      "children": [
+        "email",
+        "phone"
+      ],
       "defaults": {
         "variants": {
           "cols": "1",
@@ -485,7 +537,11 @@
       "component": "grid",
       "mode": "layout",
       "autoBind": true,
-      "children": ["birthDate", "age", "country"],
+      "children": [
+        "birthDate",
+        "age",
+        "country"
+      ],
       "defaults": {
         "variants": {
           "cols": "1",
@@ -500,7 +556,10 @@
       "component": "grid",
       "mode": "layout",
       "autoBind": true,
-      "children": ["password", "passwordConfirm"],
+      "children": [
+        "password",
+        "passwordConfirm"
+      ],
       "defaults": {
         "variants": {
           "cols": "1",
@@ -515,7 +574,9 @@
       "component": "grid",
       "mode": "layout",
       "autoBind": true,
-      "children": ["profile"],
+      "children": [
+        "profile"
+      ],
       "defaults": {
         "variants": {
           "cols": "1",
@@ -530,7 +591,12 @@
       "component": "grid",
       "mode": "layout",
       "autoBind": true,
-      "children": ["subscription", "notifEmail", "notifSms", "newsletter"],
+      "children": [
+        "subscription",
+        "notifEmail",
+        "notifSms",
+        "newsletter"
+      ],
       "defaults": {
         "variants": {
           "cols": "1",
@@ -545,7 +611,10 @@
       "component": "grid",
       "mode": "layout",
       "autoBind": true,
-      "children": ["cancelAction", "submitAction"],
+      "children": [
+        "cancelAction",
+        "submitAction"
+      ],
       "defaults": {
         "variants": {
           "cols": "1",

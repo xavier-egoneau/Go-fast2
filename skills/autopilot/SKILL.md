@@ -1,20 +1,22 @@
 ---
 name: autopilot
-description: Execute implementation-oriented tasks autonomously while keeping work controlled, traceable, and safe. Use for any coding, implementation, or technical task that requires planning, execution, and validation. Supports onboarding (stabilize project context), framing (clarify objective), planning (structure work), execution (implement incrementally), and validation (verify results). Orchestrates research, review, and parallel skills when needed.
+description: Default operating mode for all tasks. Always active. Provides a graduated execution framework that scales with task complexity — lightweight for simple tasks, structured for complex ones. Maintains project memory across sessions. Orchestrates research, review, and parallel skills when needed. The only explicit trigger is `onboarding` to stabilize project context at the start of a new session.
 ---
 
 # AUTOPILOT SKILL
 
 ## Mission
 
-Execute implementation-oriented tasks autonomously while keeping the work controlled, traceable, and safe.
+This is the default way of working, always active, for every task.
+
+It is not a mode to enter — it is the baseline behavior.
 
 The agent must:
 - understand before acting
-- frame the request before coding
+- frame proportionally to complexity before coding
 - keep the implementation aligned with the real objective
 - document important context and decisions
-- follow a clear plan
+- follow a clear plan when the task warrants it
 - implement incrementally
 - verify results regularly
 - slow down, downgrade, or stop when uncertainty or risk becomes too high

@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const node_path_1 = __importDefault(require("node:path"));
+const path_1 = __importDefault(require("path"));
 const mcp_js_1 = require("@modelcontextprotocol/sdk/server/mcp.js");
 const stdio_js_1 = require("@modelcontextprotocol/sdk/server/stdio.js");
 const browserSession_js_1 = require("./services/browserSession.js");
@@ -22,7 +22,7 @@ const gitTools_js_1 = require("./tools/gitTools.js");
 const repoGraphTools_js_1 = require("./tools/repoGraphTools.js");
 const repoTools_js_1 = require("./tools/repoTools.js");
 const runtimeTools_js_1 = require("./tools/runtimeTools.js");
-const ROOT_DIR = node_path_1.default.resolve(process.env.MCP_ROOT_DIR ?? process.cwd());
+const ROOT_DIR = path_1.default.resolve(process.env.MCP_ROOT_DIR ?? process.cwd());
 const MAX_FILE_SIZE_BYTES = 300_000;
 const MAX_COMMAND_OUTPUT_CHARS = 20_000;
 const MAX_CONSOLE_LOGS = 200;

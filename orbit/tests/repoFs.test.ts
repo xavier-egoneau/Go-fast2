@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { normalizeSafePath } from "../utils/repoFs.js";
 
 describe("normalizeSafePath", () => {
-  const root = "/tmp/orbit-test-root";
+  const root = path.resolve("orbit-test-root");
 
   it("returns absolute path for a simple relative file", () => {
     const result = normalizeSafePath(root, "src/index.ts");
@@ -30,6 +30,7 @@ describe("normalizeSafePath", () => {
   });
 
   it("throws for absolute paths outside root", () => {
-    expect(() => normalizeSafePath(root, "/etc/passwd")).toThrow("Acces refuse");
+    const outsidePath = path.resolve(root, "..", "outside.ts");
+    expect(() => normalizeSafePath(root, outsidePath)).toThrow("Acces refuse");
   });
 });

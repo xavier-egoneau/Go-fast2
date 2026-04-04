@@ -7,7 +7,7 @@ const node_path_1 = __importDefault(require("node:path"));
 const vitest_1 = require("vitest");
 const repoFs_js_1 = require("../utils/repoFs.js");
 (0, vitest_1.describe)("normalizeSafePath", () => {
-    const root = "/tmp/orbit-test-root";
+    const root = node_path_1.default.resolve("orbit-test-root");
     (0, vitest_1.it)("returns absolute path for a simple relative file", () => {
         const result = (0, repoFs_js_1.normalizeSafePath)(root, "src/index.ts");
         (0, vitest_1.expect)(result).toBe(node_path_1.default.join(root, "src/index.ts"));
@@ -28,6 +28,7 @@ const repoFs_js_1 = require("../utils/repoFs.js");
         (0, vitest_1.expect)(result).toBe(node_path_1.default.join(root, "other.ts"));
     });
     (0, vitest_1.it)("throws for absolute paths outside root", () => {
-        (0, vitest_1.expect)(() => (0, repoFs_js_1.normalizeSafePath)(root, "/etc/passwd")).toThrow("Acces refuse");
+        const outsidePath = node_path_1.default.resolve(root, "..", "outside.ts");
+        (0, vitest_1.expect)(() => (0, repoFs_js_1.normalizeSafePath)(root, outsidePath)).toThrow("Acces refuse");
     });
 });

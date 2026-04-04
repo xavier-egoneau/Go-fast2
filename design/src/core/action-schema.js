@@ -1,5 +1,10 @@
 export const ACTION_TYPES = [
   'update-params',
+  'update-part-params',
+  'update-collection-params',
+  'update-family-params',
+  'update-instance-params',
+  'update-layout-group-params',
   'update-item',
   'duplicate-item',
   'add-item',

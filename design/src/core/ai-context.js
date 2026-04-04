@@ -5,7 +5,32 @@ import { ACTION_TYPES } from './action-schema.js'
 const SUPPORTED_ACTIONS = [
   {
     type: 'update-params',
-    purpose: 'Change existing params or content fields on an existing item.',
+    purpose: 'Change root-level props on an existing item. Do not use this for referenced parts or collections.',
+    requiresExistingItem: true
+  },
+  {
+    type: 'update-part-params',
+    purpose: 'Change the exposed child fields of a referenced part on an existing item, using child field names rather than flat parent params.',
+    requiresExistingItem: true
+  },
+  {
+    type: 'update-collection-params',
+    purpose: 'Change the exposed shared child fields of a referenced collection on an existing item, using child field names rather than flat parent params.',
+    requiresExistingItem: true
+  },
+  {
+    type: 'update-family-params',
+    purpose: 'Change the exposed shared child fields of a non-list family on an existing item.',
+    requiresExistingItem: true
+  },
+  {
+    type: 'update-instance-params',
+    purpose: 'Change the exposed child fields of an individual repeated instance on an existing item.',
+    requiresExistingItem: true
+  },
+  {
+    type: 'update-layout-group-params',
+    purpose: 'Change the exposed child fields of a layout group on an existing item.',
     requiresExistingItem: true
   },
   {
@@ -57,13 +82,51 @@ function serializeSceneItem(item, getEntryById) {
     height: item.height,
     viewport: item.viewport || null,
     params: item.params || {},
+    partsState: item.partsState || {},
+    collectionsState: item.collectionsState || {},
+    familiesState: item.familiesState || {},
+    instancesState: item.instancesState || {},
+    layoutGroupsState: item.layoutGroupsState || {},
     entry: entry
       ? {
           id: entry.id,
           name: entry.name,
           kind: entry.kind,
           category: entry.category || null,
-          level: entry.level || null
+          level: entry.level || null,
+          parts: Object.entries(entry.parts || {}).map(([id, part]) => ({
+            id,
+            label: part.label || id,
+            component: part.component || null,
+            mode: part.mode || null
+          })),
+          collections: Object.entries(entry.collections || {}).map(([id, collection]) => ({
+            id,
+            label: collection.label || id,
+            kind: collection.kind || null,
+            itemComponent: collection.itemComponent || null,
+            mode: collection.mode || null
+          })),
+          families: Object.entries(entry.families || {}).map(([id, family]) => ({
+            id,
+            label: family.label || id,
+            component: family.component || null,
+            mode: family.mode || null
+          })),
+          instances: Object.entries(entry.instances || {}).map(([id, instance]) => ({
+            id,
+            label: instance.label || id,
+            component: instance.component || null,
+            family: instance.family || null,
+            mode: instance.mode || null
+          })),
+          layoutGroups: Object.entries(entry.layoutGroups || {}).map(([id, layoutGroup]) => ({
+            id,
+            label: layoutGroup.label || id,
+            component: layoutGroup.component || null,
+            mode: layoutGroup.mode || null,
+            children: Array.isArray(layoutGroup.children) ? [...layoutGroup.children] : []
+          }))
         }
       : null
   }
@@ -175,9 +238,9 @@ export function buildAIContext(state, getEntryById) {
       tokenSummary: buildTokenSummary(tokens),
       rules: {
         effectiveTruth: 'versioned-codebase',
+        structuredSceneStatePrimary: true,
         preferReuseOverInvention: true,
         forbidNearDuplicateBlocks: true,
-        legacyCompatibilityRequired: true,
         requireExplicitEscalationForNewComponent: true,
         notesAreAnnotationsNotComponents: true
       },

@@ -89,7 +89,7 @@ export function auditBrainOutput(payload, { intent = '', context = null } = {}) 
 
   const actions = output.actions.map(action => {
     if (!inferredItemId) return action
-    if (!['update-params', 'update-item', 'duplicate-item', 'remove-item'].includes(action.type)) return action
+    if (!['update-params', 'update-part-params', 'update-collection-params', 'update-item', 'duplicate-item', 'remove-item'].includes(action.type)) return action
     if (action.targetId) return action
 
     return {

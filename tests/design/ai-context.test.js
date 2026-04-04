@@ -21,7 +21,14 @@ describe('buildAIContext', () => {
             width: 120,
             height: 40,
             viewport: 'desktop',
-            params: { variant: 'primary', text: 'Click' }
+            params: { variant: 'primary', text: 'Click' },
+            partsState: {
+              icon: {
+                variants: { variant: 'outline' },
+                content: {}
+              }
+            },
+            collectionsState: {}
           }
         ],
         notes: [
@@ -50,7 +57,10 @@ describe('buildAIContext', () => {
     expect(context.scene.summary).toEqual({ itemCount: 1, noteCount: 1 })
     expect(context.selection?.type).toBe('item')
     expect(context.interaction.focus).toBe('selected-item')
+    expect(context.selection?.item.partsState.icon.variants.variant).toBe('outline')
     expect(context.system.rules.notesAreAnnotationsNotComponents).toBe(true)
+    expect(context.system.rules.structuredSceneStatePrimary).toBe(true)
+    expect(context.system.rules).not.toHaveProperty('legacyCompatibilityRequired')
     expect(context.system.actions.supportedTypes).toContain('add-note')
     expect(context.system.actions.unsupported).toContain('create a brand new component')
   })
@@ -88,6 +98,8 @@ describe('buildBrainPrompt', () => {
     expect(prompt).toContain('Reuse existing components/includes/pages before inventing anything.')
     expect(prompt).toContain('Canvas notes are annotations only, not production components.')
     expect(prompt).toContain('Only use action types explicitly listed in context.system.actions.supported.')
+    expect(prompt).toContain('Structured scene state is the primary interaction model')
+    expect(prompt).toContain('Never use update-params for referenced child controls')
     expect(prompt).toContain('When interaction.focus is "selected-item"')
     expect(prompt).toContain('Interaction guidance:')
   })

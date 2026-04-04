@@ -566,6 +566,37 @@ The goal is not to produce a full dependency map every time, but to avoid local 
 
 ---
 
+## Momentum rule
+
+When a task completes, the agent must assess whether to continue autonomously or pause.
+
+**The agent continues autonomously if all of the following are true:**
+
+- the next task is explicitly identified in `PLAN.md`
+- the scope of that task is clear and local
+- no blocker was introduced by the task just completed
+- no human decision or validation is required to proceed
+- the mode remains A or B
+- the next task does not touch a sensitive area
+
+When continuing, the agent must announce the next task in one line before starting it:
+
+> `→ continuing with: [task name]`
+
+**The agent must pause and wait for confirmation if any of the following are true:**
+
+- the next task is ambiguous or not clearly scoped
+- the task just completed revealed new unknowns that affect what comes next
+- a decision made during execution changes the scope of the next task
+- the mode would escalate to C
+- the next task touches a sensitive area
+- the plan has no clear next task
+- the overall direction feels less certain than when the current task started
+
+Pausing is not a failure. It is the correct response when the conditions for autonomous continuation are not met.
+
+---
+
 ## Phase 4 — Validation
 
 The agent must validate as much as reasonably possible before considering the work complete.

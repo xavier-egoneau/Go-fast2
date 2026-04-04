@@ -7,6 +7,7 @@ import Twig from 'twig'
 import tailwindcss from '@tailwindcss/vite'
 import { normalizeAgentRunPayload, normalizeBrainOutput } from './design/src/core/brain-contract.js'
 import { listAgentProviders } from './design/src/core/agent-providers.js'
+import { applyPreviewPayloadToTwigData, decodePreviewPayload, PREVIEW_PAYLOAD_QUERY_KEY, resolvePreviewComposableData } from './design/src/core/preview-payload.js'
 
 const ROOT = process.cwd()
 const config = JSON.parse(fs.readFileSync('./gofast.config.json', 'utf8'))
@@ -200,6 +201,18 @@ function renderTwig(twigPath, data = {}) {
       else resolve(html)
     })
   })
+}
+
+function createShowcaseEntryResolver(showcaseData = {}) {
+  const components = (showcaseData.components || []).map(entry => ({ ...entry, kind: 'component' }))
+  const pages = (showcaseData.pages || []).map(entry => ({ ...entry, kind: 'page' }))
+  const all = [...components, ...pages]
+
+  return (id, kind = null) => {
+    if (kind === 'component') return components.find(entry => entry.id === id) || null
+    if (kind === 'page') return pages.find(entry => entry.id === id) || null
+    return all.find(entry => entry.id === id) || null
+  }
 }
 
 // Plugin principal : routage .html → .twig + génération showcase.json
@@ -438,7 +451,17 @@ function goFastPlugin() {
         if (fs.existsSync(showcasePath)) {
           try { Object.assign(data, JSON.parse(fs.readFileSync(showcasePath, 'utf8'))) } catch (_) {}
         }
+        const previewPayload = decodePreviewPayload(urlObj.searchParams.get(PREVIEW_PAYLOAD_QUERY_KEY))
+        if (previewPayload) {
+          const resolveShowcaseEntry = createShowcaseEntryResolver(data)
+          const previewEntry = resolveShowcaseEntry(previewPayload.ref, previewPayload.kind)
+          const resolvedComposableData = previewEntry
+            ? resolvePreviewComposableData(previewPayload, previewEntry, resolveShowcaseEntry)
+            : null
+          Object.assign(data, applyPreviewPayloadToTwigData(data, previewPayload, resolvedComposableData))
+        }
         urlObj.searchParams.forEach((val, key) => {
+          if (key === PREVIEW_PAYLOAD_QUERY_KEY) return
           if (key === '_layout') return  // param interne, ne pas passer à Twig
           if (val === 'true') data[key] = true
           else if (val === 'false') data[key] = false

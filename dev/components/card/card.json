@@ -36,11 +36,25 @@
       "label": "Description",
       "type": "text",
       "default": "Courte description du contenu de la carte."
-    },
-    "ctaText": {
-      "label": "Texte du bouton",
-      "type": "text",
-      "default": "En savoir plus"
+    }
+  },
+  "parts": {
+    "cta": {
+      "label": "CTA",
+      "component": "button",
+      "mode": "single",
+      "autoBind": true,
+      "defaults": {
+        "variants": {
+          "variant": "outline",
+          "size": "sm",
+          "full": false,
+          "disabled": false
+        },
+        "content": {
+          "text": "En savoir plus"
+        }
+      }
     }
   }
 }

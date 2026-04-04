@@ -1,45 +1,36 @@
-# AGENTS.md
+# AGENTS
 
-This project contains local workflow skills under `skills/`.
+## Execution rules
+- Check whether exactly one local skill clearly applies before acting.
+- If one local skill clearly applies, read its `SKILL.md` and follow it.
+- If multiple local skills could apply, choose the most specific one and do not load unrelated skills.
+- Prefer the lightest workflow that can still produce a reliable result.
+- Do not let planning, research, or review work drift into implementation unless the user explicitly changes mode.
+- Hand off clearly between investigation, planning, implementation, and review instead of blurring boundaries.
+
+## Code conventions
+- Preserve the existing project architecture: `dev/` is the product workspace, `app/` is framework/showcase infrastructure, and `design/` is the current product focus area.
+- Follow the established component rules when touching Twig and SCSS: `|default()` on exposed Twig variables, explicit includes, design-token-driven SCSS, and readable conventions over cleverness.
+- Avoid unrelated refactors while working on Design Surface tasks.
+- Keep agent-facing behavior grounded in the real component system rather than inventing fake system abstractions.
+
+## Validation rules
+- Validate the directly impacted area, not just the edited file.
+- Prefer verifying scene behavior, agent flow behavior, and UI interactions when changing the Design Surface.
+- Be explicit about what was validated and what still needs human confirmation.
+- Treat designer-facing UX issues as requiring practical validation, not just code-level confidence.
+
+## Output expectations
+- List modified files.
+- List created files.
+- List validations performed.
+- List validations not performed.
+- List remaining risks or open questions.
 
 ## Local skills
-
-Before acting on a task:
-
-1. Check whether exactly one local skill clearly applies.
-2. If so, read that skill's `SKILL.md` and follow it.
-3. If multiple skills could apply, choose the most specific one.
-4. Do not load unrelated skills.
-5. Treat local skills as project-specific operating guidance.
-
-## Skill locations
-
-Local skills live here:
-
-- `skills/plan/SKILL.md`
-- `skills/research/SKILL.md`
-- `skills/ulw/SKILL.md`
+- Treat local workflow skills under `skills/` as project-specific operating guidance.
+- Current local skills present in the repository:
 - `skills/autopilot/SKILL.md`
-- `skills/cancel/SKILL.md`
-- `skills/security-review/SKILL.md`
-
-## Intent of each skill
-
-- `plan` — clarify scope, tradeoffs, acceptance criteria, and execution steps before implementation
-- `research` — investigate deeply and return structured findings before deciding or changing code
-- `ulw` — run bounded independent lanes in parallel when parallelism is genuinely useful
-- `autopilot` — orchestrate a task end to end using the lightest workflow that can still produce a verified result
-- `cancel` — stop the current workflow cleanly and report what remains
-- `security-review` — review code or architecture for realistic security risk and return a severity-ranked report
-
-## Operating rules
-
-- Prefer the lightest skill that matches the task.
-- Do not use `autopilot` when a simpler skill is enough.
-- Do not use `ulw` unless the work has real independent lanes.
-- Do not let `plan`, `research`, or `security-review` silently drift into implementation unless the user explicitly changes mode.
-- When a skill completes, hand off clearly to the next step instead of blurring boundaries.
-
-## Goal
-
-Use these skills to improve task selection, consistency, and workflow clarity without adding unnecessary process.
+- `skills/parallel/SKILL.md`
+- `skills/research/SKILL.md`
+- `skills/review/SKILL.md`

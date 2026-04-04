@@ -1,6 +1,7 @@
-import { loadRegistry, searchEntries, getEntryById, getDefaultParams, listEntries } from './core/registry.js'
+import { loadRegistry, getEntryById, getDefaultParams, listEntries, listComposableBindings, resolveComposableParentParamKey } from './core/registry.js'
 import { buildRenderUrl } from './core/render-url.js'
-import { loadTokens, getTokenSummaryForEntry } from './core/tokens.js'
+import { applyComposablePatchToItem, applyFlatParamsPatchToItem, createStructuredStates, getRenderableItemParams, normalizeSceneItemState } from './core/composable-state.js'
+import { loadTokens, getTokenSummaryForEntry, getTokenById } from './core/tokens.js'
 import { listSceneFiles, loadSceneFile } from './core/scene-file.js'
 import { saveSceneFile, deleteSceneFile } from './core/scene-api.js'
 import { diffScenes } from './core/diff.js'
@@ -32,23 +33,57 @@ import { renderAgentPanel } from './ui/agent-panel.js'
 let rootEl = null
 let dragState = null
 let resizeState = null
+let panState = null
 let dragPointerId = null
 let resizePointerId = null
 let historyMuted = false
 let frameInteractivityDisabled = false
+let canvasWheelAbortController = null
+let canvasPanAbortController = null
+let keyboardAbortController = null
+let spacePanPressed = false
+let suppressNextClickUntil = 0
 
-const VIEWPORTS = {
-  mobile: { label: 'Mobile', width: 390, height: 844 },
-  tablet: { label: 'Tablet', width: 768, height: 1024 },
-  desktop: { label: 'Desktop', width: 1440, height: 1024 }
+const VIEWPORT_SPECS = {
+  mobile: { label: 'Mobile', breakpointId: 'breakpoint-sm', fallbackWidth: 640, height: 844 },
+  tablet: { label: 'Tablette', breakpointId: 'breakpoint-md', fallbackWidth: 768, height: 1024 },
+  desktop: { label: 'Desktop', breakpointId: 'breakpoint-lg', fallbackWidth: 1024, height: 1024 }
+}
+
+const INSPECTOR_NODE_DEFINITIONS = {
+  part: { stateKey: 'partsState', actionName: 'part-param-change', idAttr: 'dataPartId', stateMode: 'bucket' },
+  collection: { stateKey: 'collectionsState', actionName: 'collection-param-change', idAttr: 'dataCollectionId', stateMode: 'shared-bucket' },
+  family: { stateKey: 'familiesState', actionName: 'family-param-change', idAttr: 'dataFamilyId', stateMode: 'bucket' },
+  instance: { stateKey: 'instancesState', actionName: 'instance-param-change', idAttr: 'dataInstanceId', stateMode: 'bucket' },
+  layoutGroup: { stateKey: 'layoutGroupsState', actionName: 'layout-group-param-change', idAttr: 'dataLayoutGroupId', stateMode: 'bucket' }
 }
 
 function uid(prefix = 'item') {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`
 }
 
+function parsePxValue(value, fallback) {
+  const match = String(value || '').match(/([0-9]+(?:\.[0-9]+)?)px/)
+  return match ? Number(match[1]) : fallback
+}
+
+function getViewportDefinitions() {
+  return Object.fromEntries(Object.entries(VIEWPORT_SPECS).map(([key, spec]) => {
+    const token = getTokenById(spec.breakpointId)
+    const width = parsePxValue(token?.value, spec.fallbackWidth)
+    return [key, {
+      label: spec.label,
+      width,
+      height: spec.height,
+      breakpoint: token?.scssVar || `$${spec.breakpointId}`,
+      breakpointValue: token?.value || `${spec.fallbackWidth}px`
+    }]
+  }))
+}
+
 function getViewportConfig(viewport) {
-  return VIEWPORTS[viewport] || VIEWPORTS.desktop
+  const definitions = getViewportDefinitions()
+  return definitions[viewport] || definitions.desktop
 }
 
 function getItemDimensions(entry, viewport) {
@@ -87,6 +122,7 @@ function buildLaneLayout(scene) {
   const laneMap = new Map()
   let cursorX = 96
   const gap = 32
+  const laneWidthOverrides = scene?.laneWidths || {}
 
   for (const laneKey of orderedLaneKeys) {
     const sampleEntry = (scene.items || [])
@@ -103,12 +139,21 @@ function buildLaneLayout(scene) {
     })
 
     const widest = laneItems.reduce((max, item) => Math.max(max, item.width || 0), 0)
-    const width = Math.max(baseLane.minWidth, widest + 32)
+    const occupiedWidth = laneItems.reduce((max, item) => {
+      const relativeRight = Math.max(0, ((item.x || 0) - cursorX) + (item.width || 0))
+      return Math.max(max, relativeRight)
+    }, 0)
+    const occupiedHeight = laneItems.reduce((max, item) => {
+      const relativeBottom = Math.max(0, ((item.y || 0) - baseLane.y) + (item.height || 0))
+      return Math.max(max, relativeBottom)
+    }, 0)
+    const width = Math.max(baseLane.minWidth, widest + 32, occupiedWidth + 32, laneWidthOverrides[laneKey] || 0)
     laneMap.set(laneKey, {
       ...baseLane,
       key: laneKey,
       x: cursorX,
-      width
+      width,
+      height: Math.max(baseLane.height, occupiedHeight + 96)
     })
     cursorX += width + gap
   }
@@ -162,6 +207,79 @@ function reflowSceneItems(items, targetLaneKey = null) {
   return nextItems
 }
 
+function snapSceneItemsToGrid(items, targetLaneKey = null) {
+  return JSON.parse(JSON.stringify(items || [])).map(item => {
+    const entry = getEntryById(item.ref, item.kind)
+    if (!entry) return item
+    const laneKey = getLaneConfig(entry).key
+    if (targetLaneKey && laneKey !== targetLaneKey) return item
+
+    return {
+      ...item,
+      x: snapToGrid(item.x || 0),
+      y: snapToGrid(item.y || 0),
+      width: Math.max(220, snapToGrid(item.width || 220, 4)),
+      height: Math.max(140, snapToGrid(item.height || 140, 4))
+    }
+  })
+}
+
+function alignSceneItemsToGrid(items, targetLaneKey = null) {
+  const nextItems = JSON.parse(JSON.stringify(items || []))
+  const laneKeys = targetLaneKey ? [targetLaneKey] : ['atom', 'molecule', 'organism', 'template']
+  const gap = 32
+  const rowThreshold = 120
+
+  for (const laneKey of laneKeys) {
+    const laneItems = nextItems
+      .filter(item => {
+        const entry = getEntryById(item.ref, item.kind)
+        if (!entry) return false
+        return getLaneConfig(entry).key === laneKey
+      })
+      .sort((a, b) => (a.y - b.y) || (a.x - b.x))
+
+    if (!laneItems.length) continue
+
+    const rows = []
+
+    for (const item of laneItems) {
+      const itemTop = item.y || 0
+      let row = rows.find(candidate => Math.abs(candidate.anchorY - itemTop) <= rowThreshold)
+
+      if (!row) {
+        row = { anchorY: itemTop, items: [] }
+        rows.push(row)
+      }
+
+      row.items.push(item)
+      row.anchorY = Math.round((row.anchorY + itemTop) / 2)
+    }
+
+    rows.sort((a, b) => a.anchorY - b.anchorY)
+
+    let cursorY = snapToGrid(Math.min(...rows.map(row => row.anchorY)))
+
+    rows.forEach(row => {
+      row.items.sort((a, b) => a.x - b.x)
+
+      const originalMinX = Math.min(...row.items.map(item => item.x || 0))
+      let cursorX = snapToGrid(originalMinX)
+      const rowHeight = Math.max(...row.items.map(item => item.height || 0), 140)
+
+      row.items.forEach(item => {
+        item.x = cursorX
+        item.y = cursorY
+        cursorX = snapToGrid(item.x + (item.width || 0) + gap)
+      })
+
+      cursorY = snapToGrid(cursorY + rowHeight + gap)
+    })
+  }
+
+  return nextItems
+}
+
 function organizeSelectedLane() {
   const selectedItem = getSelectedSceneItem()
   if (!selectedItem) return
@@ -172,7 +290,7 @@ function organizeSelectedLane() {
     ...prev,
     scene: {
       ...prev.scene,
-      items: reflowSceneItems(prev.scene.items, lane.key)
+      items: alignSceneItemsToGrid(prev.scene.items, lane.key)
     }
   }))
   commitSceneHistory()
@@ -183,7 +301,7 @@ function organizeCanvas() {
     ...prev,
     scene: {
       ...prev.scene,
-      items: reflowSceneItems(prev.scene.items)
+      items: alignSceneItemsToGrid(prev.scene.items)
     }
   }))
   commitSceneHistory()
@@ -198,6 +316,7 @@ function createSceneItemFromEntry(entry, scene) {
   const viewport = scene.viewport || 'desktop'
   const dimensions = getItemDimensions(entry, viewport)
   const placement = computeAutoPlacement(scene, entry, dimensions)
+  const structuredState = createStructuredStates(entry, getEntryById)
   return {
     id: uid(),
     kind: entry.kind,
@@ -207,14 +326,24 @@ function createSceneItemFromEntry(entry, scene) {
     y: placement.y,
     width: dimensions.width,
     height: dimensions.height,
-    params: getDefaultParams(entry)
+    params: getDefaultParams(entry),
+    partsState: structuredState.partsState,
+    collectionsState: structuredState.collectionsState,
+    familiesState: structuredState.familiesState,
+    instancesState: structuredState.instancesState,
+    layoutGroupsState: structuredState.layoutGroupsState
   }
 }
 
-function hydrateSceneWithRegistry(scene) {
+function hydrateSceneWithRegistry(scene, options = {}) {
+  const preserveExistingLayout = options.preserveExistingLayout ?? true
   const baseScene = {
     ...scene,
-    items: [...(scene.items || [])],
+    items: [...(scene.items || [])].map(item => {
+      const entry = getEntryById(item.ref, item.kind)
+      if (!entry) return item
+      return normalizeSceneItemState(item, entry, getEntryById)
+    }),
     notes: scene.notes || []
   }
 
@@ -233,7 +362,9 @@ function hydrateSceneWithRegistry(scene) {
     existingRefs.add(key)
   }
 
-  baseScene.items = reflowSceneItems(baseScene.items)
+  if (!preserveExistingLayout) {
+    baseScene.items = reflowSceneItems(baseScene.items)
+  }
   return baseScene
 }
 
@@ -304,7 +435,92 @@ function updateItemParams(itemId, paramsPatch) {
     ...prev,
     scene: {
       ...prev.scene,
-      items: prev.scene.items.map(item => item.id === itemId ? { ...item, params: { ...item.params, ...paramsPatch } } : item)
+      items: prev.scene.items.map(item => {
+        if (item.id !== itemId) return item
+        const entry = getEntryById(item.ref, item.kind)
+        if (!entry) return { ...item, params: { ...item.params, ...paramsPatch } }
+        return applyFlatParamsPatchToItem(item, entry, paramsPatch, getEntryById)
+      })
+    }
+  }))
+  commitSceneHistory()
+}
+
+function updatePartParams(itemId, partId, paramsPatch) {
+  setState(prev => ({
+    ...prev,
+    scene: {
+      ...prev.scene,
+      items: prev.scene.items.map(item => {
+        if (item.id !== itemId) return item
+        const entry = getEntryById(item.ref, item.kind)
+        if (!entry) return item
+        return applyComposablePatchToItem(item, entry, 'part', partId, paramsPatch, getEntryById)
+      })
+    }
+  }))
+  commitSceneHistory()
+}
+
+function updateCollectionParams(itemId, collectionId, paramsPatch) {
+  setState(prev => ({
+    ...prev,
+    scene: {
+      ...prev.scene,
+      items: prev.scene.items.map(item => {
+        if (item.id !== itemId) return item
+        const entry = getEntryById(item.ref, item.kind)
+        if (!entry) return item
+        return applyComposablePatchToItem(item, entry, 'collection', collectionId, paramsPatch, getEntryById)
+      })
+    }
+  }))
+  commitSceneHistory()
+}
+
+function updateFamilyParams(itemId, familyId, paramsPatch) {
+  setState(prev => ({
+    ...prev,
+    scene: {
+      ...prev.scene,
+      items: prev.scene.items.map(item => {
+        if (item.id !== itemId) return item
+        const entry = getEntryById(item.ref, item.kind)
+        if (!entry) return item
+        return applyComposablePatchToItem(item, entry, 'family', familyId, paramsPatch, getEntryById)
+      })
+    }
+  }))
+  commitSceneHistory()
+}
+
+function updateInstanceParams(itemId, instanceId, paramsPatch) {
+  setState(prev => ({
+    ...prev,
+    scene: {
+      ...prev.scene,
+      items: prev.scene.items.map(item => {
+        if (item.id !== itemId) return item
+        const entry = getEntryById(item.ref, item.kind)
+        if (!entry) return item
+        return applyComposablePatchToItem(item, entry, 'instance', instanceId, paramsPatch, getEntryById)
+      })
+    }
+  }))
+  commitSceneHistory()
+}
+
+function updateLayoutGroupParams(itemId, layoutGroupId, paramsPatch) {
+  setState(prev => ({
+    ...prev,
+    scene: {
+      ...prev.scene,
+      items: prev.scene.items.map(item => {
+        if (item.id !== itemId) return item
+        const entry = getEntryById(item.ref, item.kind)
+        if (!entry) return item
+        return applyComposablePatchToItem(item, entry, 'layoutGroup', layoutGroupId, paramsPatch, getEntryById)
+      })
     }
   }))
   commitSceneHistory()
@@ -355,10 +571,6 @@ function clearScene() {
   commitSceneHistory()
 }
 
-function setQuery(query) {
-  patchState({ query })
-}
-
 function refreshSelectionUI() {
   if (!rootEl) return
   const { selectedItemId } = getState()
@@ -405,14 +617,16 @@ async function loadSceneFromFile(fileName, options = {}) {
     const scene = await loadSceneFile(fileName)
     const normalized = { ...scene, notes: scene.notes || [], items: scene.items || [] }
     const keepWorkingScene = options.keepWorkingScene ?? false
-    const hydrated = hydrateSceneWithRegistry(normalized)
+    const hydrated = hydrateSceneWithRegistry(normalized, {
+      preserveExistingLayout: normalized.items.length > 0
+    })
 
     setState(prev => ({
       ...prev,
       selectedItemId: null,
       activeSceneFile: fileName,
       baseScene: hydrated,
-      scene: keepWorkingScene ? hydrateSceneWithRegistry(prev.scene) : hydrated,
+      scene: keepWorkingScene ? hydrateSceneWithRegistry(prev.scene, { preserveExistingLayout: true }) : hydrated,
       history: keepWorkingScene ? prev.history : [hydrated],
       historyIndex: keepWorkingScene ? prev.historyIndex : 0
     }))
@@ -534,12 +748,6 @@ function toggleAgentPanel() {
   render()
 }
 
-function toggleNavigatorPanel() {
-  const agent = getAgentState()
-  patchAgentState({ navigatorOpen: !agent.navigatorOpen })
-  render()
-}
-
 function stringifyAgentJson(value) {
   return JSON.stringify(value, null, 2)
 }
@@ -632,7 +840,7 @@ async function handleAgentSubmit() {
       return
     }
 
-    const previewScene = applyActionSetToScene(state.scene, validation.normalized)
+    const previewScene = applyActionSetToScene(state.scene, validation.normalized, getEntryById)
     patchAgentState({
       ...nextPatch,
       previewScene
@@ -686,7 +894,7 @@ function handleAgentPreview() {
       render()
       return
     }
-    const previewScene = applyActionSetToScene(state.scene, result.normalized)
+    const previewScene = applyActionSetToScene(state.scene, result.normalized, getEntryById)
     patchAgentState({
       validationErrors: [],
       runtimeError: '',
@@ -741,47 +949,37 @@ function getRenderedScene() {
   return agent.previewScene || getState().scene
 }
 
-function renderLibrary() {
-  const { query, scene } = getState()
-  const entries = searchEntries(query)
-
-  return `
-    <aside class="ds-panel">
-      <div class="ds-panel__header">
-        <h2 class="ds-panel__title">Navigator</h2>
-        <p class="ds-panel__subtitle">Recherche, filtre et focus dans le système déjà présent sur le canvas.</p>
-      </div>
-      <div class="ds-panel__body">
-        <input class="ds-search" id="ds-search" type="search" placeholder="Rechercher un composant ou une page" value="${escapeAttr(query)}">
-        <div class="ds-library-list" style="margin-top: 16px;">
-          ${entries.map(entry => {
-            const sceneItem = (scene.items || []).find(item => item.ref === entry.id && item.kind === entry.kind)
-            return `
-            <article class="ds-card">
-              <div class="ds-card__top"><div class="ds-card__name">${escapeHtml(entry.name)}</div><span class="ds-badge">${escapeHtml(entry.kind)}</span></div>
-              <div class="ds-card__meta">${escapeHtml(entry.level || '')} · ${escapeHtml(entry.category || '')}</div>
-              <p class="ds-card__desc">${escapeHtml(entry.description || 'Sans description')}</p>
-              <div class="ds-card__actions"><button class="ds-btn" data-action="focus-item" data-kind="${entry.kind}" data-id="${entry.id}" ${sceneItem ? '' : 'disabled'}>Focus on canvas</button></div>
-            </article>
-          `}).join('') || `<p class="ds-muted">Aucun résultat.</p>`}
-        </div>
-      </div>
-    </aside>
-  `
-}
-
 function renderFrames(scene) {
   const viewport = scene.viewport || 'desktop'
-  const vp = getViewportConfig(viewport)
   const lanes = [...buildLaneLayout(scene).values()].map(lane => ({
     ...lane,
-    height: Math.max(880, vp.height)
+    height: Math.max(lane.height || 0, 880)
   }))
 
   return `
-    <div class="ds-frame" style="left:64px;top:64px;width:${Math.max(vp.width + 32, (lanes[lanes.length - 1]?.x || 0) + (lanes[lanes.length - 1]?.width || 0) - 64)}px;height:${vp.height + 72}px;"><div class="ds-frame__label"><span>${escapeHtml(vp.label)}</span><span class="ds-badge">${vp.width} × ${vp.height}</span></div></div>
-    ${lanes.map(lane => `<div class="ds-lane" style="left:${lane.x}px;top:${lane.y}px;width:${lane.width}px;height:${lane.height}px;"><div class="ds-lane__label">${escapeHtml(lane.label)}</div></div>`).join('')}
+    ${lanes.map(lane => `<div class="ds-lane" style="left:${lane.x}px;top:${lane.y}px;width:${lane.width}px;height:${lane.height}px;"><div class="ds-lane__label">${escapeHtml(lane.label)}</div><div class="ds-lane__resize" data-lane-resize-handle="${lane.key}" title="Agrandir la colonne ${escapeAttr(lane.label)}"></div></div>`).join('')}
   `
+}
+
+function getCanvasMetrics(scene) {
+  const viewport = scene.viewport || 'desktop'
+  const vp = getViewportConfig(viewport)
+  const lanes = [...buildLaneLayout(scene).values()]
+  const itemBounds = (scene.items || []).reduce((acc, item) => ({
+    right: Math.max(acc.right, (item.x || 0) + (item.width || 0)),
+    bottom: Math.max(acc.bottom, (item.y || 0) + (item.height || 0))
+  }), { right: 0, bottom: 0 })
+  const noteBounds = (scene.notes || []).reduce((acc, note) => ({
+    right: Math.max(acc.right, (note.x || 0) + 280),
+    bottom: Math.max(acc.bottom, (note.y || 0) + 180)
+  }), { right: 0, bottom: 0 })
+  const lanesRight = lanes.length ? Math.max(...lanes.map(lane => lane.x + lane.width)) : 0
+  const lanesBottom = lanes.length ? Math.max(...lanes.map(lane => lane.y + lane.height)) : 0
+
+  return {
+    width: Math.max(1800, vp.width + 160, lanesRight + 160, itemBounds.right + 160, noteBounds.right + 160),
+    height: Math.max(1200, vp.height + 180, lanesBottom + 160, itemBounds.bottom + 160, noteBounds.bottom + 160)
+  }
 }
 
 function buildAgentFeedbackModel() {
@@ -857,40 +1055,54 @@ function renderPreviewStatus() {
 
 function renderCanvas() {
   const scene = getRenderedScene()
-  const { selectedItemId } = getState()
+  const { selectedItemId, zoom } = getState()
   const notes = scene.notes || []
+  const metrics = getCanvasMetrics(scene)
 
   return `
     <main class="ds-canvas-wrap">
       ${renderPreviewStatus()}
-      <div class="ds-canvas" id="ds-canvas">
-        ${renderFrames(scene)}
-        ${scene.items.length === 0 && notes.length === 0 ? '<div class="ds-empty">Ajoute un composant, une page ou une note depuis la library.</div>' : ''}
-        ${notes.map(note => {
-          const attachedItem = note.targetId ? scene.items.find(item => item.id === note.targetId) : null
-          const noteX = attachedItem ? attachedItem.x + Math.max(16, attachedItem.width - 24) : note.x
-          const noteY = attachedItem ? Math.max(24, attachedItem.y - 12) : note.y
-          return `
-          <section class="ds-note ${selectedItemId === note.id ? 'ds-note--selected' : ''}${note.open ? ' ds-note--open' : ''}" data-note-id="${note.id}" style="left:${noteX}px;top:${noteY}px;">
-            <button class="ds-note__pin" data-note-drag-handle="${note.id}" data-action="toggle-note" data-note-id="${note.id}" title="Ouvrir ou fermer la note"></button>
-            ${note.open ? `<div class="ds-note__popover"><div class="ds-note__title">Annotation</div><button class="ds-note__delete" data-action="delete-note-inline" data-note-id="${note.id}" title="Supprimer la note">×</button><div class="ds-note__text">${escapeHtml(note.text)}</div></div>` : ''}
-          </section>
-        `}).join('')}
-        ${scene.items.map(item => {
-          const entry = getEntryById(item.ref, item.kind)
-          if (!entry) return ''
-          const url = buildRenderUrl(entry, item.params)
-          return `
-            <section class="ds-item ${selectedItemId === item.id ? 'ds-item--selected' : ''}" data-item-id="${item.id}" style="left:${item.x}px;top:${item.y}px;width:${item.width}px;height:${item.height}px;">
-              <div class="ds-item__toolbar" data-drag-handle="${item.id}">
-                <div><div class="ds-item__title">${escapeHtml(entry.name)}</div><div class="ds-item__meta">${escapeHtml(item.viewport || 'desktop')} · ${escapeHtml(entry.kind)} · ${escapeHtml(entry.level || '')}</div></div>
-                <div class="ds-item__toolbar-actions"><button class="ds-badge ds-badge--button" data-action="add-note-to-item" data-item-id="${item.id}">note</button><a class="ds-badge" href="${escapeAttr(url)}" target="_blank" rel="noreferrer">ouvrir</a></div>
-              </div>
-              <iframe class="ds-item__frame" src="${escapeAttr(url)}" title="${escapeAttr(entry.name)}" style="height: calc(100% - 41px);"></iframe>
-              <div class="ds-item__resize" data-resize-handle="${item.id}" title="Redimensionner"></div>
+      <div class="ds-canvas-stage" style="width:${Math.round(metrics.width * zoom)}px;height:${Math.round(metrics.height * zoom)}px;">
+        <div class="ds-canvas" id="ds-canvas" style="width:${metrics.width}px;height:${metrics.height}px;transform: scale(${zoom});">
+          ${renderFrames(scene)}
+          ${scene.items.length === 0 && notes.length === 0 ? '<div class="ds-empty">Ajoute un composant, une page ou une note depuis la library.</div>' : ''}
+          ${notes.map(note => {
+            const attachedItem = note.targetId ? scene.items.find(item => item.id === note.targetId) : null
+            const noteX = attachedItem ? attachedItem.x + Math.max(16, attachedItem.width - 24) : note.x
+            const noteY = attachedItem ? Math.max(24, attachedItem.y - 12) : note.y
+            return `
+            <section class="ds-note ${selectedItemId === note.id ? 'ds-note--selected' : ''}${note.open ? ' ds-note--open' : ''}" data-note-id="${note.id}" style="left:${noteX}px;top:${noteY}px;">
+              <button class="ds-note__pin" data-note-drag-handle="${note.id}" data-action="toggle-note" data-note-id="${note.id}" title="Ouvrir ou fermer la note"></button>
+              ${note.open ? `<div class="ds-note__popover"><div class="ds-note__title">Annotation</div><button class="ds-note__delete" data-action="delete-note-inline" data-note-id="${note.id}" title="Supprimer la note">×</button><div class="ds-note__text">${escapeHtml(note.text)}</div></div>` : ''}
             </section>
-          `
-        }).join('')}
+          `}).join('')}
+          ${scene.items.map(item => {
+            const entry = getEntryById(item.ref, item.kind)
+            if (!entry) {
+              return `
+              <section class="ds-item ${selectedItemId === item.id ? 'ds-item--selected' : ''}" data-item-id="${item.id}" style="left:${item.x}px;top:${item.y}px;width:${item.width}px;height:${item.height}px;">
+                <div class="ds-item__toolbar" data-drag-handle="${item.id}">
+                  <div><div class="ds-item__title">${escapeHtml(item.ref || 'Entrée inconnue')}</div><div class="ds-item__meta">missing registry entry</div></div>
+                  <div class="ds-item__toolbar-actions"><button class="ds-badge ds-badge--button" data-action="add-note-to-item" data-item-id="${item.id}">note</button></div>
+                </div>
+                <div class="ds-item__frame" style="height: calc(100% - 41px); display:flex; align-items:center; justify-content:center; padding:16px; color:#94a3b8; text-align:center; background:rgba(15,23,42,0.08);">Référence introuvable dans le registry.<br>${escapeHtml(item.kind || 'item')} · ${escapeHtml(item.ref || 'unknown')}</div>
+                <div class="ds-item__resize" data-resize-handle="${item.id}" title="Redimensionner"></div>
+              </section>
+            `
+            }
+            const url = buildRenderUrl(entry, item, getEntryById)
+            return `
+              <section class="ds-item ${selectedItemId === item.id ? 'ds-item--selected' : ''}" data-item-id="${item.id}" style="left:${item.x}px;top:${item.y}px;width:${item.width}px;height:${item.height}px;">
+                <div class="ds-item__toolbar" data-drag-handle="${item.id}">
+                  <div><div class="ds-item__title">${escapeHtml(entry.name)}</div><div class="ds-item__meta">${escapeHtml(item.viewport || 'desktop')} · ${escapeHtml(entry.kind)} · ${escapeHtml(entry.level || '')}</div></div>
+                  <div class="ds-item__toolbar-actions"><button class="ds-badge ds-badge--button" data-action="add-note-to-item" data-item-id="${item.id}">note</button><a class="ds-badge" href="${escapeAttr(url)}" target="_blank" rel="noreferrer">ouvrir</a></div>
+                </div>
+                <iframe class="ds-item__frame" src="${escapeAttr(url)}" title="${escapeAttr(entry.name)}" style="height: calc(100% - 41px);"></iframe>
+                <div class="ds-item__resize" data-resize-handle="${item.id}" title="Redimensionner"></div>
+              </section>
+            `
+          }).join('')}
+        </div>
       </div>
     </main>
   `
@@ -900,11 +1112,16 @@ function renderDiffPanel() {
   const { baseScene } = getState()
   const diff = diffScenes(baseScene, getRenderedScene())
   const hasChanges = diff.sceneMeta.length || diff.items.length || diff.notes.length
+  const summary = []
+
+  if (diff.sceneMeta.length) summary.push(`${diff.sceneMeta.length} changement(s) de scène`)
+  if (diff.items.length) summary.push(`${diff.items.length} item(s) modifié(s)`)
+  if (diff.notes.length) summary.push(`${diff.notes.length} note(s) modifiée(s)`)
 
   if (!hasChanges) {
     return `
       <div class="ds-inspector-group">
-        <h3 class="ds-inspector-group__title">Diff sémantique</h3>
+        <h3 class="ds-inspector-group__title">État de travail</h3>
         <p class="ds-muted">Aucun écart avec la scène de base.</p>
       </div>
     `
@@ -912,35 +1129,180 @@ function renderDiffPanel() {
 
   return `
     <div class="ds-inspector-group">
-      <h3 class="ds-inspector-group__title">Diff sémantique</h3>
-      <div class="ds-diff-list">
-        ${diff.sceneMeta.length ? `
-          <div class="ds-diff-card">
-            <div class="ds-diff-card__title">Scène</div>
-            ${diff.sceneMeta.map(change => `<div class="ds-diff-change"><code>${escapeHtml(change.key)}</code> : ${escapeHtml(String(change.before))} → ${escapeHtml(String(change.after))}</div>`).join('')}
-          </div>
-        ` : ''}
-        ${diff.items.map(item => `
-          <div class="ds-diff-card">
-            <div class="ds-diff-card__title">Item ${escapeHtml(item.ref || item.id)}</div>
-            <div class="ds-diff-card__meta">${escapeHtml(item.type)} · ${escapeHtml(item.kind || 'item')}</div>
-            ${item.changes.map(change => `<div class="ds-diff-change"><code>${escapeHtml(change.scope || 'meta')}.${escapeHtml(change.key)}</code> : ${escapeHtml(String(change.before))} → ${escapeHtml(String(change.after))}</div>`).join('') || '<div class="ds-diff-change">Aucun détail.</div>'}
-          </div>
-        `).join('')}
-        ${diff.notes.map(note => `
-          <div class="ds-diff-card">
-            <div class="ds-diff-card__title">Note ${escapeHtml(note.id)}</div>
-            <div class="ds-diff-card__meta">${escapeHtml(note.type)}</div>
-            ${note.changes.map(change => `<div class="ds-diff-change"><code>${escapeHtml(change.key)}</code> : ${escapeHtml(String(change.before))} → ${escapeHtml(String(change.after))}</div>`).join('') || '<div class="ds-diff-change">Aucun détail.</div>'}
-          </div>
-        `).join('')}
+      <h3 class="ds-inspector-group__title">État de travail</h3>
+      <div class="ds-callout">
+        <div class="ds-callout__title">Résumé</div>
+        <div class="ds-callout__text">${escapeHtml(summary.join(' · '))}</div>
+        <div class="ds-callout__text">Pour relire et partager les changements, privilégie une branche Git. Le détail technique reste disponible ci-dessous si besoin.</div>
       </div>
+      <details class="ds-details">
+        <summary class="ds-details__summary">Voir le détail technique</summary>
+        <div class="ds-diff-list">
+          ${diff.sceneMeta.length ? `
+            <div class="ds-diff-card">
+              <div class="ds-diff-card__title">Scène</div>
+              ${diff.sceneMeta.map(change => `<div class="ds-diff-change"><code>${escapeHtml(change.key)}</code> : ${escapeHtml(String(change.before))} → ${escapeHtml(String(change.after))}</div>`).join('')}
+            </div>
+          ` : ''}
+          ${diff.items.map(item => `
+            <div class="ds-diff-card">
+              <div class="ds-diff-card__title">Item ${escapeHtml(item.ref || item.id)}</div>
+              <div class="ds-diff-card__meta">${escapeHtml(item.type)} · ${escapeHtml(item.kind || 'item')}</div>
+              ${item.changes.map(change => `<div class="ds-diff-change"><code>${escapeHtml(change.scope || 'meta')}.${escapeHtml(change.key)}</code> : ${escapeHtml(String(change.before))} → ${escapeHtml(String(change.after))}</div>`).join('') || '<div class="ds-diff-change">Aucun détail.</div>'}
+            </div>
+          `).join('')}
+          ${diff.notes.map(note => `
+            <div class="ds-diff-card">
+              <div class="ds-diff-card__title">Note ${escapeHtml(note.id)}</div>
+              <div class="ds-diff-card__meta">${escapeHtml(note.type)}</div>
+              ${note.changes.map(change => `<div class="ds-diff-change"><code>${escapeHtml(change.key)}</code> : ${escapeHtml(String(change.before))} → ${escapeHtml(String(change.after))}</div>`).join('') || '<div class="ds-diff-change">Aucun détail.</div>'}
+            </div>
+          `).join('')}
+        </div>
+      </details>
     </div>
   `
 }
 
 function renderInspectorWrapped() {
   return `<div data-ui-region="inspector">${renderInspector()}</div>`
+}
+
+function renderInspectorControl(item, key, ctrl, options = {}) {
+  const value = options.value ?? item.params[key]
+  const inputId = `ds-field-${item.id}-${options.scope || 'root'}-${key}`
+  const label = options.label || ctrl.label
+  const actionName = options.actionName || 'param-change'
+  const extraAttrs = [
+    `data-action="${actionName}"`,
+    `data-item-id="${item.id}"`,
+    options.dataPartId ? `data-part-id="${options.dataPartId}"` : '',
+    options.dataCollectionId ? `data-collection-id="${options.dataCollectionId}"` : '',
+    options.dataFamilyId ? `data-family-id="${options.dataFamilyId}"` : '',
+    options.dataInstanceId ? `data-instance-id="${options.dataInstanceId}"` : '',
+    options.dataLayoutGroupId ? `data-layout-group-id="${options.dataLayoutGroupId}"` : '',
+    options.dataSection ? `data-section="${options.dataSection}"` : '',
+    options.dataChildKey ? `data-child-key="${options.dataChildKey}"` : '',
+    `data-key="${key}"`
+  ].filter(Boolean).join(' ')
+  if (ctrl.type === 'select') {
+    return `<label class="ds-field" for="${inputId}"><span class="ds-field__label">${escapeHtml(label)}</span><select class="ds-field__select" id="${inputId}" ${extraAttrs}>${(ctrl.options || []).map(option => `<option value="${escapeAttr(option)}"${String(option) === String(value) ? ' selected' : ''}>${escapeHtml(option)}</option>`).join('')}</select></label>`
+  }
+  if (ctrl.type === 'checkbox') {
+    return `<label class="ds-field__checkbox"><input type="checkbox" ${value ? 'checked' : ''} ${extraAttrs}><span>${escapeHtml(label)}</span></label>`
+  }
+  return `<label class="ds-field" for="${inputId}"><span class="ds-field__label">${escapeHtml(label)}</span><input class="ds-field__input" id="${inputId}" type="text" value="${escapeAttr(value ?? '')}" ${extraAttrs}></label>`
+}
+
+function resolveAutoBoundParentKey(nodeId, node, parentEntry, childKey, section) {
+  return resolveComposableParentParamKey(parentEntry, nodeId, node, childKey, section)
+}
+
+function collectNestedParentKeys(parentEntry) {
+  const keys = {
+    variants: new Set(),
+    content: new Set()
+  }
+
+  const collectFromNode = (nodeId, node, childEntry) => {
+    if (!childEntry) return
+    for (const section of ['variants', 'content']) {
+      for (const childKey of Object.keys(childEntry?.[section] || {})) {
+        const explicitKey = node.binding?.[section]?.[childKey]
+        if (explicitKey) {
+          keys[section].add(explicitKey)
+          continue
+        }
+        const autoBoundKey = resolveAutoBoundParentKey(nodeId, node, parentEntry, childKey, section)
+        if (autoBoundKey) keys[section].add(autoBoundKey)
+      }
+    }
+  }
+
+  Object.entries(parentEntry.parts || {}).forEach(([partKey, part]) => {
+    collectFromNode(partKey, part, getEntryById(part.component, 'component'))
+  })
+
+  Object.entries(parentEntry.collections || {}).forEach(([collectionKey, collection]) => {
+    collectFromNode(collectionKey, collection, getEntryById(collection.itemComponent, 'component'))
+  })
+
+  Object.entries(parentEntry.families || {}).forEach(([familyKey, family]) => {
+    collectFromNode(familyKey, family, getEntryById(family.component, 'component'))
+  })
+
+  Object.entries(parentEntry.instances || {}).forEach(([instanceKey, instance]) => {
+    collectFromNode(instanceKey, instance, getEntryById(instance.component, 'component'))
+  })
+
+  Object.entries(parentEntry.layoutGroups || {}).forEach(([groupKey, group]) => {
+    collectFromNode(groupKey, group, getEntryById(group.component, 'component'))
+  })
+
+  return keys
+}
+
+function getInspectorNodeBucket(item, nodeType, nodeId) {
+  const definition = INSPECTOR_NODE_DEFINITIONS[nodeType]
+  if (!definition) return null
+  const rawState = item[definition.stateKey]?.[nodeId]
+  return definition.stateMode === 'shared-bucket' ? rawState?.shared : rawState
+}
+
+function resolveBoundControls(item, parentEntry, childEntry, nodeType, nodeId, node = {}, section) {
+  const bucket = getInspectorNodeBucket(item, nodeType, nodeId)
+  return listComposableBindings(parentEntry, nodeId, node, childEntry)[section]
+    .map(({ childKey, parentKey, childControl, parentControl }) => {
+      return {
+        childKey,
+        parentKey,
+        ctrl: parentControl || childControl,
+        value: section === 'variants'
+          ? bucket?.variants?.[childKey] ?? item.params?.[parentKey]
+          : bucket?.content?.[childKey] ?? item.params?.[parentKey]
+      }
+    })
+    .filter(Boolean)
+}
+
+function renderInspectorDrawer(item, parentEntry, nodeType, nodeId, node, label, childEntry, scopeId, emptyLabel) {
+  const definition = INSPECTOR_NODE_DEFINITIONS[nodeType]
+  if (!childEntry || !definition) return ''
+  const variantControls = resolveBoundControls(item, parentEntry, childEntry, nodeType, nodeId, node, 'variants')
+  const contentControls = resolveBoundControls(item, parentEntry, childEntry, nodeType, nodeId, node, 'content')
+  if (!variantControls.length && !contentControls.length) {
+    return `
+      <details class="ds-inspector-group">
+        <summary class="ds-inspector-group__title">${escapeHtml(label)}</summary>
+        <p class="ds-muted">${escapeHtml(emptyLabel)}</p>
+      </details>
+    `
+  }
+
+  return `
+    <details class="ds-inspector-group">
+      <summary class="ds-inspector-group__title">${escapeHtml(label)} · ${escapeHtml(childEntry.name || childEntry.id)}</summary>
+      ${variantControls.length ? `<div class="ds-inspector-group"><h4 class="ds-inspector-group__title">Variantes</h4>${variantControls.map(({ parentKey, ctrl, childKey, value }) => renderInspectorControl(item, parentKey, ctrl, {
+        scope: scopeId,
+        label: ctrl.label || childKey,
+        value,
+        actionName: definition.actionName,
+        [definition.idAttr]: nodeId,
+        dataSection: 'variants',
+        dataChildKey: childKey
+      })).join('')}</div>` : ''}
+      ${contentControls.length ? `<div class="ds-inspector-group"><h4 class="ds-inspector-group__title">Contenu</h4>${contentControls.map(({ parentKey, ctrl, childKey, value }) => renderInspectorControl(item, parentKey, ctrl, {
+        scope: scopeId,
+        label: ctrl.label || childKey,
+        value,
+        actionName: definition.actionName,
+        [definition.idAttr]: nodeId,
+        dataSection: 'content',
+        dataChildKey: childKey
+      })).join('')}</div>` : ''}
+      ${nodeType === 'layoutGroup' && Array.isArray(node.children) && node.children.length ? `<p class="ds-muted">Enfants : ${node.children.map(childId => escapeHtml(childId)).join(', ')}</p>` : ''}
+    </details>
+  `
 }
 
 function renderInspector() {
@@ -977,23 +1339,34 @@ function renderInspector() {
   }
 
   const entry = getEntryById(item.ref, item.kind)
-  if (!entry) return ''
-  const suggestedTokens = getTokenSummaryForEntry(entry)
-
-  const renderControl = (key, ctrl) => {
-    const value = item.params[key]
-    const inputId = `ds-field-${item.id}-${key}`
-    if (ctrl.type === 'select') {
-      return `<label class="ds-field" for="${inputId}"><span class="ds-field__label">${escapeHtml(ctrl.label)}</span><select class="ds-field__select" id="${inputId}" data-action="param-change" data-item-id="${item.id}" data-key="${key}">${(ctrl.options || []).map(option => `<option value="${escapeAttr(option)}"${String(option) === String(value) ? ' selected' : ''}>${escapeHtml(option)}</option>`).join('')}</select></label>`
-    }
-    if (ctrl.type === 'checkbox') {
-      return `<label class="ds-field__checkbox"><input type="checkbox" ${value ? 'checked' : ''} data-action="param-change" data-item-id="${item.id}" data-key="${key}"><span>${escapeHtml(ctrl.label)}</span></label>`
-    }
-    return `<label class="ds-field" for="${inputId}"><span class="ds-field__label">${escapeHtml(ctrl.label)}</span><input class="ds-field__input" id="${inputId}" type="text" value="${escapeAttr(value ?? '')}" data-action="param-change" data-item-id="${item.id}" data-key="${key}"></label>`
+  if (!entry) {
+    return `
+      <aside class="ds-panel">
+        <div class="ds-panel__header"><h2 class="ds-panel__title">Inspector</h2><p class="ds-panel__subtitle">Référence introuvable</p></div>
+        <div class="ds-panel__body">
+          <div class="ds-inspector-group">
+            <h3 class="ds-inspector-group__title">Item stale</h3>
+            <p class="ds-muted">Cette scène référence un item absent du registry courant.</p>
+            <p class="ds-muted">Kind : ${escapeHtml(item.kind || 'unknown')}</p>
+            <p class="ds-muted">Ref : ${escapeHtml(item.ref || 'unknown')}</p>
+            <p class="ds-muted">Position : ${item.x}px × ${item.y}px</p>
+            <p class="ds-muted">Format : ${item.width}px × ${item.height}px</p>
+          </div>
+          ${renderDiffPanel()}
+        </div>
+      </aside>
+    `
   }
+  const suggestedTokens = getTokenSummaryForEntry(entry)
+  const nestedParentKeys = collectNestedParentKeys(entry)
 
-  const variants = Object.entries(entry.variants || {})
-  const content = Object.entries(entry.content || {})
+  const variants = Object.entries(entry.variants || {}).filter(([key]) => !nestedParentKeys.variants.has(key))
+  const content = Object.entries(entry.content || {}).filter(([key]) => !nestedParentKeys.content.has(key))
+  const parts = Object.entries(entry.parts || {})
+  const collections = Object.entries(entry.collections || {})
+  const families = Object.entries(entry.families || {})
+  const instances = Object.entries(entry.instances || {})
+  const layoutGroups = Object.entries(entry.layoutGroups || {})
 
   return `
     <aside class="ds-panel">
@@ -1001,13 +1374,16 @@ function renderInspector() {
       <div class="ds-panel__body">
         <div class="ds-inspector-group">
           <h3 class="ds-inspector-group__title">Instance</h3>
-          <label class="ds-field"><span class="ds-field__label">Viewport</span><select class="ds-field__select" data-action="item-viewport" data-item-id="${item.id}">${Object.entries(VIEWPORTS).map(([key, vp]) => `<option value="${key}"${key === (item.viewport || 'desktop') ? ' selected' : ''}>${escapeHtml(vp.label)}</option>`).join('')}</select></label>
-          <label class="ds-field"><span class="ds-field__label">Largeur</span><input class="ds-field__input" type="number" value="${item.width}" data-action="item-prop" data-item-id="${item.id}" data-key="width"></label>
-          <label class="ds-field"><span class="ds-field__label">Hauteur</span><input class="ds-field__input" type="number" value="${item.height}" data-action="item-prop" data-item-id="${item.id}" data-key="height"></label>
+          <label class="ds-field"><span class="ds-field__label">Viewport</span><select class="ds-field__select" data-action="item-viewport" data-item-id="${item.id}">${Object.entries(getViewportDefinitions()).map(([key, vp]) => `<option value="${key}"${key === (item.viewport || 'desktop') ? ' selected' : ''}>${escapeHtml(vp.label)} · ${vp.breakpointValue} · ${escapeHtml(vp.breakpoint || '')}</option>`).join('')}</select></label>
+          <p class="ds-muted">Format : ${item.width}px × ${item.height}px</p>
           <p class="ds-muted">Position : ${item.x}px × ${item.y}px</p>
         </div>
-        ${variants.length ? `<div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Variantes</h3>${variants.map(([key, ctrl]) => renderControl(key, ctrl)).join('')}</div>` : ''}
-        ${content.length ? `<div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Contenu</h3>${content.map(([key, ctrl]) => renderControl(key, ctrl)).join('')}</div>` : ''}
+        ${(variants.length || content.length) ? `<div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Props</h3>${variants.map(([key, ctrl]) => renderInspectorControl(item, key, ctrl)).join('')}${content.map(([key, ctrl]) => renderInspectorControl(item, key, ctrl)).join('')}</div>` : ''}
+        ${parts.length ? `<div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Sous-composants</h3>${parts.map(([partKey, part]) => renderInspectorDrawer(item, entry, 'part', partKey, part, part.label || partKey, getEntryById(part.component, 'component'), `part-${partKey}`, 'Aucun champ editable mappe sur cette part.')).join('')}</div>` : ''}
+        ${collections.length ? `<div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Collections</h3>${collections.map(([collectionKey, collection]) => renderInspectorDrawer(item, entry, 'collection', collectionKey, collection, collection.label || collectionKey, getEntryById(collection.itemComponent, 'component'), `collection-${collectionKey}`, 'Aucun champ bulk mappe sur cette collection.')).join('')}</div>` : ''}
+        ${families.length ? `<div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Familles</h3>${families.map(([familyKey, family]) => renderInspectorDrawer(item, entry, 'family', familyKey, family, family.label || familyKey, getEntryById(family.component, 'component'), `family-${familyKey}`, 'Aucun champ partage mappe sur cette famille.')).join('')}</div>` : ''}
+        ${instances.length ? `<div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Instances</h3>${instances.map(([instanceKey, instance]) => renderInspectorDrawer(item, entry, 'instance', instanceKey, instance, instance.label || instanceKey, getEntryById(instance.component, 'component'), `instance-${instanceKey}`, 'Aucun champ editable mappe sur cette instance.')).join('')}</div>` : ''}
+        ${layoutGroups.length ? `<div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Layout</h3>${layoutGroups.map(([groupKey, group]) => renderInspectorDrawer(item, entry, 'layoutGroup', groupKey, group, group.label || groupKey, getEntryById(group.component, 'component'), `layout-group-${groupKey}`, 'Aucun champ de layout mappe sur ce groupe.')).join('')}</div>` : ''}
         <div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Tokens suggérés</h3><div class="ds-token-list">${suggestedTokens.map(token => `<div class="ds-token"><div class="ds-token__top"><div class="ds-token__name">${escapeHtml(token.scssVar)}</div><span class="ds-badge">${escapeHtml(token.category)}</span></div><div class="ds-token__value">${escapeHtml(token.value)}</div></div>`).join('') || '<p class="ds-muted">Aucun token suggéré.</p>'}</div></div>
         ${renderDiffPanel()}
       </div>
@@ -1018,20 +1394,22 @@ function renderInspector() {
 function renderTopbar() {
   const { scene, history, historyIndex, sceneFiles, activeSceneFile } = getState()
   const agent = getAgentState()
+  const viewport = getViewportConfig(scene.viewport || 'desktop')
+  const showSceneSelector = (sceneFiles || []).length > 1
+  const zoomPercent = Math.round(getState().zoom * 100)
   return `
     <header class="ds-topbar">
       <div>
         <div class="ds-topbar__title">Design Surface</div>
-        <div class="ds-topbar__meta">${escapeHtml(scene.name)} · ${scene.items.length} item(s) · ${(scene.notes || []).length} note(s) · viewport ${escapeHtml(scene.viewport || 'desktop')}</div>
+        <div class="ds-topbar__meta">${escapeHtml(scene.name)} · ${scene.items.length} item(s) · ${(scene.notes || []).length} note(s) · viewport ${escapeHtml(viewport.label)} (${escapeHtml(viewport.breakpointValue || '')}, ${escapeHtml(viewport.breakpoint || '')})</div>
       </div>
       <div class="ds-topbar__actions">
-        <button class="ds-btn ${agent.navigatorOpen ? 'ds-btn--active' : ''}" data-action="toggle-navigator">Navigator</button>
-        <select class="ds-field__select" data-action="scene-file" style="width: 180px;">
-          ${(sceneFiles || []).map(file => `<option value="${escapeAttr(file.file)}"${file.file === activeSceneFile ? ' selected' : ''}>${escapeHtml(file.name)}</option>`).join('')}
-        </select>
-        <select class="ds-field__select" data-action="scene-viewport" style="width: 140px;">
-          ${Object.entries(VIEWPORTS).map(([key, vp]) => `<option value="${key}"${key === (scene.viewport || 'desktop') ? ' selected' : ''}>${escapeHtml(vp.label)}</option>`).join('')}
-        </select>
+        ${showSceneSelector ? `<select class="ds-field__select" data-action="scene-file" style="width: 180px;">${(sceneFiles || []).map(file => `<option value="${escapeAttr(file.file)}"${file.file === activeSceneFile ? ' selected' : ''}>${escapeHtml(file.name)}</option>`).join('')}</select>` : ''}
+        <div class="ds-zoom-controls">
+          <button class="ds-btn" data-action="zoom-out" title="Zoom arrière">−</button>
+          <button class="ds-btn" data-action="zoom-reset" title="Réinitialiser le zoom">${zoomPercent}%</button>
+          <button class="ds-btn" data-action="zoom-in" title="Zoom avant">+</button>
+        </div>
         <div class="ds-history">
           <button class="ds-btn" data-action="undo" ${historyIndex <= 0 ? 'disabled' : ''}>Undo</button>
           <button class="ds-btn" data-action="redo" ${historyIndex >= history.length - 1 ? 'disabled' : ''}>Redo</button>
@@ -1045,9 +1423,8 @@ function renderTopbar() {
 
 function renderLayout() {
   const agent = getAgentState()
-  const navigator = agent.navigatorOpen ? renderLibrary() : ''
-  const content = `${navigator}${renderCanvas()}${renderInspectorWrapped()}${renderAgentPanel({ selectionHint: getAgentSelectionHint() })}`
-  return `<div class="ds-app">${renderTopbar()}<div class="ds-layout${agent.open ? ' ds-layout--with-agent' : ''}${!agent.navigatorOpen ? ' ds-layout--no-nav' : ''}">${content}</div></div>`
+  const content = `${renderInspectorWrapped()}${renderCanvas()}${renderAgentPanel({ selectionHint: getAgentSelectionHint() })}`
+  return `<div class="ds-app">${renderTopbar()}<div class="ds-layout ds-layout--no-nav${agent.open ? ' ds-layout--with-agent' : ''}">${content}</div></div>`
 }
 
 function setFramesInteractive(interactive) {
@@ -1077,9 +1454,15 @@ function unbindGlobalPointerCleanup() {
 function handleGlobalPointerEnd(event) {
   if (dragState && (!event || dragPointerId === null || event.pointerId === dragPointerId)) stopDrag()
   if (resizeState && (!event || resizePointerId === null || event.pointerId === resizePointerId)) stopResize()
+  if (panState && (!event || panState.pointerId === null || event.pointerId === panState.pointerId)) stopPan()
 }
 
 function startDrag(kind, targetId, event) {
+  if (spacePanPressed) {
+    startPan(event)
+    return
+  }
+
   const state = getState()
   const scene = getRenderedScene()
   const collection = kind === 'note' ? (scene.notes || []) : scene.items
@@ -1113,22 +1496,131 @@ function snapToGrid(value, size = 24) {
   return Math.round(value / size) * size
 }
 
+function setSpacePanPressed(nextValue) {
+  spacePanPressed = Boolean(nextValue)
+  rootEl?.querySelector('.ds-canvas-wrap')?.classList.toggle('ds-canvas-wrap--space-pan', spacePanPressed)
+}
+
+function getZoomFactor() {
+  return getState().zoom || 1
+}
+
+function setCanvasZoom(nextZoom) {
+  patchState({ zoom: Math.min(Math.max(Number(nextZoom) || 1, 0.5), 2) })
+}
+
+function shiftZoom(step) {
+  const current = getZoomFactor()
+  setCanvasZoom(Math.round((current + step) * 100) / 100)
+}
+
+function updateSceneLaneWidth(laneKey, width) {
+  const currentScene = getRenderedScene()
+  const previousLayout = buildLaneLayout(currentScene)
+  const nextScene = {
+    ...currentScene,
+    laneWidths: {
+      ...(currentScene.laneWidths || {}),
+      [laneKey]: width
+    }
+  }
+  const nextLayout = buildLaneLayout(nextScene)
+
+  setState(prev => ({
+    ...prev,
+    scene: {
+      ...prev.scene,
+      laneWidths: {
+        ...(prev.scene.laneWidths || {}),
+        [laneKey]: width
+      },
+      items: prev.scene.items.map(item => {
+        const entry = getEntryById(item.ref, item.kind)
+        if (!entry) return item
+        const key = getLaneConfig(entry).key
+        if (key === laneKey) return item
+
+        const prevLane = previousLayout.get(key)
+        const nextLane = nextLayout.get(key)
+        if (!prevLane || !nextLane) return item
+        const shiftX = nextLane.x - prevLane.x
+        if (!shiftX) return item
+
+        return {
+          ...item,
+          x: item.x + shiftX
+        }
+      })
+    }
+  }))
+  commitSceneHistory()
+}
+
+function maybeExpandLaneForItem(itemId, nextX, itemWidth) {
+  const scene = getRenderedScene()
+  const item = scene.items.find(candidate => candidate.id === itemId)
+  if (!item) return
+  const entry = getEntryById(item.ref, item.kind)
+  if (!entry) return
+
+  const laneKey = getLaneConfig(entry).key
+  const lane = buildLaneLayout(scene).get(laneKey)
+  if (!lane) return
+
+  const requiredWidth = Math.max(lane.width, (nextX - lane.x) + itemWidth + 32)
+  if (requiredWidth > lane.width) {
+    updateSceneLaneWidth(laneKey, snapToGrid(requiredWidth))
+  }
+}
+
 function clampItemToLane(item, x, y) {
   const entry = getEntryById(item.ref, item.kind)
   if (!entry) return { x, y }
   const lane = buildLaneLayout(getRenderedScene()).get(getLaneConfig(entry).key) || getLaneConfig(entry)
-  const maxX = lane.x + lane.width - item.width
   const maxY = lane.y + lane.height - Math.min(item.height, lane.height)
   return {
-    x: Math.min(Math.max(x, lane.x), Math.max(lane.x, maxX)),
+    x: Math.max(x, lane.x),
     y: Math.min(Math.max(y, lane.contentY), Math.max(lane.contentY, maxY))
   }
 }
 
+function startPan(event) {
+  const canvasWrap = rootEl?.querySelector('.ds-canvas-wrap')
+  if (!canvasWrap) return
+
+  event.preventDefault()
+  event.stopPropagation()
+
+  panState = {
+    pointerId: event.pointerId ?? null,
+    startMouseX: event.clientX,
+    startMouseY: event.clientY,
+    startScrollLeft: canvasWrap.scrollLeft,
+    startScrollTop: canvasWrap.scrollTop,
+    targetEl: canvasWrap
+  }
+
+  setFramesInteractive(false)
+  document.body.style.cursor = 'grab'
+  canvasWrap.classList.add('ds-canvas-wrap--panning')
+  try {
+    event.currentTarget?.setPointerCapture?.(event.pointerId)
+  } catch {}
+  bindGlobalPointerCleanup()
+}
+
 function onDragMove(event) {
+  if (panState?.targetEl) {
+    const deltaX = event.clientX - panState.startMouseX
+    const deltaY = event.clientY - panState.startMouseY
+    panState.targetEl.scrollLeft = panState.startScrollLeft - deltaX
+    panState.targetEl.scrollTop = panState.startScrollTop - deltaY
+    return
+  }
   if (!dragState?.targetEl) return
-  const deltaX = event.clientX - dragState.startMouseX
-  const deltaY = event.clientY - dragState.startMouseY
+  const zoom = getZoomFactor()
+  const deltaX = (event.clientX - dragState.startMouseX) / zoom
+  const deltaY = (event.clientY - dragState.startMouseY) / zoom
   let x = Math.max(0, snapToGrid(dragState.startX + deltaX))
   let y = Math.max(0, snapToGrid(dragState.startY + deltaY))
 
@@ -1153,8 +1645,13 @@ function stopDrag() {
       x: dragState.lastX ?? dragState.startX,
       y: dragState.lastY ?? dragState.startY
     }
-    if (dragState.kind === 'note') updateNote(dragState.targetId, { ...patch, targetId: null })
-    else updateItem(dragState.targetId, patch)
+    if (dragState.kind === 'note') {
+      updateNote(dragState.targetId, { ...patch, targetId: null })
+    } else {
+      updateItem(dragState.targetId, patch)
+      const item = getRenderedScene().items.find(candidate => candidate.id === dragState.targetId)
+      if (item) maybeExpandLaneForItem(item.id, patch.x, item.width)
+    }
   }
   setPersistMuted(false)
   dragState = null
@@ -1162,9 +1659,41 @@ function stopDrag() {
   if (!resizeState) setFramesInteractive(true)
   document.body.style.cursor = resizeState ? 'nwse-resize' : ''
   if (!resizeState) unbindGlobalPointerCleanup()
+  render()
+}
+
+function stopPan() {
+  if (!panState) return
+  panState.targetEl?.classList.remove('ds-canvas-wrap--panning')
+  panState = null
+  suppressNextClickUntil = Date.now() + 150
+  if (!dragState && !resizeState) setFramesInteractive(true)
+  document.body.style.cursor = ''
+  if (!dragState && !resizeState) unbindGlobalPointerCleanup()
+}
+
+function preserveCanvasScroll(left, top) {
+  const canvasWrap = rootEl?.querySelector('.ds-canvas-wrap')
+  if (!canvasWrap) return
+
+  const apply = () => {
+    canvasWrap.scrollLeft = left
+    canvasWrap.scrollTop = top
+  }
+
+  apply()
+  requestAnimationFrame(() => {
+    apply()
+    requestAnimationFrame(apply)
+  })
 }
 
 function startResize(itemId, event) {
+  if (spacePanPressed) {
+    startPan(event)
+    return
+  }
+
   const item = getRenderedScene().items.find(candidate => candidate.id === itemId)
   if (!item) return
 
@@ -1187,10 +1716,44 @@ function startResize(itemId, event) {
   bindGlobalPointerCleanup()
 }
 
+function startLaneResize(laneKey, event) {
+  if (spacePanPressed) {
+    startPan(event)
+    return
+  }
+
+  const lane = buildLaneLayout(getRenderedScene()).get(laneKey)
+  if (!lane) return
+
+  resizePointerId = event.pointerId ?? null
+  resizeState = {
+    kind: 'lane',
+    laneKey,
+    startMouseX: event.clientX,
+    startWidth: lane.width,
+    targetEl: rootEl?.querySelector(`[data-lane-resize-handle="${laneKey}"]`)?.closest('.ds-lane')
+  }
+
+  document.body.style.cursor = 'ew-resize'
+  try {
+    event.currentTarget?.setPointerCapture?.(event.pointerId)
+  } catch {}
+  bindGlobalPointerCleanup()
+}
+
 function onResizeMove(event) {
   if (!resizeState?.targetEl) return
-  const deltaX = event.clientX - resizeState.startMouseX
-  const deltaY = event.clientY - resizeState.startMouseY
+  const zoom = getZoomFactor()
+  const deltaX = (event.clientX - resizeState.startMouseX) / zoom
+
+  if (resizeState.kind === 'lane') {
+    const width = Math.max(220, snapToGrid(resizeState.startWidth + deltaX))
+    resizeState.lastWidth = width
+    resizeState.targetEl.style.width = `${width}px`
+    return
+  }
+
+  const deltaY = (event.clientY - resizeState.startMouseY) / zoom
   const width = Math.max(220, Math.round(resizeState.startWidth + deltaX))
   const height = Math.max(140, Math.round(resizeState.startHeight + deltaY))
   resizeState.lastWidth = width
@@ -1201,16 +1764,21 @@ function onResizeMove(event) {
 
 function stopResize() {
   if (resizeState) {
-    updateItem(resizeState.itemId, {
-      width: resizeState.lastWidth ?? resizeState.startWidth,
-      height: resizeState.lastHeight ?? resizeState.startHeight
-    })
+    if (resizeState.kind === 'lane') {
+      updateSceneLaneWidth(resizeState.laneKey, resizeState.lastWidth ?? resizeState.startWidth)
+    } else {
+      updateItem(resizeState.itemId, {
+        width: resizeState.lastWidth ?? resizeState.startWidth,
+        height: resizeState.lastHeight ?? resizeState.startHeight
+      })
+    }
   }
   resizeState = null
   resizePointerId = null
   if (!dragState) setFramesInteractive(true)
   document.body.style.cursor = dragState ? 'grabbing' : ''
   if (!dragState) unbindGlobalPointerCleanup()
+  render()
 }
 
 function bindAgentEvents() {
@@ -1261,7 +1829,20 @@ function bindSelectionDependentEvents() {
     if (!entry) return
     const viewport = select.value
     const dimensions = getItemDimensions(entry, viewport)
-    updateItem(select.dataset.itemId, { viewport, width: dimensions.width, height: dimensions.height })
+    setState(prev => ({
+      ...prev,
+      scene: {
+        ...prev.scene,
+        viewport,
+        items: prev.scene.items.map(candidate => candidate.id === select.dataset.itemId ? {
+          ...candidate,
+          viewport,
+          width: dimensions.width,
+          height: dimensions.height
+        } : candidate)
+      }
+    }))
+    commitSceneHistory()
   }))
   rootEl.querySelectorAll('[data-action="item-prop"]').forEach(input => input.addEventListener('input', () => {
     const value = Number(input.value)
@@ -1275,25 +1856,62 @@ function bindSelectionDependentEvents() {
     input.addEventListener(input.tagName === 'SELECT' ? 'change' : 'input', handler)
     if (input.type === 'checkbox') input.addEventListener('change', handler)
   })
+  rootEl.querySelectorAll('[data-action="part-param-change"]').forEach(input => {
+    const handler = () => {
+      const value = input.type === 'checkbox' ? input.checked : input.value
+      updatePartParams(input.dataset.itemId, input.dataset.partId, { [input.dataset.childKey]: value })
+    }
+    input.addEventListener(input.tagName === 'SELECT' ? 'change' : 'input', handler)
+    if (input.type === 'checkbox') input.addEventListener('change', handler)
+  })
+  rootEl.querySelectorAll('[data-action="collection-param-change"]').forEach(input => {
+    const handler = () => {
+      const value = input.type === 'checkbox' ? input.checked : input.value
+      updateCollectionParams(input.dataset.itemId, input.dataset.collectionId, { [input.dataset.childKey]: value })
+    }
+    input.addEventListener(input.tagName === 'SELECT' ? 'change' : 'input', handler)
+    if (input.type === 'checkbox') input.addEventListener('change', handler)
+  })
+  rootEl.querySelectorAll('[data-action="family-param-change"]').forEach(input => {
+    const handler = () => {
+      const value = input.type === 'checkbox' ? input.checked : input.value
+      updateFamilyParams(input.dataset.itemId, input.dataset.familyId, { [input.dataset.childKey]: value })
+    }
+    input.addEventListener(input.tagName === 'SELECT' ? 'change' : 'input', handler)
+    if (input.type === 'checkbox') input.addEventListener('change', handler)
+  })
+  rootEl.querySelectorAll('[data-action="instance-param-change"]').forEach(input => {
+    const handler = () => {
+      const value = input.type === 'checkbox' ? input.checked : input.value
+      updateInstanceParams(input.dataset.itemId, input.dataset.instanceId, { [input.dataset.childKey]: value })
+    }
+    input.addEventListener(input.tagName === 'SELECT' ? 'change' : 'input', handler)
+    if (input.type === 'checkbox') input.addEventListener('change', handler)
+  })
+  rootEl.querySelectorAll('[data-action="layout-group-param-change"]').forEach(input => {
+    const handler = () => {
+      const value = input.type === 'checkbox' ? input.checked : input.value
+      updateLayoutGroupParams(input.dataset.itemId, input.dataset.layoutGroupId, { [input.dataset.childKey]: value })
+    }
+    input.addEventListener(input.tagName === 'SELECT' ? 'change' : 'input', handler)
+    if (input.type === 'checkbox') input.addEventListener('change', handler)
+  })
 }
 
 function bindEvents() {
-  rootEl.querySelector('#ds-search')?.addEventListener('input', event => setQuery(event.target.value))
-  rootEl.querySelectorAll('[data-action="focus-item"]').forEach(button => button.addEventListener('click', () => {
-    const { scene } = getState()
-    const item = (scene.items || []).find(candidate => candidate.ref === button.dataset.id && candidate.kind === button.dataset.kind)
-    if (!item) return
-    selectItem(item.id)
-    const canvas = rootEl.querySelector('.ds-canvas-wrap')
-    const top = Math.max(0, item.y - 120)
-    const left = Math.max(0, item.x - 120)
-    canvas?.scrollTo({ top, left, behavior: 'smooth' })
-  }))
-  rootEl.querySelectorAll('[data-action="add-note"]').forEach(button => button.addEventListener('click', () => addNote()))
+  rootEl.addEventListener('click', event => {
+    if (Date.now() <= suppressNextClickUntil) {
+      event.preventDefault()
+      event.stopPropagation()
+    }
+  }, true)
   rootEl.querySelectorAll('[data-action="add-note-to-item"]').forEach(button => button.addEventListener('click', event => {
     event.stopPropagation()
     addNote(button.dataset.itemId)
   }))
+  rootEl.querySelectorAll('.ds-item__toolbar-actions button, .ds-item__toolbar-actions a').forEach(control => {
+    control.addEventListener('pointerdown', event => event.stopPropagation())
+  })
   rootEl.querySelectorAll('.ds-item').forEach(element => element.addEventListener('click', () => { if (element.dataset.itemId) selectItem(element.dataset.itemId) }))
   rootEl.querySelectorAll('.ds-note').forEach(element => element.addEventListener('click', () => { if (element.dataset.noteId) selectItem(element.dataset.noteId) }))
   rootEl.querySelectorAll('[data-action="toggle-note"]').forEach(button => button.addEventListener('click', event => {
@@ -1310,16 +1928,77 @@ function bindEvents() {
   rootEl.querySelectorAll('[data-drag-handle]').forEach(handle => handle.addEventListener('pointerdown', event => { event.preventDefault(); startDrag('item', handle.dataset.dragHandle, event) }))
   rootEl.querySelectorAll('[data-note-drag-handle]').forEach(handle => handle.addEventListener('pointerdown', event => { event.preventDefault(); startDrag('note', handle.dataset.noteDragHandle, event) }))
   rootEl.querySelectorAll('[data-resize-handle]').forEach(handle => handle.addEventListener('pointerdown', event => { event.preventDefault(); event.stopPropagation(); startResize(handle.dataset.resizeHandle, event) }))
+  rootEl.querySelectorAll('[data-lane-resize-handle]').forEach(handle => handle.addEventListener('pointerdown', event => { event.preventDefault(); event.stopPropagation(); startLaneResize(handle.dataset.laneResizeHandle, event) }))
   bindSelectionDependentEvents()
-  rootEl.querySelector('[data-action="scene-viewport"]')?.addEventListener('change', event => setSceneViewport(event.target.value))
   rootEl.querySelector('[data-action="scene-file"]')?.addEventListener('change', event => loadSceneFromFile(event.target.value))
+  rootEl.querySelector('[data-action="zoom-out"]')?.addEventListener('click', () => shiftZoom(-0.1))
+  rootEl.querySelector('[data-action="zoom-in"]')?.addEventListener('click', () => shiftZoom(0.1))
+  rootEl.querySelector('[data-action="zoom-reset"]')?.addEventListener('click', () => setCanvasZoom(1))
   rootEl.querySelector('[data-action="undo"]')?.addEventListener('click', undoHistory)
   rootEl.querySelector('[data-action="redo"]')?.addEventListener('click', redoHistory)
   rootEl.querySelector('[data-action="organize-canvas"]')?.addEventListener('click', organizeCanvas)
   rootEl.querySelector('[data-action="toggle-agent"]')?.addEventListener('click', toggleAgentPanel)
-  rootEl.querySelector('[data-action="toggle-navigator"]')?.addEventListener('click', toggleNavigatorPanel)
   bindTopbarMenus()
   bindAgentEvents()
+  bindCanvasZoomInteractions()
+  bindCanvasPanInteractions()
+}
+
+function bindCanvasZoomInteractions() {
+  canvasWheelAbortController?.abort()
+  canvasWheelAbortController = new AbortController()
+
+  rootEl.querySelector('.ds-canvas-wrap')?.addEventListener('wheel', event => {
+    if (!event.ctrlKey && !event.metaKey) return
+    event.preventDefault()
+    shiftZoom(event.deltaY > 0 ? -0.1 : 0.1)
+  }, { passive: false, signal: canvasWheelAbortController.signal })
+}
+
+function bindCanvasPanInteractions() {
+  canvasPanAbortController?.abort()
+  keyboardAbortController?.abort()
+  canvasPanAbortController = new AbortController()
+  keyboardAbortController = new AbortController()
+
+  window.addEventListener('keydown', event => {
+    if (event.repeat) return
+    if (event.code !== 'Space') return
+    const targetTag = event.target?.tagName
+    const isEditable = event.target?.isContentEditable
+    if (targetTag === 'INPUT' || targetTag === 'TEXTAREA' || targetTag === 'SELECT' || isEditable) return
+    event.preventDefault()
+    event.stopPropagation()
+    setSpacePanPressed(true)
+  }, { capture: true, signal: keyboardAbortController.signal })
+
+  window.addEventListener('keypress', event => {
+    if (event.code !== 'Space') return
+    event.preventDefault()
+    event.stopPropagation()
+  }, { capture: true, signal: keyboardAbortController.signal })
+
+  window.addEventListener('keyup', event => {
+    if (event.code !== 'Space') return
+    const canvasWrap = rootEl?.querySelector('.ds-canvas-wrap')
+    const scrollLeft = canvasWrap?.scrollLeft ?? 0
+    const scrollTop = canvasWrap?.scrollTop ?? 0
+    event.preventDefault()
+    event.stopPropagation()
+    setSpacePanPressed(false)
+    if (panState) stopPan()
+    preserveCanvasScroll(scrollLeft, scrollTop)
+  }, { capture: true, signal: keyboardAbortController.signal })
+
+  window.addEventListener('blur', () => {
+    setSpacePanPressed(false)
+    if (panState) stopPan()
+  }, { signal: keyboardAbortController.signal })
+
+  rootEl.querySelector('.ds-canvas-wrap')?.addEventListener('pointerdown', event => {
+    if (!spacePanPressed) return
+    startPan(event)
+  }, { signal: canvasPanAbortController.signal })
 }
 
 function buildElementRestoreSelector(element) {
@@ -1345,6 +2024,7 @@ function buildElementRestoreSelector(element) {
 function captureRenderState() {
   const activeElement = document.activeElement
   const selector = buildElementRestoreSelector(activeElement)
+  const canvasWrap = rootEl.querySelector('.ds-canvas-wrap')
   const activeControl = selector
     ? {
         selector,
@@ -1367,6 +2047,12 @@ function captureRenderState() {
 
   return {
     activeControl,
+    canvasScroll: canvasWrap
+      ? {
+          left: canvasWrap.scrollLeft,
+          top: canvasWrap.scrollTop
+        }
+      : null,
     frames: new Map(frameEntries.map(entry => [entry.itemId, entry]))
   }
 }
@@ -1398,11 +2084,24 @@ function restoreActiveControl(renderState) {
     nextElement.value = control.value
   }
 
-  nextElement.focus()
+  try {
+    nextElement.focus({ preventScroll: true })
+  } catch {
+    nextElement.focus()
+  }
 
   if (typeof nextElement.setSelectionRange === 'function' && control.selectionStart !== null && control.selectionEnd !== null) {
     nextElement.setSelectionRange(control.selectionStart, control.selectionEnd)
   }
+}
+
+function restoreCanvasScroll(renderState) {
+  const canvasScroll = renderState?.canvasScroll
+  const canvasWrap = rootEl.querySelector('.ds-canvas-wrap')
+  if (!canvasWrap || !canvasScroll) return
+
+  canvasWrap.scrollLeft = canvasScroll.left
+  canvasWrap.scrollTop = canvasScroll.top
 }
 
 function render() {
@@ -1411,6 +2110,7 @@ function render() {
   rootEl.innerHTML = renderLayout()
   restorePersistentFrames(renderState)
   bindEvents()
+  restoreCanvasScroll(renderState)
   restoreActiveControl(renderState)
 }
 
@@ -1456,7 +2156,7 @@ export async function renderApp(root) {
     subscribeAgentState(() => render())
     await loadSceneFromFile('default.scene.json', { keepWorkingScene: hasWorkingScene() })
     if (!hasWorkingScene()) {
-      const hydrated = hydrateSceneWithRegistry(getState().scene)
+      const hydrated = hydrateSceneWithRegistry(getState().scene, { preserveExistingLayout: false })
       replaceWorkingScene(hydrated)
     }
     render()

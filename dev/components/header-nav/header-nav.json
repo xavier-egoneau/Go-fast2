@@ -10,12 +10,6 @@
       "default": "light",
       "options": ["light", "dark"]
     },
-    "ctaVariant": {
-      "label": "Variante du CTA",
-      "type": "select",
-      "default": "auto",
-      "options": ["auto", "primary", "secondary", "outline", "ghost", "danger"]
-    },
     "sticky": {
       "label": "Sticky",
       "type": "checkbox",
@@ -27,11 +21,25 @@
       "label": "Logo (texte)",
       "type": "text",
       "default": "MonSite"
-    },
-    "ctaText": {
-      "label": "Texte du bouton",
-      "type": "text",
-      "default": "Commencer"
+    }
+  },
+  "parts": {
+    "cta": {
+      "label": "CTA",
+      "component": "button",
+      "mode": "single",
+      "autoBind": true,
+      "defaults": {
+        "variants": {
+          "variant": "auto",
+          "size": "sm",
+          "full": false,
+          "disabled": false
+        },
+        "content": {
+          "text": "Commencer"
+        }
+      }
     }
   }
 }

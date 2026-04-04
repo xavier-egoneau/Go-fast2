@@ -1,4 +1,33 @@
 {% set gridCols = gridCols|default('3') %}
+{% set previewHeader = __previewParts.header.params|default({}) %}
+{% set previewFooter = __previewParts.footer.params|default({}) %}
+{% set previewArticles = __previewCollections.articles.shared.params|default({}) %}
+{% set header = {
+  variant: previewHeader.variant|default('light'),
+  sticky: previewHeader.sticky|default(true),
+  logoText: previewHeader.logoText|default('MonSite'),
+  cta: {
+    variant: previewHeader.ctaVariant|default('auto'),
+    size: previewHeader.ctaSize|default('sm'),
+    full: previewHeader.ctaFull|default(false),
+    disabled: previewHeader.ctaDisabled|default(false),
+    text: previewHeader.ctaText|default('Commencer')
+  }
+} %}
+{% set footer = {
+  variant: previewFooter.variant|default('dark'),
+  logoText: previewFooter.logoText|default('MonSite'),
+  tagline: previewFooter.tagline|default('Construisons quelque chose de grand.'),
+  copyright: previewFooter.copyright|default('© 2025 MonSite. Tous droits réservés.')
+} %}
+{% set articlesShared = {
+  variant: previewArticles.variant|default('default'),
+  hasImage: previewArticles.hasImage|default(true),
+  hasCta: previewArticles.hasCta|default(true),
+  cta: {
+    text: previewArticles.ctaText|default('Lire l\'article')
+  }
+} %}
 
 <!DOCTYPE html>
 <html lang="fr">
@@ -11,10 +40,10 @@
 <body>
 
   {% include 'dev/components/header-nav/header-nav.twig' with {
-    variant: 'light',
-    sticky: true,
-    logoText: 'MonSite',
-    ctaText: 'Commencer',
+    variant: header.variant,
+    sticky: header.sticky,
+    logoText: header.logoText,
+    cta: header.cta,
     links: [
       { label: 'Accueil',  href: '#' },
       { label: 'Articles', href: '#', active: true },
@@ -88,15 +117,15 @@
       {% set gridContent %}
         {% for article in articles %}
           {% include 'dev/components/card/card.twig' with {
-            variant: 'default',
+            variant: articlesShared.variant,
             title: article.title,
             text: article.text,
             tag: article.tag,
-            ctaText: article.ctaText,
+            cta: articlesShared.cta,
             imageUrl: article.imageUrl,
             imageAlt: article.imageAlt,
-            hasImage: true,
-            hasCta: true
+            hasImage: articlesShared.hasImage,
+            hasCta: articlesShared.hasCta
           } %}
         {% endfor %}
       {% endset %}
@@ -114,10 +143,10 @@
   </main>
 
   {% include 'dev/components/footer/footer.twig' with {
-    variant: 'dark',
-    logoText: 'MonSite',
-    tagline: 'Construisons quelque chose de grand.',
-    copyright: '© 2025 MonSite. Tous droits réservés.'
+    variant: footer.variant,
+    logoText: footer.logoText,
+    tagline: footer.tagline,
+    copyright: footer.copyright
   } %}
 
 </body>

@@ -46,6 +46,10 @@ export function getTokens() {
   return tokensCache
 }
 
+export function getTokenById(id) {
+  return tokensCache.find(token => token.id === id) || null
+}
+
 export function serializeTokensForAI() {
   return tokensCache.map(token => ({
     id: token.id,

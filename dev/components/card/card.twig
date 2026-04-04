@@ -4,7 +4,14 @@
 {% set hasCta     = hasCta|default(true) %}
 {% set title      = title|default('Titre de la carte') %}
 {% set text       = text|default('Courte description du contenu de la carte.') %}
-{% set ctaText    = ctaText|default('En savoir plus') %}
+{% set previewCta = __previewParts.cta.params|default(cta|default({})) %}
+{% set cta = {
+  variant: previewCta.variant|default('outline'),
+  size: previewCta.size|default('sm'),
+  full: previewCta.full|default(false),
+  disabled: previewCta.disabled|default(false),
+  text: previewCta.text|default('En savoir plus')
+} %}
 {% set imageUrl   = imageUrl|default('https://placehold.co/600x400') %}
 {% set imageAlt   = imageAlt|default('') %}
 {% set tag        = tag|default('') %}
@@ -34,9 +41,11 @@
     {% if hasCta %}
       <div class="card__footer">
         {% include 'dev/components/button/button.twig' with {
-          text: ctaText,
-          variant: 'outline',
-          size: 'sm'
+          text: cta.text,
+          variant: cta.variant,
+          size: cta.size,
+          full: cta.full,
+          disabled: cta.disabled
         } %}
       </div>
     {% endif %}

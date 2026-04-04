@@ -16,6 +16,7 @@
 
 <fieldset
   class="radio-group{% if inline %} radio-group--inline{% endif %}{% if disabled %} radio-group--disabled{% endif %}"
+  data-gf-component="radio"
   {% if hasError %}aria-describedby="{{ errorId }}"{% endif %}
 >
   <legend class="radio-group__legend">

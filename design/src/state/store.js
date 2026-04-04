@@ -4,7 +4,7 @@ function createEmptyScene() {
   return {
     id: 'default-scene',
     name: 'Default scene',
-    version: 1,
+    version: 2,
     viewport: 'desktop',
     notes: [],
     items: []
@@ -16,6 +16,7 @@ function createInitialState() {
     registryLoaded: false,
     tokensLoaded: false,
     query: '',
+    zoom: 1,
     selectedItemId: null,
     history: [],
     historyIndex: -1,
@@ -28,12 +29,14 @@ function createInitialState() {
 
 let state = normalizeState(loadState()) || createInitialState()
 const listeners = new Set()
+let persistMuted = false
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value))
 }
 
 function persist() {
+  if (persistMuted) return
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
 }
 
@@ -48,6 +51,7 @@ function normalizeState(raw) {
   return {
     ...initial,
     ...raw,
+    zoom: Number.isFinite(raw.zoom) ? Math.min(Math.max(raw.zoom, 0.5), 2) : 1,
     history: Array.isArray(raw.history) ? raw.history : [],
     historyIndex: Number.isInteger(raw.historyIndex) ? raw.historyIndex : -1,
     sceneFiles: Array.isArray(raw.sceneFiles) ? raw.sceneFiles : [],
@@ -149,6 +153,10 @@ export function replaceScene(scene) {
 export function resetState() {
   state = createInitialState()
   emit()
+}
+
+export function setPersistMuted(value) {
+  persistMuted = Boolean(value)
 }
 
 export function rehydrateState() {

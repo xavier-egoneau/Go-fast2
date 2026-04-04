@@ -7,7 +7,7 @@
 {% set disabled = disabled|default(false) %}
 {% set size     = size|default('md') %}
 
-<div class="switch switch--{{ size }}{% if disabled %} switch--disabled{% endif %}">
+<div class="switch switch--{{ size }}{% if disabled %} switch--disabled{% endif %}" data-gf-component="switch">
 
   <label class="switch__label" for="{{ id }}">
     <input

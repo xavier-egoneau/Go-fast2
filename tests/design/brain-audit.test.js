@@ -79,9 +79,10 @@ describe('auditBrainOutput', () => {
       summary: 'Set header CTA to outline',
       actions: [
         {
-          type: 'update-params',
+          type: 'update-part-params',
+          partId: 'cta',
           patch: {
-            ctaVariant: 'outline'
+            variant: 'outline'
           }
         }
       ],
@@ -108,14 +109,50 @@ describe('auditBrainOutput', () => {
     expect(result.actions[0].targetId).toBe('item-header-nav')
   })
 
+  it('injects the selected item targetId for part-level actions too', () => {
+    const result = auditBrainOutput({
+      summary: 'Set CTA to secondary',
+      actions: [
+        {
+          type: 'update-part-params',
+          partId: 'cta',
+          patch: {
+            variant: 'secondary'
+          }
+        }
+      ],
+      warnings: [],
+      requiresNewComponent: false,
+      unresolved: []
+    }, {
+      intent: 'Change the header CTA to secondary',
+      context: {
+        selection: {
+          type: 'item',
+          item: {
+            id: 'item-header-nav'
+          }
+        },
+        system: {
+          registry: [
+            { kind: 'component', id: 'header-nav' }
+          ]
+        }
+      }
+    })
+
+    expect(result.actions[0].targetId).toBe('item-header-nav')
+  })
+
   it('infers a likely scene target from intent when selection is missing', () => {
     const result = auditBrainOutput({
       summary: 'Set header CTA to outline',
       actions: [
         {
-          type: 'update-params',
+          type: 'update-part-params',
+          partId: 'cta',
           patch: {
-            ctaVariant: 'outline'
+            variant: 'outline'
           }
         }
       ],

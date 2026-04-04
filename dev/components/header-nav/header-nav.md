@@ -11,8 +11,8 @@ En-tête de page principal. Compose un logo, des liens de navigation et un bouto
 | `variant` | `string` | `'light'` | Thème visuel : `light` ou `dark` |
 | `sticky` | `boolean` | `false` | Position fixe en haut de page si `true` |
 | `logoText` | `string` | `'MonSite'` | Nom affiché dans le logo |
-| `ctaText` | `string` | `'Commencer'` | Texte du bouton d'action |
 | `links` | `array` | *(4 liens exemples)* | Tableau de liens : `{ label, href, active? }` |
+| `cta` | `object` | `{ variant, size, full, disabled, text }` | Configuration du bouton d'action imbriqué |
 
 ## Accessibilité
 
@@ -36,7 +36,9 @@ En-tête de page principal. Compose un logo, des liens de navigation et un bouto
 {% include 'dev/components/header-nav/header-nav.twig' with {
   variant: 'dark',
   logoText: 'MonSite',
-  ctaText: 'Se connecter'
+  cta: {
+    text: 'Se connecter'
+  }
 } %}
 ```
 
@@ -45,7 +47,9 @@ En-tête de page principal. Compose un logo, des liens de navigation et un bouto
 ```twig
 {% include 'dev/components/header-nav/header-nav.twig' with {
   logoText: 'MonSite',
-  ctaText: 'Essai gratuit',
+  cta: {
+    text: 'Essai gratuit'
+  },
   links: [
     { label: 'Accueil',  href: '/',        active: true },
     { label: 'Produits', href: '/produits' },
@@ -60,6 +64,8 @@ En-tête de page principal. Compose un logo, des liens de navigation et un bouto
 ```twig
 {% include 'dev/components/header-nav/header-nav.twig' with {
   sticky: true,
-  ctaText: 'Démarrer'
+  cta: {
+    text: 'Démarrer'
+  }
 } %}
 ```

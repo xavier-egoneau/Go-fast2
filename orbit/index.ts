@@ -1,4 +1,4 @@
-import path from "node:path";
+import path from "path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { BrowserSessionService } from "./services/browserSession.js";

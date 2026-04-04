@@ -14,10 +14,10 @@ Conteneur de contenu structuré. Utiliser pour afficher un élément d'une liste
 | `hasCta` | `boolean` | `true` | Affiche le bouton d'action |
 | `title` | `string` | `'Titre de la carte'` | Titre principal |
 | `text` | `string` | `'Courte description…'` | Texte descriptif |
-| `ctaText` | `string` | `'En savoir plus'` | Texte du bouton |
 | `imageUrl` | `string` | placeholder 600×400 | URL de l'image |
 | `imageAlt` | `string` | `''` | Texte alternatif de l'image (vide = décorative) |
 | `tag` | `string` | `''` | Étiquette catégorie affichée en haut du body |
+| `cta` | `object` | `{ variant, size, full, disabled, text }` | Configuration du bouton imbriqué |
 
 ## Accessibilité
 
@@ -42,7 +42,9 @@ Conteneur de contenu structuré. Utiliser pour afficher un élément d'une liste
   tag: 'Nouveau',
   title: 'Titre de l\'article',
   text: 'Une description courte et percutante.',
-  ctaText: 'Lire l\'article'
+  cta: {
+    text: 'Lire l\'article'
+  }
 } %}
 ```
 

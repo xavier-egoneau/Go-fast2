@@ -2,10 +2,10 @@
   "name": "Grid",
   "level": "atom",
   "category": "Layout",
-  "description": "Conteneur CSS Grid configurable. Gère colonnes, gap et alignement pour toute mise en page.",
+  "description": "Conteneur CSS Grid configurable. Gere colonnes, gap et alignement pour toute mise en page.",
   "variants": {
     "cols": {
-      "label": "Colonnes (défaut)",
+      "label": "Colonnes (defaut)",
       "type": "select",
       "default": "3",
       "options": ["1", "2", "3", "4", "6", "12", "auto"]
@@ -43,7 +43,7 @@
   },
   "content": {
     "tag": {
-      "label": "Élément HTML",
+      "label": "Element HTML",
       "type": "text",
       "default": "div"
     }

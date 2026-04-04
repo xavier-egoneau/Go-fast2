@@ -15,7 +15,8 @@ let agentState = {
   lastWarnings: [],
   requiresNewComponent: false,
   unresolved: [],
-  previewScene: null
+  previewScene: null,
+  feedbackDismissed: false
 }
 
 const listeners = new Set()

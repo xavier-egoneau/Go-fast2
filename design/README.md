@@ -46,48 +46,35 @@ Puis ouvrir :
 ### Disponible
 
 - library alimentée par `dev/data/showcase.json`
-- canvas auto-peuplé : tous les composants du projet sont posés d'emblée (bento layout par niveau atomique)
+- canvas simple de scène de travail
 - rendu réel via iframes Twig
-- inspector auto-généré depuis les métadonnées JSON, y compris les paramètres de type `array` (textarea JSON)
+- inspector auto-généré depuis les métadonnées JSON
 - persistance locale via `localStorage`
 - scènes JSON locales
-- drag (snap grille 24px) / resize basiques
-- zoom canvas : `Ctrl+scroll`, `Ctrl+=`, `Ctrl+-`, `Ctrl+0`, boutons dans la topbar
-- pan canvas : `Espace` maintenu + drag
-- sélection → premier plan automatique (z-index)
-- suppression d'un item depuis le canvas (bouton × dans la toolbar)
-- notes compactes (pins) liées à un composant — s'ouvrent au clic, déplaçables
-- badge IA sur l'item sélectionné — indique le contexte agent courant
-- alertes agent fermables (bouton ×)
-- contrat canvas ↔ brain cadré dans `design/specs/canvas-brain-contract.md`
-- abstraction frontend de providers en place
-- génération de prompt et normalisation de sortie amorcées
+- drag / resize basiques
+- notes compactes sur canvas, pouvant se lier à un élément sélectionné
+- contrat canvas ↔ brain déjà cadré dans `design/specs/canvas-brain-contract.md`
+- abstraction frontend de providers déjà en place
+- génération de prompt et normalisation de sortie déjà amorcées
 - premier provider réel branché : `codex-cli`
 - contexte brain enrichi avec registry, contrôles, tokens, règles et actions supportées
+- flow agent centré sur `proposition -> preview -> apply`, sans mutation implicite au submit
 
 ### Encore incomplet
 
 - bridge runtime local posé mais encore incomplet
 - endpoint local `POST /__design_api/agent/run` en place pour le flux MVP
+- registry providers exposée localement
 - un seul provider CLI réel branché pour l'instant : `codex-cli`
 - test sur scènes et composants réels encore à pousser
-- contexte système encore à durcir sur les refus et dérives réelles
+- contexte système renforcé mais encore à durcir sur les refus et dérives réelles
+- audit métier ajouté pour détecter certaines sorties silencieusement hors système
+- feedback de preview remonté plus visiblement au niveau du canvas
 - boucle produit complète `intent -> preview -> apply` encore à fiabiliser
-- aimantage live pendant le drag (le canvas ne pousse pas les éléments pour faire de la place)
-- snap/align par catégorie encore à renforcer (pas de contrainte stricte empêchant de mélanger les niveaux)
+- navigation canvas type Figma encore limitée
 - multi-select / align / snap / guides absents
+- édition designer-first encore trop faible
 - tokens panel encore rudimentaire
-- nav gauche : boutons "Ajouter au canvas" et "Tout afficher" à supprimer, remplacer par un bouton "Créer un composant/page"
-- DnD depuis la nav vers un item canvas (composition) pas encore implémenté
-
-### Raccourcis clavier
-
-| Action | Raccourci |
-|--------|-----------|
-| Pan | `Espace` + drag |
-| Zoom + | `Ctrl` + `=` ou `Ctrl` + scroll haut |
-| Zoom − | `Ctrl` + `-` ou `Ctrl` + scroll bas |
-| Zoom reset | `Ctrl` + `0` |
 
 ## Thèse produit
 
@@ -273,6 +260,13 @@ La priorité est de prouver qu'un vrai cerveau peut transformer une scène sans 
 - remplacement total de Figma
 - outil de chat purement technique exposé au designer
 - appel direct d'un CLI externe depuis le browser
+
+## Modèle mental actuel
+
+- **Library** : catalogue du système réel exposé par le showcase
+- **Canvas** : scène de travail locale qui compose des instances de ces blocs
+- **Agent** : génère d'abord une proposition structurée, puis un preview, puis un apply explicite
+- **Notes** : annotations de canvas, distinctes des composants de prod
 
 ## Résumé
 

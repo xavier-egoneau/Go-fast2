@@ -24,7 +24,7 @@ Spec de référence : `design/specs/canvas-brain-contract.md`
 - [ ] Verrouiller le contrat canvas ↔ cerveau pour le MVP
 - [ ] Brancher un vrai bridge runtime local pour un premier provider réel
 - [ ] Rendre le contexte système suffisamment fiable pour empêcher la dérive
-- [ ] Valider la boucle complète intent → preview → apply dans la scène
+- [x] Valider une première boucle crédible intent → preview → apply dans la scène
 - [ ] Renforcer ensuite l'action designer-first dans le canvas
 - [ ] Seulement après, rapprocher le résultat du repo et de git
 
@@ -102,26 +102,25 @@ Objectif : empêcher le cerveau de produire des propositions impressionnantes ma
 
 Objectif : obtenir un flux crédible de bout en bout avant de toucher au repo réel.
 
-- [ ] générer un prompt final stable à partir de l'intent + contexte
-- [ ] valider les actions renvoyées avant preview
-- [ ] produire un preview lisible des changements proposés
-- [ ] permettre `apply`
-- [ ] permettre `reject`
-- [ ] préserver undo / redo / history
-- [ ] confirmer que l'apply modifie correctement le modèle de scène
+- [x] générer un prompt final stable à partir de l'intent + contexte
+- [x] valider les actions renvoyées avant preview
+- [x] produire un preview lisible des changements proposés
+- [x] permettre `apply`
+- [x] permettre `reject`
+- [x] préserver undo / redo / history
+- [x] confirmer qu'un apply explicite modifie correctement le modèle de scène
 - [ ] tester plusieurs scénarios réels de transformation
 
 ### Étape 6 — renforcer le pouvoir d'action du designer
 
 Objectif : augmenter la valeur du canvas une fois le cerveau réel branché.
 
-- [x] garder move
-- [x] garder resize
-- [x] garder duplicate
-- [x] garder delete — bouton × dans la toolbar de chaque item
-- [x] garder notes — remplacées par des pins compacts liés aux composants
-- [x] rendre les notes clairement distinctes des composants de prod
-- [x] badge contexte IA sur l'item sélectionné
+- [ ] garder move
+- [ ] garder resize
+- [ ] garder duplicate
+- [ ] garder delete
+- [ ] garder notes
+- [ ] rendre les notes clairement distinctes des composants de prod
 - [ ] ajouter un réagencement simple
 - [ ] ajouter un panneau de tokens designer-friendly
 - [ ] ajouter des variations de scène plus claires
@@ -131,16 +130,14 @@ Objectif : augmenter la valeur du canvas une fois le cerveau réel branché.
 
 Objectif : rendre l'exploration plus naturelle sans dériver vers un éditeur vectoriel généraliste.
 
-- [x] pan : `Espace` + drag
-- [x] zoom : `Ctrl+scroll`, `Ctrl+=`/`-`/`0`, boutons topbar
-- [x] canvas auto-peuplé au démarrage (bento layout par niveau atomique)
-- [x] sélection → premier plan automatique
-- [x] alertes agent fermables
-- [ ] aimantage live pendant le drag (reflow des voisins)
+- [ ] améliorer pan / zoom
 - [ ] clarifier boards / frames / structure de scène
 - [ ] rendre le drag des notes évident et fiable
 - [ ] ajouter multi-select
 - [ ] ajouter align / snap / guides
+- [ ] ajouter un z-order simple
+- [ ] évaluer lock si utile
+- [ ] améliorer la lecture des variantes de scène
 - [ ] polish save / load / duplicate / import
 
 ### Étape 8 — rapprocher la scène du repo réel

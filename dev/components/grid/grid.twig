@@ -11,6 +11,6 @@
 {% if colsMd %}{% set classes = classes ~ ' grid--md-cols-' ~ colsMd %}{% endif %}
 {% if colsLg %}{% set classes = classes ~ ' grid--lg-cols-' ~ colsLg %}{% endif %}
 
-<{{ tag }} class="{{ classes }}">
+<{{ tag }} class="{{ classes }}" data-gf-component="grid">
   {{ children|default('') }}
 </{{ tag }}>

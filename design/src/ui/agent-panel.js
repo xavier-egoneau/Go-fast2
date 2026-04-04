@@ -21,8 +21,8 @@ export function renderAgentPanel({ selectionHint = '' } = {}) {
             <span class="ds-field__label">Demande libre</span>
             <textarea class="ds-field__input" rows="6" data-agent-action="input" placeholder="Exemple : rends ce header plus premium, ou crée une variante de page plus éditoriale.">${agent.input}</textarea>
           </label>
-          <button class="ds-btn ds-btn--primary" data-agent-action="submit-request">Appliquer la demande</button>
-          <p class="ds-muted">Le moteur utilise automatiquement la sélection courante et les composants du système.</p>
+          <button class="ds-btn ds-btn--primary" data-agent-action="submit-request">Générer une proposition</button>
+          <p class="ds-muted">Le moteur utilise automatiquement la sélection courante et les composants du système. La demande génère d'abord une proposition prévisualisable avant application.</p>
         </div>
         ${agent.runtimeError ? `<div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Erreur</h3><div class="ds-diff-change">${agent.runtimeError}</div></div>` : ''}
         ${agent.lastSummary ? `<div class="ds-inspector-group"><h3 class="ds-inspector-group__title">Résumé</h3><p class="ds-muted">${agent.lastSummary}</p></div>` : ''}

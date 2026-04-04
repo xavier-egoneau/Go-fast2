@@ -2,25 +2,13 @@
   "name": "Header Nav",
   "level": "organism",
   "category": "Navigation",
-  "description": "En-tête de page avec logo, liens de navigation et bouton d'action principal.",
+  "description": "En-tete de page avec logo, liens de navigation et bouton d'action principal.",
   "variants": {
     "variant": {
       "label": "Variante",
       "type": "select",
       "default": "light",
       "options": ["light", "dark"]
-    },
-    "ctaVariant": {
-      "label": "Variante du CTA",
-      "type": "select",
-      "default": "auto",
-      "options": ["auto", "primary", "secondary", "outline", "ghost", "danger"]
-    },
-    "ctaSize": {
-      "label": "Taille du CTA",
-      "type": "select",
-      "default": "sm",
-      "options": ["sm", "md", "lg"]
     },
     "sticky": {
       "label": "Sticky",
@@ -33,21 +21,25 @@
       "label": "Logo (texte)",
       "type": "text",
       "default": "MonSite"
-    },
-    "ctaText": {
-      "label": "Texte du bouton",
-      "type": "text",
-      "default": "Commencer"
-    },
-    "links": {
-      "label": "Liens de navigation",
-      "type": "array",
-      "default": [
-        { "label": "Accueil",  "href": "#" },
-        { "label": "Produits", "href": "#" },
-        { "label": "Tarifs",   "href": "#" },
-        { "label": "Contact",  "href": "#" }
-      ]
+    }
+  },
+  "parts": {
+    "cta": {
+      "label": "CTA",
+      "component": "button",
+      "mode": "single",
+      "autoBind": true,
+      "defaults": {
+        "variants": {
+          "variant": "auto",
+          "size": "sm",
+          "full": false,
+          "disabled": false
+        },
+        "content": {
+          "text": "Commencer"
+        }
+      }
     }
   }
 }

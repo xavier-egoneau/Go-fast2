@@ -2,7 +2,7 @@
   "name": "Card",
   "level": "molecule",
   "category": "Layout",
-  "description": "Conteneur de contenu structuré avec image, titre, texte et action optionnels.",
+  "description": "Conteneur de contenu structure avec image, titre, texte et action optionnels.",
   "variants": {
     "variant": {
       "label": "Variante",
@@ -24,18 +24,6 @@
       "label": "Avec bouton",
       "type": "checkbox",
       "default": true
-    },
-    "ctaVariant": {
-      "label": "Variante du bouton",
-      "type": "select",
-      "default": "outline",
-      "options": ["primary", "secondary", "outline", "ghost", "danger"]
-    },
-    "ctaSize": {
-      "label": "Taille du bouton",
-      "type": "select",
-      "default": "sm",
-      "options": ["sm", "md", "lg"]
     }
   },
   "content": {
@@ -48,11 +36,6 @@
       "label": "Description",
       "type": "text",
       "default": "Courte description du contenu de la carte."
-    },
-    "ctaText": {
-      "label": "Texte du bouton",
-      "type": "text",
-      "default": "En savoir plus"
     },
     "tag": {
       "label": "Tag de la carte",
@@ -68,6 +51,25 @@
       "label": "Alt de l'image",
       "type": "text",
       "default": ""
+    }
+  },
+  "parts": {
+    "cta": {
+      "label": "CTA",
+      "component": "button",
+      "mode": "single",
+      "autoBind": true,
+      "defaults": {
+        "variants": {
+          "variant": "outline",
+          "size": "sm",
+          "full": false,
+          "disabled": false
+        },
+        "content": {
+          "text": "En savoir plus"
+        }
+      }
     }
   }
 }

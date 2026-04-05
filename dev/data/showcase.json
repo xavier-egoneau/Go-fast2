@@ -664,6 +664,12 @@
           "component": "input",
           "mode": "single",
           "autoBind": true
+        },
+        "header-nav": {
+          "label": "header-nav",
+          "component": "header-nav",
+          "mode": "single",
+          "autoBind": true
         }
       },
       "collections": {},

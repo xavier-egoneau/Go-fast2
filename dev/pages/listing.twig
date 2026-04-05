@@ -114,29 +114,23 @@
         }
       ] %}
 
-      {% set gridContent %}
+      <div class="grid grid--gap-xl">
         {% for article in articles %}
-          {% include 'dev/components/card/card.twig' with {
-            variant: articlesShared.variant,
-            title: article.title,
-            text: article.text,
-            tag: article.tag,
-            cta: articlesShared.cta,
-            imageUrl: article.imageUrl,
-            imageAlt: article.imageAlt,
-            hasImage: articlesShared.hasImage,
-            hasCta: articlesShared.hasCta
-          } %}
+          <div class="grid-item grid--cols-12{% if gridCols == '2' %} grid--md-cols-6{% elseif gridCols == '3' %} grid--sm-cols-6 grid--md-cols-4{% endif %}">
+            {% include 'dev/components/card/card.twig' with {
+              variant: articlesShared.variant,
+              title: article.title,
+              text: article.text,
+              tag: article.tag,
+              cta: articlesShared.cta,
+              imageUrl: article.imageUrl,
+              imageAlt: article.imageAlt,
+              hasImage: articlesShared.hasImage,
+              hasCta: articlesShared.hasCta
+            } %}
+          </div>
         {% endfor %}
-      {% endset %}
-
-      {% include 'dev/components/grid/grid.twig' with {
-        cols: '1',
-        colsSm: gridCols == '1' ? '1' : '2',
-        colsLg: gridCols,
-        gap: 'xl',
-        children: gridContent
-      } %}
+      </div>
 
     </section>
 

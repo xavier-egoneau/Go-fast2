@@ -1,7 +1,0 @@
-{% set gap   = gap|default('md') %}
-{% set align = align|default('stretch') %}
-{% set tag   = tag|default('div') %}
-
-<{{ tag }} class="grid grid--gap-{{ gap }} grid--align-{{ align }}" data-gf-component="grid">
-  {{ children|default('') }}
-</{{ tag }}>

@@ -51,6 +51,8 @@ let previewComposableClearTimeout = null
 let previewComposableActionHovered = false
 let composablePopoverState = null
 let gridCellOverlayState = null
+// Scroll canvas mémorisé en dehors du cycle render pour éviter les race conditions
+let canvasScrollMemory = { left: 0, top: 0 }
 let gridCellClearTimeout = null
 
 const VIEWPORT_SPECS = {
@@ -665,9 +667,10 @@ function syncSceneItemsWithRegistry() {
     ...prev,
     scene: {
       ...prev.scene,
-      items: prev.scene.items.map(item => {
+      items: prev.scene.items.flatMap(item => {
         const entry = getEntryById(item.ref, item.kind)
-        return entry ? normalizeSceneItemState(item, entry, getEntryById) : item
+        // Purge les items dont la référence n'existe plus dans le registry
+        return entry ? [normalizeSceneItemState(item, entry, getEntryById)] : []
       })
     }
   }))
@@ -1105,7 +1108,16 @@ function handleAgentApply() {
     if (!getAgentState().previewScene) return
   }
   replaceWorkingScene(getAgentState().previewScene)
-  patchAgentState({ previewScene: null, validationErrors: [], runtimeError: '' })
+  patchAgentState({
+    previewScene: null,
+    validationErrors: [],
+    runtimeError: '',
+    lastSummary: '',
+    lastWarnings: [],
+    requiresNewComponent: false,
+    unresolved: [],
+    feedbackDismissed: false
+  })
   render()
 }
 
@@ -1237,8 +1249,9 @@ function renderCanvas() {
   const metrics = getCanvasMetrics(scene)
 
   return `
+    <div class="ds-canvas-area">
+    ${renderPreviewStatus()}
     <main class="ds-canvas-wrap">
-      ${renderPreviewStatus()}
       <div class="ds-canvas-stage" style="width:${Math.round(metrics.width * zoom)}px;height:${Math.round(metrics.height * zoom)}px;">
         <div class="ds-canvas" id="ds-canvas" style="width:${metrics.width}px;height:${metrics.height}px;transform: scale(${zoom});">
           ${renderFrames(scene)}
@@ -1271,10 +1284,10 @@ function renderCanvas() {
             return `
               <section class="ds-item ${selectedItemId === item.id ? 'ds-item--selected' : ''}" data-item-id="${item.id}" style="left:${item.x}px;top:${item.y}px;width:${item.width}px;height:${item.height}px;">
                 <div class="ds-item__toolbar" data-drag-handle="${item.id}">
-                  <div><div class="ds-item__title">${escapeHtml(entry.name)}</div><div class="ds-item__meta">${escapeHtml(item.viewport || 'desktop')} · ${escapeHtml(entry.kind)} · ${escapeHtml(entry.level || '')}</div></div>
+                  <div><div class="ds-item__title">${escapeHtml(item.label || entry.name)}</div><div class="ds-item__meta">${escapeHtml(item.viewport || 'desktop')} · ${escapeHtml(entry.kind)} · ${escapeHtml(entry.level || '')}</div></div>
                   <div class="ds-item__toolbar-actions"><button class="ds-badge ds-badge--button" data-action="add-note-to-item" data-item-id="${item.id}">note</button><a class="ds-badge" href="${escapeAttr(url)}" target="_blank" rel="noreferrer">ouvrir</a></div>
                 </div>
-                <iframe class="ds-item__frame" src="${escapeAttr(url)}" title="${escapeAttr(entry.name)}" style="height: calc(100% - 41px);"></iframe>
+                <iframe class="ds-item__frame" src="${escapeAttr(url)}" title="${escapeAttr(item.label || entry.name)}" style="height: calc(100% - 41px);"></iframe>
                 <div class="ds-item__resize" data-resize-handle="${item.id}" title="Redimensionner"></div>
               </section>
             `
@@ -1282,6 +1295,7 @@ function renderCanvas() {
         </div>
       </div>
     </main>
+    </div>
   `
 }
 
@@ -1561,6 +1575,7 @@ function renderInspector() {
       <div class="ds-panel__body">
         <div class="ds-inspector-group">
           <h3 class="ds-inspector-group__title">Instance</h3>
+          <label class="ds-field"><span class="ds-field__label">Nom</span><input class="ds-field__input" type="text" data-action="item-label" data-item-id="${item.id}" value="${escapeAttr(item.label || '')}" placeholder="${escapeAttr(entry.name)}"></label>
           <label class="ds-field"><span class="ds-field__label">Viewport</span><select class="ds-field__select" data-action="item-viewport" data-item-id="${item.id}">${Object.entries(getViewportDefinitions()).map(([key, vp]) => `<option value="${key}"${key === (item.viewport || 'desktop') ? ' selected' : ''}>${escapeHtml(vp.label)} · ${vp.breakpointValue} · ${escapeHtml(vp.breakpoint || '')}</option>`).join('')}</select></label>
           <p class="ds-muted">Format : ${item.width}px × ${item.height}px</p>
         </div>
@@ -1856,6 +1871,7 @@ function stopPan() {
 }
 
 function preserveCanvasScroll(left, top) {
+  canvasScrollMemory = { left, top }
   const canvasWrap = rootEl?.querySelector('.ds-canvas-wrap')
   if (!canvasWrap) return
 
@@ -2146,9 +2162,9 @@ function bindPreviewComposableHoverEvents() {
 // Préfixes CSS par viewport
 const GRID_VIEWPORT_PREFIXES = { mobile: '', tablet: 'sm-', desktop: 'md-' }
 const GRID_VIEWPORTS = [
-  { key: 'mobile',  label: 'Mobile' },
+  { key: 'desktop', label: 'Desktop' },
   { key: 'tablet',  label: 'Tablette' },
-  { key: 'desktop', label: 'Desktop' }
+  { key: 'mobile',  label: 'Mobile' }
 ]
 
 function applyGridCellStyles(itemId) {
@@ -2440,6 +2456,19 @@ function bindSelectionDependentEvents() {
     const selectedItem = getSelectedSceneItem()
     updateNote(input.dataset.noteId, { targetId: input.checked ? (selectedItem?.id || null) : null })
   }))
+  rootEl.querySelectorAll('[data-action="item-label"]').forEach(input => {
+    input.addEventListener('change', () => {
+      const label = input.value.trim()
+      setState(prev => ({
+        ...prev,
+        scene: {
+          ...prev.scene,
+          items: prev.scene.items.map(candidate => candidate.id === input.dataset.itemId ? { ...candidate, label: label || null } : candidate)
+        }
+      }))
+      commitSceneHistory()
+    })
+  })
   rootEl.querySelectorAll('[data-action="item-viewport"]').forEach(select => select.addEventListener('change', () => {
     const item = getRenderedScene().items.find(candidate => candidate.id === select.dataset.itemId)
     if (!item) return
@@ -2612,12 +2641,18 @@ function bindCanvasPanInteractions() {
 
   window.addEventListener('keypress', event => {
     if (event.code !== 'Space') return
+    const targetTag = event.target?.tagName
+    const isEditable = event.target?.isContentEditable
+    if (targetTag === 'INPUT' || targetTag === 'TEXTAREA' || targetTag === 'SELECT' || isEditable) return
     event.preventDefault()
     event.stopPropagation()
   }, { capture: true, signal: keyboardAbortController.signal })
 
   window.addEventListener('keyup', event => {
     if (event.code !== 'Space') return
+    const targetTag = event.target?.tagName
+    const isEditable = event.target?.isContentEditable
+    if (targetTag === 'INPUT' || targetTag === 'TEXTAREA' || targetTag === 'SELECT' || isEditable) return
     const canvasWrap = rootEl?.querySelector('.ds-canvas-wrap')
     const scrollLeft = canvasWrap?.scrollLeft ?? 0
     const scrollTop = canvasWrap?.scrollTop ?? 0
@@ -2662,7 +2697,6 @@ function buildElementRestoreSelector(element) {
 function captureRenderState() {
   const activeElement = document.activeElement
   const selector = buildElementRestoreSelector(activeElement)
-  const canvasWrap = rootEl.querySelector('.ds-canvas-wrap')
   const activeControl = selector
     ? {
         selector,
@@ -2685,12 +2719,8 @@ function captureRenderState() {
 
   return {
     activeControl,
-    canvasScroll: canvasWrap
-      ? {
-          left: canvasWrap.scrollLeft,
-          top: canvasWrap.scrollTop
-        }
-      : null,
+    // canvasScrollMemory est la source de vérité : jamais réinitialisé par un rebuild DOM
+    canvasScroll: { ...canvasScrollMemory },
     frames: new Map(frameEntries.map(entry => [entry.itemId, entry]))
   }
 }
@@ -2735,9 +2765,8 @@ function restoreActiveControl(renderState) {
 
 function restoreCanvasScroll(renderState) {
   const canvasScroll = renderState?.canvasScroll
-  const canvasWrap = rootEl.querySelector('.ds-canvas-wrap')
+  const canvasWrap = rootEl?.querySelector('.ds-canvas-wrap')
   if (!canvasWrap || !canvasScroll) return
-
   canvasWrap.scrollLeft = canvasScroll.left
   canvasWrap.scrollTop = canvasScroll.top
 }
@@ -2801,6 +2830,12 @@ export async function renderApp(root) {
       clearPreviewComposableTarget()
     }, { capture: true })
 
+    // Maintenir canvasScrollMemory à jour sur les vrais scrolls utilisateur
+    rootEl.addEventListener('scroll', event => {
+      const canvasWrap = event.target.closest?.('.ds-canvas-wrap') ?? (event.target.classList.contains('ds-canvas-wrap') ? event.target : null)
+      if (canvasWrap) canvasScrollMemory = { left: canvasWrap.scrollLeft, top: canvasWrap.scrollTop }
+    }, { capture: true })
+
     subscribe(render)
     subscribeAgentState(() => render())
     await loadSceneFromFile('default.scene.json', { keepWorkingScene: hasWorkingScene() })
@@ -2808,6 +2843,8 @@ export async function renderApp(root) {
       const hydrated = hydrateSceneWithRegistry(getState().scene, { preserveExistingLayout: false })
       replaceWorkingScene(hydrated)
     }
+    // Purge les items dont la référence a disparu du registry (ex: composant supprimé)
+    syncSceneItemsWithRegistry()
     render()
   } catch (error) {
     console.error('[design-surface]', error)

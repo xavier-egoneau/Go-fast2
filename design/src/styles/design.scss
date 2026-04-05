@@ -252,10 +252,18 @@ button.ds-badge,
 .ds-card__desc { margin: 8px 0 0; font-size: 13px; color: var(--ds-text); }
 .ds-card__actions { margin-top: 10px; display: flex; }
 
+.ds-canvas-area {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
 .ds-canvas-wrap {
   min-width: 0;
   min-height: 0;
-  height: 100%;
+  flex: 1;
   overflow: auto;
   background:
     linear-gradient(90deg, rgba(148,163,184,.18) 1px, transparent 1px) 0 0 / 24px 24px,
@@ -277,8 +285,7 @@ button.ds-badge,
 }
 
 .ds-preview-banner {
-  position: sticky;
-  top: 0;
+  flex-shrink: 0;
   z-index: 4;
   display: grid;
   gap: 12px;

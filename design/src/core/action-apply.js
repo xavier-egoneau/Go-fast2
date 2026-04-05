@@ -50,9 +50,14 @@ export function applyActionSetToScene(scene, actionSet, getEntryById = () => nul
       case 'duplicate-item': {
         const source = next.items.find(item => item.id === action.targetId)
         if (!source) break
+        const sourceEntry = getEntryById(source.ref, source.kind)
+        const baseName = source.label || sourceEntry?.name || source.ref
+        const sameRefCount = next.items.filter(item => item.ref === source.ref).length
+        const autoLabel = `${baseName} ${sameRefCount + 1}`
         next.items.push({
           ...source,
-          id: uid('item'),
+          id: action.newId || uid('item'),
+          label: action.label || autoLabel,
           x: source.x + (action.offset?.x ?? 40),
           y: source.y + (action.offset?.y ?? 40)
         })

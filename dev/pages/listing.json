@@ -14,7 +14,30 @@
       ]
     }
   },
-  "content": {},
+  "content": {
+    "header": {
+      "label": "Header",
+      "type": "component-params",
+      "ref": "header-nav",
+      "default": {
+        "variant": "light",
+        "sticky": true,
+        "logoText": "MonSite",
+        "ctaText": "Commencer"
+      }
+    },
+    "footer": {
+      "label": "Footer",
+      "type": "component-params",
+      "ref": "footer",
+      "default": {
+        "variant": "dark",
+        "logoText": "MonSite",
+        "tagline": "Construisons quelque chose de grand.",
+        "copyright": "© 2025 MonSite. Tous droits réservés."
+      }
+    }
+  },
   "parts": {
     "header": {
       "label": "Header",
@@ -57,6 +80,12 @@
       "component": "card",
       "mode": "single",
       "autoBind": true
+    },
+    "header-nav": {
+      "label": "header-nav",
+      "component": "header-nav",
+      "mode": "single",
+      "autoBind": true
     }
   },
   "collections": {
@@ -88,30 +117,6 @@
           "title",
           "text"
         ]
-      }
-    }
-  },
-  "content": {
-    "header": {
-      "label": "Header",
-      "type": "component-params",
-      "ref": "header-nav",
-      "default": {
-        "variant": "light",
-        "sticky": true,
-        "logoText": "MonSite",
-        "ctaText": "Commencer"
-      }
-    },
-    "footer": {
-      "label": "Footer",
-      "type": "component-params",
-      "ref": "footer",
-      "default": {
-        "variant": "dark",
-        "logoText": "MonSite",
-        "tagline": "Construisons quelque chose de grand.",
-        "copyright": "© 2025 MonSite. Tous droits réservés."
       }
     }
   }

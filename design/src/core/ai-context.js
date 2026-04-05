@@ -177,9 +177,17 @@ function buildInteractionGuidance(selectedItem, selectedNote) {
   if (selectedItem) {
     return {
       focus: 'selected-item',
-      designerIntentHint: 'When an item is selected, prefer modifying that selected item or deriving a variant from it before changing the whole scene.',
+      designerIntentHint: [
+        `The selected item is "${selectedItem.ref}" (id: ${selectedItem.id}, kind: ${selectedItem.kind}).`,
+        'If the designer asks to modify or update this item, use update-params / update-instance-params / update-family-params / update-part-params targeting this item id.',
+        'If the designer asks to "create", "duplicate", "make a variant of" or "the same page but with X", use duplicate-item with a newId string, then apply modification actions targeting that newId.',
+        'To change a named field on a specific instance (e.g. "input prénom", "firstName"), use update-instance-params with the instanceId matching the instance id in entry.instances.',
+        'To change a shared field across all instances of a family, use update-family-params with the familyId.',
+        'Patch keys must be child field names (e.g. "disabled", "label") not parent flat param names.'
+      ].join(' '),
       selectedKind: selectedItem.kind || null,
-      selectedRef: selectedItem.ref || null
+      selectedRef: selectedItem.ref || null,
+      selectedId: selectedItem.id || null
     }
   }
 

@@ -1,33 +1,91 @@
 export function buildBrainPrompt({ intent = '', context = null } = {}) {
   return [
-    'You are the Design Surface brain.',
-    'Operate strictly inside the real production system.',
-    'The versioned codebase is the effective source of truth.',
-    'Reuse existing components/includes/pages before inventing anything.',
-    'Prefer reconfiguring or rearranging existing blocks over adding new ones.',
-    'Never create a fake close-enough replacement when a real block already exists in the registry.',
-    'Only use action types explicitly listed in context.system.actions.supported.',
-    'Do not output repo file edits, code patches, or unsupported action families.',
-    'Canvas notes are annotations only, not production components.',
-    'Structured scene state is the primary interaction model: root fields live in item.params, referenced child drawers live in item.partsState, and bulk collection controls live in item.collectionsState.',
-    'Use update-params only for true root props of the selected item.',
-    'Never use update-params for referenced child controls when update-part-params or update-collection-params applies.',
-    'When interaction.focus is "canvas", interpret page requests as scene-level or page-level work.',
-    'When interaction.focus is "selected-item", treat the selected item as the primary target unless the designer explicitly asks for a broader page variant.',
-    'When interaction.focus is "selected-item", scene actions such as update-params, update-part-params, update-collection-params, update-item, duplicate-item, and remove-item should target the selected scene item id.',
-    'Prefer update-part-params when the requested change belongs to a referenced sub-component drawer.',
-    'Prefer update-collection-params when the requested change belongs to a bulk-edited collection drawer.',
-    'If the request exceeds the system, set requiresNewComponent to true, explain why, and keep actions conservative.',
-    'In summary and warnings, explicitly mention reuse decisions and important limitations.',
-    'Return normalized JSON only with keys: summary, actions, warnings, requiresNewComponent, unresolved.',
+    '=== DESIGN SURFACE BRAIN — JSON OUTPUT TASK ===',
     '',
-    'Designer intent:',
+    'OUTPUT REQUIREMENT (read this first):',
+    'Your final response message must contain ONLY a single valid JSON object.',
+    'No markdown, no code fences, no explanation — pure JSON only.',
+    'Do NOT read any files. Do NOT run any shell commands. The complete context is in this message.',
+    '',
+    'JSON schema to return:',
+    '{ "summary": "string", "actions": [], "warnings": [], "requiresNewComponent": false, "unresolved": [] }',
+    '',
+    '=== TASK ===',
+    '',
+    'You are the Design Surface brain. Given a designer intent and a scene context, produce a JSON action set.',
+    'Only use action types from context.system.actions.supported.',
+    'Never edit Twig, SCSS or repo files — output JSON actions only.',
+    'Reuse existing components from the registry. Never invent new includes or identifiers.',
+    '',
+    '=== SCENE STATE MODEL ===',
+    '',
+    'Root props live in item.params → use "update-params" (only for fields in entry.variants or entry.content).',
+    'Parts live in item.partsState → use "update-part-params" with partId.',
+    'Collections live in item.collectionsState → use "update-collection-params" with collectionId.',
+    'Families live in item.familiesState → use "update-family-params" with familyId.',
+    'Instances live in item.instancesState → use "update-instance-params" with instanceId.',
+    'Layout groups live in item.layoutGroupsState → use "update-layout-group-params" with layoutGroupId.',
+    'NEVER use "update-params" for child controls — use the correct child action type.',
+    '',
+    '=== CREATING A PAGE VARIANT ===',
+    '',
+    'When the intent says "la même page mais avec X" or "create a variant with X":',
+    '  Step 1 — duplicate-item: { "type": "duplicate-item", "targetId": "<selected-item-id>", "newId": "item-variant-1", "offset": { "x": 500, "y": 0 } }',
+    '  Step 2 — modify the duplicate: use update-instance-params / update-family-params / update-part-params with "targetId": "item-variant-1"',
+    '',
+    'Example — "la même page mais avec l\'input prénom en disabled":',
+    '  Step 1: { "type": "duplicate-item", "targetId": "<id>", "newId": "item-variant-1", "offset": { "x": 500, "y": 0 } }',
+    '  Step 2: { "type": "update-instance-params", "targetId": "item-variant-1", "instanceId": "firstName", "patch": { "disabled": true } }',
+    '',
+    '=== ROUTING CHANGES ===',
+    '',
+    'Named instance (e.g. "input prénom", "firstName"): "update-instance-params" with instanceId = instance key from entry.instances.',
+    'All instances of a family: "update-family-params" with familyId.',
+    'A specific part: "update-part-params" with partId.',
+    '',
+    '=== INTERACTION CONTEXT ===',
+    '',
+    `interaction.focus = "${context?.interaction?.focus || 'canvas'}"`,
+    context?.interaction?.designerIntentHint ? `Hint: ${context.interaction.designerIntentHint}` : '',
+    '',
+    '=== DESIGNER INTENT ===',
+    '',
     intent || '(empty)',
     '',
-    'Interaction guidance:',
-    context?.interaction?.designerIntentHint || '(none)',
+    '=== CONTEXT JSON ===',
     '',
-    'Context JSON:',
-    JSON.stringify(context || {}, null, 2)
-  ].join('\n')
+    JSON.stringify(buildFocusedContext(context), null, 2)
+  ].filter(line => line !== null && line !== undefined).join('\n')
+}
+
+function buildFocusedContext(context) {
+  if (!context) return {}
+
+  // When a specific item is selected, trim the registry to avoid overwhelming the model.
+  // The selected item's full entry is already embedded in context.selection.item.entry.
+  const trimmedRegistry = context.system?.registry
+    ? context.system.registry.map(entry => ({
+        id: entry.id,
+        kind: entry.kind,
+        name: entry.name,
+        category: entry.category || null,
+        level: entry.level || null
+      }))
+    : []
+
+  return {
+    scene: context.scene,
+    selection: context.selection,
+    interaction: {
+      focus: context.interaction?.focus,
+      selectedId: context.interaction?.selectedId || null,
+      selectedRef: context.interaction?.selectedRef || null,
+      selectedKind: context.interaction?.selectedKind || null
+    },
+    system: {
+      registrySummary: context.system?.registrySummary,
+      registryIndex: trimmedRegistry,
+      actions: context.system?.actions
+    }
+  }
 }

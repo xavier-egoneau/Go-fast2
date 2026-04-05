@@ -13,7 +13,7 @@ const ROOT = process.cwd()
 
 const REQUIRED_FIELDS = ['name', 'level', 'category', 'description']
 const VALID_LEVELS = ['atom', 'molecule', 'organism', 'template', 'page']
-const VALID_CONTROL_TYPES = ['select', 'checkbox', 'text', 'color', 'number']
+const VALID_CONTROL_TYPES = ['select', 'checkbox', 'text', 'color', 'number', 'array']
 const VALID_PART_MODES = ['single']
 const VALID_COLLECTION_MODES = ['bulk']
 const VALID_COLLECTION_KINDS = ['list']

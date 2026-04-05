@@ -2,7 +2,7 @@ import { ACTION_TYPES } from './action-schema.js'
 import { normalizeBrainOutput } from './brain-output.js'
 import { listComposableBindings } from './registry.js'
 
-const ITEM_PATCH_KEYS = new Set(['x', 'y', 'width', 'height', 'viewport'])
+const ITEM_PATCH_KEYS = new Set(['x', 'y', 'width', 'height', 'viewport', 'label'])
 const VIEWPORTS = new Set(['mobile', 'tablet', 'desktop'])
 
 function isPlainObject(value) {
@@ -133,7 +133,10 @@ function getComposableNodeConfig(item, action, getEntryById) {
   return { error: 'type composable non supporte' }
 }
 
-function validateComposablePatch(action, index, errors, state, getEntryById) {
+function validateComposablePatch(action, index, errors, state, getEntryById, virtualItemIds = new Set()) {
+  // Item virtuel (créé par duplicate-item dans ce même set) : validation détaillée impossible
+  if (virtualItemIds.has(action.targetId)) return
+
   const item = getSceneItem(state, action.targetId)
   if (!item) {
     errors.push(`Action ${index}: targetId doit referencer un item (${action.targetId})`)
@@ -173,6 +176,16 @@ export function validateActionSet(actionSet, state, getEntryById) {
 
   const normalized = normalizeBrainOutput(actionSet)
 
+  // IDs virtuels créés par duplicate-item dans ce même action set (via newId)
+  const virtualItemIds = new Set(
+    normalized.actions
+      .filter(a => a.type === 'duplicate-item' && typeof a.newId === 'string' && a.newId)
+      .map(a => a.newId)
+  )
+
+  const hasEffectiveSceneTarget = (id) => hasSceneTarget(state, id) || virtualItemIds.has(id)
+  const hasEffectiveItemTarget = (id) => hasItemTarget(state, id) || virtualItemIds.has(id)
+
   normalized.actions.forEach((action, index) => {
     if (!isPlainObject(action)) {
       errors.push(`Action ${index}: format invalide`)
@@ -186,12 +199,12 @@ export function validateActionSet(actionSet, state, getEntryById) {
 
     if (['update-params', 'update-part-params', 'update-collection-params', 'update-family-params', 'update-instance-params', 'update-layout-group-params', 'update-item', 'duplicate-item', 'remove-item'].includes(action.type)) {
       const targetId = action.targetId
-      if (!targetId || !hasSceneTarget(state, targetId)) {
+      if (!targetId || !hasEffectiveSceneTarget(targetId)) {
         errors.push(`Action ${index}: targetId introuvable (${targetId})`)
       }
     }
 
-    if (['update-params', 'update-part-params', 'update-collection-params', 'update-family-params', 'update-instance-params', 'update-layout-group-params', 'update-item', 'duplicate-item'].includes(action.type) && action.targetId && !hasItemTarget(state, action.targetId)) {
+    if (['update-params', 'update-part-params', 'update-collection-params', 'update-family-params', 'update-instance-params', 'update-layout-group-params', 'update-item', 'duplicate-item'].includes(action.type) && action.targetId && !hasEffectiveItemTarget(action.targetId)) {
       errors.push(`Action ${index}: targetId doit referencer un item (${action.targetId})`)
     }
 
@@ -200,7 +213,7 @@ export function validateActionSet(actionSet, state, getEntryById) {
     }
 
     if (['update-part-params', 'update-collection-params', 'update-family-params', 'update-instance-params', 'update-layout-group-params'].includes(action.type)) {
-      validateComposablePatch(action, index, errors, state, getEntryById)
+      validateComposablePatch(action, index, errors, state, getEntryById, virtualItemIds)
     }
 
     if (action.type === 'update-item') {

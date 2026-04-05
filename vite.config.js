@@ -60,11 +60,51 @@ function getProviderBase(providerId) {
   return listAgentProviders().find(provider => provider.id === providerId) || listAgentProviders()[0]
 }
 
+function resolveCodexBin() {
+  // 1. Check PATH first
+  const pathDirs = (process.env.PATH || '').split(path.delimiter)
+  for (const dir of pathDirs) {
+    const candidate = path.join(dir, 'codex')
+    if (fs.existsSync(candidate)) return candidate
+  }
+
+  // 2. Check VS Code extension directories (OpenAI ChatGPT extension ships codex)
+  const extensionsDir = path.join(os.homedir(), '.vscode', 'extensions')
+  if (fs.existsSync(extensionsDir)) {
+    for (const ext of fs.readdirSync(extensionsDir)) {
+      if (!ext.startsWith('openai.chatgpt')) continue
+      const candidates = [
+        path.join(extensionsDir, ext, 'bin', 'macos-aarch64', 'codex'),
+        path.join(extensionsDir, ext, 'bin', 'macos-x64', 'codex'),
+        path.join(extensionsDir, ext, 'bin', 'linux-x64', 'codex'),
+        path.join(extensionsDir, ext, 'bin', 'win32-x64', 'codex.exe')
+      ]
+      for (const c of candidates) {
+        if (fs.existsSync(c)) return c
+      }
+    }
+  }
+
+  return null
+}
+
+
 async function getCodexProviderState() {
   const base = getProviderBase('codex-cli')
+  const codexBin = resolveCodexBin()
+
+  if (!codexBin) {
+    return {
+      ...base,
+      available: false,
+      connected: false,
+      authRequired: false,
+      reason: 'Codex CLI not found'
+    }
+  }
 
   try {
-    const status = await spawnCommand('codex', ['login', 'status'], { timeoutMs: 10000 })
+    const status = await spawnCommand(codexBin, ['login', 'status'], { timeoutMs: 10000 })
     const combined = `${status.stdout}\n${status.stderr}`
     const connected = /Logged in/i.test(combined)
     return {
@@ -75,17 +115,6 @@ async function getCodexProviderState() {
       reason: connected ? '' : 'Codex CLI is installed but not logged in'
     }
   } catch (error) {
-    const message = String(error?.message || error)
-    if (/ENOENT/i.test(message)) {
-      return {
-        ...base,
-        available: false,
-        connected: false,
-        authRequired: false,
-        reason: 'Codex CLI not found in PATH'
-      }
-    }
-
     return {
       ...base,
       available: true,
@@ -103,6 +132,32 @@ async function getRuntimeProviders() {
     return provider
   }))
   return providers
+}
+
+function extractJsonFromText(text) {
+  // Try direct parse first
+  try {
+    return JSON.parse(text)
+  } catch {}
+
+  // Strip markdown code fences (```json ... ``` or ``` ... ```)
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (fenceMatch) {
+    try {
+      return JSON.parse(fenceMatch[1].trim())
+    } catch {}
+  }
+
+  // Find the first { ... } block spanning the whole content
+  const start = text.indexOf('{')
+  const end = text.lastIndexOf('}')
+  if (start !== -1 && end > start) {
+    try {
+      return JSON.parse(text.slice(start, end + 1))
+    } catch {}
+  }
+
+  throw new Error(`Codex CLI returned non-JSON output: ${text.slice(0, 200)}`)
 }
 
 function readCodexOutputFile(filePath) {
@@ -123,11 +178,14 @@ async function runCodexProvider(payload) {
   if (!provider.available) throw new Error(provider.reason || 'Codex CLI is unavailable')
   if (provider.authRequired) throw new Error(provider.reason || 'Codex CLI authentication is required')
 
+  const codexBin = resolveCodexBin()
+  if (!codexBin) throw new Error('Codex CLI binary not found')
+
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'design-codex-'))
   const outputPath = path.join(tempDir, 'last-message.json')
 
   try {
-    const result = await spawnCommand('codex', [
+    const result = await spawnCommand(codexBin, [
       'exec',
       '--skip-git-repo-check',
       '--sandbox', 'read-only',
@@ -145,7 +203,7 @@ async function runCodexProvider(payload) {
     }
 
     const rawOutput = readCodexOutputFile(outputPath)
-    const parsed = JSON.parse(rawOutput)
+    const parsed = extractJsonFromText(rawOutput)
     return {
       provider: {
         ...provider,

@@ -286,52 +286,6 @@
       "layoutGroups": {}
     },
     {
-      "id": "grid",
-      "path": "dev/components/grid/grid",
-      "name": "Grid",
-      "level": "atom",
-      "category": "Layout",
-      "description": "Ligne CSS Grid 12 colonnes. Chaque enfant utilise .grid-item + .grid--cols-N pour definir son span (ex. cols-6 = 50%, cols-12 = 100%).",
-      "variants": {
-        "gap": {
-          "label": "Gap",
-          "type": "select",
-          "default": "md",
-          "options": [
-            "none",
-            "xs",
-            "sm",
-            "md",
-            "lg",
-            "xl"
-          ]
-        },
-        "align": {
-          "label": "Align items",
-          "type": "select",
-          "default": "stretch",
-          "options": [
-            "stretch",
-            "start",
-            "center",
-            "end"
-          ]
-        }
-      },
-      "content": {
-        "tag": {
-          "label": "Element HTML",
-          "type": "text",
-          "default": "div"
-        }
-      },
-      "parts": {},
-      "collections": {},
-      "families": {},
-      "instances": {},
-      "layoutGroups": {}
-    },
-    {
       "id": "header-nav",
       "path": "dev/components/header-nav/header-nav",
       "name": "Header Nav",
@@ -708,24 +662,6 @@
         "input": {
           "label": "input",
           "component": "input",
-          "mode": "single",
-          "autoBind": true
-        },
-        "grid": {
-          "label": "grid",
-          "component": "grid",
-          "mode": "single",
-          "autoBind": true
-        },
-        "header-nav": {
-          "label": "header-nav",
-          "component": "header-nav",
-          "mode": "single",
-          "autoBind": true
-        },
-        "switch": {
-          "label": "switch",
-          "component": "switch",
           "mode": "single",
           "autoBind": true
         }
@@ -1172,136 +1108,7 @@
           }
         }
       },
-      "layoutGroups": {
-        "personalRow1": {
-          "label": "Informations personnelles - ligne 1",
-          "component": "grid",
-          "mode": "layout",
-          "autoBind": true,
-          "children": [
-            "firstName",
-            "lastName"
-          ],
-          "defaults": {
-            "variants": {
-              "cols": "1",
-              "colsMd": "2",
-              "gap": "lg",
-              "align": "stretch"
-            }
-          }
-        },
-        "personalRow2": {
-          "label": "Informations personnelles - ligne 2",
-          "component": "grid",
-          "mode": "layout",
-          "autoBind": true,
-          "children": [
-            "email",
-            "phone"
-          ],
-          "defaults": {
-            "variants": {
-              "cols": "1",
-              "colsMd": "2",
-              "gap": "lg",
-              "align": "stretch"
-            }
-          }
-        },
-        "personalRow3": {
-          "label": "Informations personnelles - ligne 3",
-          "component": "grid",
-          "mode": "layout",
-          "autoBind": true,
-          "children": [
-            "birthDate",
-            "age",
-            "country"
-          ],
-          "defaults": {
-            "variants": {
-              "cols": "1",
-              "colsMd": "3",
-              "gap": "lg",
-              "align": "stretch"
-            }
-          }
-        },
-        "accountRow1": {
-          "label": "Acces compte - ligne 1",
-          "component": "grid",
-          "mode": "layout",
-          "autoBind": true,
-          "children": [
-            "password",
-            "passwordConfirm"
-          ],
-          "defaults": {
-            "variants": {
-              "cols": "1",
-              "colsMd": "2",
-              "gap": "lg",
-              "align": "stretch"
-            }
-          }
-        },
-        "accountRow2": {
-          "label": "Acces compte - ligne 2",
-          "component": "grid",
-          "mode": "layout",
-          "autoBind": true,
-          "children": [
-            "profile"
-          ],
-          "defaults": {
-            "variants": {
-              "cols": "1",
-              "colsMd": "2",
-              "gap": "lg",
-              "align": "stretch"
-            }
-          }
-        },
-        "preferencesRow1": {
-          "label": "Preferences - ligne 1",
-          "component": "grid",
-          "mode": "layout",
-          "autoBind": true,
-          "children": [
-            "subscription",
-            "notifEmail",
-            "notifSms",
-            "newsletter"
-          ],
-          "defaults": {
-            "variants": {
-              "cols": "1",
-              "colsMd": "2",
-              "gap": "xl",
-              "align": "stretch"
-            }
-          }
-        },
-        "actionsRow": {
-          "label": "Actions",
-          "component": "grid",
-          "mode": "layout",
-          "autoBind": true,
-          "children": [
-            "cancelAction",
-            "submitAction"
-          ],
-          "defaults": {
-            "variants": {
-              "cols": "1",
-              "colsMd": "2",
-              "gap": "md",
-              "align": "stretch"
-            }
-          }
-        }
-      }
+      "layoutGroups": {}
     },
     {
       "id": "listing",
@@ -1386,6 +1193,12 @@
         "card": {
           "label": "card",
           "component": "card",
+          "mode": "single",
+          "autoBind": true
+        },
+        "header-nav": {
+          "label": "header-nav",
+          "component": "header-nav",
           "mode": "single",
           "autoBind": true
         }

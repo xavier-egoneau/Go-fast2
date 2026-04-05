@@ -58,13 +58,6 @@
   {% set cancelAction = buttonFamily|merge(previewInstances.cancelAction.params|default({})) %}
   {% set submitAction = buttonFamily|merge(previewInstances.submitAction.params|default({})) %}
 
-  {% set personalRow1Layout = previewLayoutGroups.personalRow1.params|default({ cols: '1', colsMd: '2', gap: 'lg', align: 'stretch' }) %}
-  {% set personalRow2Layout = previewLayoutGroups.personalRow2.params|default({ cols: '1', colsMd: '2', gap: 'lg', align: 'stretch' }) %}
-  {% set personalRow3Layout = previewLayoutGroups.personalRow3.params|default({ cols: '1', colsMd: '3', gap: 'lg', align: 'stretch' }) %}
-  {% set accountRow1Layout = previewLayoutGroups.accountRow1.params|default({ cols: '1', colsMd: '2', gap: 'lg', align: 'stretch' }) %}
-  {% set accountRow2Layout = previewLayoutGroups.accountRow2.params|default({ cols: '1', colsMd: '2', gap: 'lg', align: 'stretch' }) %}
-  {% set preferencesRow1Layout = previewLayoutGroups.preferencesRow1.params|default({ cols: '1', colsMd: '2', gap: 'xl', align: 'stretch' }) %}
-
   {% include 'dev/components/header-nav/header-nav.twig' with {
     variant: header.variant,
     sticky: header.sticky,
@@ -89,247 +82,229 @@
         <section class="form-page__section">
           <h2 class="form-page__section-title">Informations personnelles</h2>
 
-          {% set rowContent %}
-            {% include 'dev/components/input/input.twig' with {
-              id: 'prenom',
-              label: firstNameField.label|default('Prenom'),
-              type: firstNameField.type|default('text'),
-              size: firstNameField.size|default('md'),
-              disabled: firstNameField.disabled|default(false),
-              required: firstNameField.required|default(true),
-              hasError: firstNameField.hasError|default(false),
-              placeholder: firstNameField.placeholder|default('ex : Jean'),
-              helpText: firstNameField.helpText|default(''),
-              errorMessage: firstNameField.errorMessage|default('Ce champ est invalide.')
-            } %}
-            {% include 'dev/components/input/input.twig' with {
-              id: 'nom',
-              label: lastNameField.label|default('Nom'),
-              type: lastNameField.type|default('text'),
-              size: lastNameField.size|default('md'),
-              disabled: lastNameField.disabled|default(false),
-              required: lastNameField.required|default(true),
-              hasError: lastNameField.hasError|default(false),
-              placeholder: lastNameField.placeholder|default('ex : Dupont'),
-              helpText: lastNameField.helpText|default(''),
-              errorMessage: lastNameField.errorMessage|default('Ce champ est invalide.')
-            } %}
-          {% endset %}
-          {% include 'dev/components/grid/grid.twig' with {
-            cols: personalRow1Layout.cols|default('1'),
-            colsMd: personalRow1Layout.colsMd|default('2'),
-            gap: personalRow1Layout.gap|default('lg'),
-            align: personalRow1Layout.align|default('stretch'),
-            children: rowContent
-          } %}
+          <div class="grid grid--gap-lg" data-gf-component="grid">
+            <div class="grid-item grid--cols-12 grid--md-cols-6">
+              {% include 'dev/components/input/input.twig' with {
+                id: 'prenom',
+                label: firstNameField.label|default('Prenom'),
+                type: firstNameField.type|default('text'),
+                size: firstNameField.size|default('md'),
+                disabled: firstNameField.disabled|default(false),
+                required: firstNameField.required|default(true),
+                hasError: firstNameField.hasError|default(false),
+                placeholder: firstNameField.placeholder|default('ex : Jean'),
+                helpText: firstNameField.helpText|default(''),
+                errorMessage: firstNameField.errorMessage|default('Ce champ est invalide.')
+              } %}
+            </div>
+            <div class="grid-item grid--cols-12 grid--md-cols-6">
+              {% include 'dev/components/input/input.twig' with {
+                id: 'nom',
+                label: lastNameField.label|default('Nom'),
+                type: lastNameField.type|default('text'),
+                size: lastNameField.size|default('md'),
+                disabled: lastNameField.disabled|default(false),
+                required: lastNameField.required|default(true),
+                hasError: lastNameField.hasError|default(false),
+                placeholder: lastNameField.placeholder|default('ex : Dupont'),
+                helpText: lastNameField.helpText|default(''),
+                errorMessage: lastNameField.errorMessage|default('Ce champ est invalide.')
+              } %}
+            </div>
+          </div>
 
-          {% set rowContent %}
-            {% include 'dev/components/input/input.twig' with {
-              id: 'email',
-              label: emailField.label|default('Adresse e-mail'),
-              type: emailField.type|default('email'),
-              size: emailField.size|default('md'),
-              disabled: emailField.disabled|default(false),
-              required: emailField.required|default(true),
-              hasError: emailField.hasError|default(false),
-              placeholder: emailField.placeholder|default('ex : jean@exemple.fr'),
-              helpText: emailField.helpText|default('Utilisee pour la connexion et les notifications.'),
-              errorMessage: emailField.errorMessage|default('Ce champ est invalide.')
-            } %}
-            {% include 'dev/components/input/input.twig' with {
-              id: 'tel',
-              label: phoneField.label|default('Telephone'),
-              type: phoneField.type|default('tel'),
-              size: phoneField.size|default('md'),
-              disabled: phoneField.disabled|default(false),
-              required: phoneField.required|default(false),
-              hasError: phoneField.hasError|default(false),
-              placeholder: phoneField.placeholder|default('ex : +33 6 12 34 56 78'),
-              helpText: phoneField.helpText|default(''),
-              errorMessage: phoneField.errorMessage|default('Ce champ est invalide.')
-            } %}
-          {% endset %}
-          {% include 'dev/components/grid/grid.twig' with {
-            cols: personalRow2Layout.cols|default('1'),
-            colsMd: personalRow2Layout.colsMd|default('2'),
-            gap: personalRow2Layout.gap|default('lg'),
-            align: personalRow2Layout.align|default('stretch'),
-            children: rowContent
-          } %}
+          <div class="grid grid--gap-lg" data-gf-component="grid">
+            <div class="grid-item grid--cols-12 grid--md-cols-6">
+              {% include 'dev/components/input/input.twig' with {
+                id: 'email',
+                label: emailField.label|default('Adresse e-mail'),
+                type: emailField.type|default('email'),
+                size: emailField.size|default('md'),
+                disabled: emailField.disabled|default(false),
+                required: emailField.required|default(true),
+                hasError: emailField.hasError|default(false),
+                placeholder: emailField.placeholder|default('ex : jean@exemple.fr'),
+                helpText: emailField.helpText|default('Utilisee pour la connexion et les notifications.'),
+                errorMessage: emailField.errorMessage|default('Ce champ est invalide.')
+              } %}
+            </div>
+            <div class="grid-item grid--cols-12 grid--md-cols-6">
+              {% include 'dev/components/input/input.twig' with {
+                id: 'tel',
+                label: phoneField.label|default('Telephone'),
+                type: phoneField.type|default('tel'),
+                size: phoneField.size|default('md'),
+                disabled: phoneField.disabled|default(false),
+                required: phoneField.required|default(false),
+                hasError: phoneField.hasError|default(false),
+                placeholder: phoneField.placeholder|default('ex : +33 6 12 34 56 78'),
+                helpText: phoneField.helpText|default(''),
+                errorMessage: phoneField.errorMessage|default('Ce champ est invalide.')
+              } %}
+            </div>
+          </div>
 
-          {% set rowContent %}
-            {% include 'dev/components/input/input.twig' with {
-              id: 'naissance',
-              label: birthDateField.label|default('Date de naissance'),
-              type: birthDateField.type|default('date'),
-              size: birthDateField.size|default('md'),
-              disabled: birthDateField.disabled|default(false),
-              required: birthDateField.required|default(false),
-              hasError: birthDateField.hasError|default(false),
-              placeholder: birthDateField.placeholder|default(''),
-              helpText: birthDateField.helpText|default(''),
-              errorMessage: birthDateField.errorMessage|default('Ce champ est invalide.')
-            } %}
-            {% include 'dev/components/input/input.twig' with {
-              id: 'age',
-              label: ageField.label|default('Age'),
-              type: ageField.type|default('number'),
-              size: ageField.size|default('md'),
-              disabled: ageField.disabled|default(false),
-              required: ageField.required|default(false),
-              hasError: ageField.hasError|default(false),
-              placeholder: ageField.placeholder|default('ex : 30'),
-              helpText: ageField.helpText|default(''),
-              errorMessage: ageField.errorMessage|default('Ce champ est invalide.')
-            } %}
-            {% include 'dev/components/select/select.twig' with {
-              id: 'pays',
-              label: countryField.label|default('Pays'),
-              size: countryField.size|default('md'),
-              disabled: countryField.disabled|default(false),
-              required: countryField.required|default(true),
-              hasError: countryField.hasError|default(false),
-              placeholder: countryField.placeholder|default('Choisissez un pays'),
-              helpText: countryField.helpText|default(''),
-              errorMessage: countryField.errorMessage|default('Veuillez selectionner une option.'),
-              options: [
-                { value: 'fr', label: 'France' },
-                { value: 'be', label: 'Belgique' },
-                { value: 'ch', label: 'Suisse' },
-                { value: 'ca', label: 'Canada' },
-                { value: 'lu', label: 'Luxembourg' }
-              ]
-            } %}
-          {% endset %}
-          {% include 'dev/components/grid/grid.twig' with {
-            cols: personalRow3Layout.cols|default('1'),
-            colsMd: personalRow3Layout.colsMd|default('3'),
-            gap: personalRow3Layout.gap|default('lg'),
-            align: personalRow3Layout.align|default('stretch'),
-            children: rowContent
-          } %}
+          <div class="grid grid--gap-lg" data-gf-component="grid">
+            <div class="grid-item grid--cols-12 grid--md-cols-4">
+              {% include 'dev/components/input/input.twig' with {
+                id: 'naissance',
+                label: birthDateField.label|default('Date de naissance'),
+                type: birthDateField.type|default('date'),
+                size: birthDateField.size|default('md'),
+                disabled: birthDateField.disabled|default(false),
+                required: birthDateField.required|default(false),
+                hasError: birthDateField.hasError|default(false),
+                placeholder: birthDateField.placeholder|default(''),
+                helpText: birthDateField.helpText|default(''),
+                errorMessage: birthDateField.errorMessage|default('Ce champ est invalide.')
+              } %}
+            </div>
+            <div class="grid-item grid--cols-12 grid--md-cols-4">
+              {% include 'dev/components/input/input.twig' with {
+                id: 'age',
+                label: ageField.label|default('Age'),
+                type: ageField.type|default('number'),
+                size: ageField.size|default('md'),
+                disabled: ageField.disabled|default(false),
+                required: ageField.required|default(false),
+                hasError: ageField.hasError|default(false),
+                placeholder: ageField.placeholder|default('ex : 30'),
+                helpText: ageField.helpText|default(''),
+                errorMessage: ageField.errorMessage|default('Ce champ est invalide.')
+              } %}
+            </div>
+            <div class="grid-item grid--cols-12 grid--md-cols-4">
+              {% include 'dev/components/select/select.twig' with {
+                id: 'pays',
+                label: countryField.label|default('Pays'),
+                size: countryField.size|default('md'),
+                disabled: countryField.disabled|default(false),
+                required: countryField.required|default(true),
+                hasError: countryField.hasError|default(false),
+                placeholder: countryField.placeholder|default('Choisissez un pays'),
+                helpText: countryField.helpText|default(''),
+                errorMessage: countryField.errorMessage|default('Veuillez selectionner une option.'),
+                options: [
+                  { value: 'fr', label: 'France' },
+                  { value: 'be', label: 'Belgique' },
+                  { value: 'ch', label: 'Suisse' },
+                  { value: 'ca', label: 'Canada' },
+                  { value: 'lu', label: 'Luxembourg' }
+                ]
+              } %}
+            </div>
+          </div>
         </section>
 
         <section class="form-page__section">
           <h2 class="form-page__section-title">Accès au compte</h2>
 
-          {% set rowContent %}
-            {% include 'dev/components/input/input.twig' with {
-              id: 'password',
-              label: passwordField.label|default('Mot de passe'),
-              type: passwordField.type|default('password'),
-              size: passwordField.size|default('md'),
-              disabled: passwordField.disabled|default(false),
-              required: passwordField.required|default(true),
-              hasError: passwordField.hasError|default(false),
-              placeholder: passwordField.placeholder|default('Min. 8 caracteres'),
-              helpText: passwordField.helpText|default('Majuscule, chiffre et caractere special recommandes.'),
-              errorMessage: passwordField.errorMessage|default('Ce champ est invalide.')
-            } %}
-            {% include 'dev/components/input/input.twig' with {
-              id: 'password-confirm',
-              label: passwordConfirmField.label|default('Confirmer le mot de passe'),
-              type: passwordConfirmField.type|default('password'),
-              size: passwordConfirmField.size|default('md'),
-              disabled: passwordConfirmField.disabled|default(false),
-              required: passwordConfirmField.required|default(true),
-              hasError: passwordConfirmField.hasError|default(false),
-              placeholder: passwordConfirmField.placeholder|default('Repetez le mot de passe'),
-              helpText: passwordConfirmField.helpText|default(''),
-              errorMessage: passwordConfirmField.errorMessage|default('Ce champ est invalide.')
-            } %}
-          {% endset %}
-          {% include 'dev/components/grid/grid.twig' with {
-            cols: accountRow1Layout.cols|default('1'),
-            colsMd: accountRow1Layout.colsMd|default('2'),
-            gap: accountRow1Layout.gap|default('lg'),
-            align: accountRow1Layout.align|default('stretch'),
-            children: rowContent
-          } %}
+          <div class="grid grid--gap-lg" data-gf-component="grid">
+            <div class="grid-item grid--cols-12 grid--md-cols-6">
+              {% include 'dev/components/input/input.twig' with {
+                id: 'password',
+                label: passwordField.label|default('Mot de passe'),
+                type: passwordField.type|default('password'),
+                size: passwordField.size|default('md'),
+                disabled: passwordField.disabled|default(false),
+                required: passwordField.required|default(true),
+                hasError: passwordField.hasError|default(false),
+                placeholder: passwordField.placeholder|default('Min. 8 caracteres'),
+                helpText: passwordField.helpText|default('Majuscule, chiffre et caractere special recommandes.'),
+                errorMessage: passwordField.errorMessage|default('Ce champ est invalide.')
+              } %}
+            </div>
+            <div class="grid-item grid--cols-12 grid--md-cols-6">
+              {% include 'dev/components/input/input.twig' with {
+                id: 'password-confirm',
+                label: passwordConfirmField.label|default('Confirmer le mot de passe'),
+                type: passwordConfirmField.type|default('password'),
+                size: passwordConfirmField.size|default('md'),
+                disabled: passwordConfirmField.disabled|default(false),
+                required: passwordConfirmField.required|default(true),
+                hasError: passwordConfirmField.hasError|default(false),
+                placeholder: passwordConfirmField.placeholder|default('Repetez le mot de passe'),
+                helpText: passwordConfirmField.helpText|default(''),
+                errorMessage: passwordConfirmField.errorMessage|default('Ce champ est invalide.')
+              } %}
+            </div>
+          </div>
 
-          {% set rowContent %}
-            {% include 'dev/components/select/select.twig' with {
-              id: 'profil',
-              label: profileField.label|default('Type de profil'),
-              size: profileField.size|default('md'),
-              disabled: profileField.disabled|default(false),
-              required: profileField.required|default(false),
-              hasError: profileField.hasError|default(false),
-              placeholder: profileField.placeholder|default('Choisissez un profil'),
-              helpText: profileField.helpText|default(''),
-              errorMessage: profileField.errorMessage|default('Veuillez selectionner une option.'),
-              options: [
-                { value: 'dev', label: 'Developpeur' },
-                { value: 'designer', label: 'Designer' },
-                { value: 'manager', label: 'Chef de projet' },
-                { value: 'other', label: 'Autre' }
-              ]
-            } %}
-          {% endset %}
-          {% include 'dev/components/grid/grid.twig' with {
-            cols: accountRow2Layout.cols|default('1'),
-            colsMd: accountRow2Layout.colsMd|default('2'),
-            gap: accountRow2Layout.gap|default('lg'),
-            align: accountRow2Layout.align|default('stretch'),
-            children: rowContent
-          } %}
+          <div class="grid grid--gap-lg" data-gf-component="grid">
+            <div class="grid-item grid--cols-12 grid--md-cols-6">
+              {% include 'dev/components/select/select.twig' with {
+                id: 'profil',
+                label: profileField.label|default('Type de profil'),
+                size: profileField.size|default('md'),
+                disabled: profileField.disabled|default(false),
+                required: profileField.required|default(false),
+                hasError: profileField.hasError|default(false),
+                placeholder: profileField.placeholder|default('Choisissez un profil'),
+                helpText: profileField.helpText|default(''),
+                errorMessage: profileField.errorMessage|default('Veuillez selectionner une option.'),
+                options: [
+                  { value: 'dev', label: 'Developpeur' },
+                  { value: 'designer', label: 'Designer' },
+                  { value: 'manager', label: 'Chef de projet' },
+                  { value: 'other', label: 'Autre' }
+                ]
+              } %}
+            </div>
+          </div>
         </section>
 
         <section class="form-page__section">
           <h2 class="form-page__section-title">Préférences</h2>
 
-          {% set rowContent %}
-            {% include 'dev/components/radio/radio.twig' with {
-              name: 'abonnement',
-              legend: subscriptionField.legend|default('Abonnement'),
-              disabled: subscriptionField.disabled|default(false),
-              hasError: subscriptionField.hasError|default(false),
-              inline: subscriptionField.inline|default(false),
-              errorMessage: subscriptionField.errorMessage|default('Veuillez choisir une option.'),
-              value: 'mensuel',
-              options: [
-                { value: 'gratuit', label: 'Gratuit - fonctions de base' },
-                { value: 'mensuel', label: 'Mensuel - 9 €/mois' },
-                { value: 'annuel', label: 'Annuel - 79 €/an' }
-              ]
-            } %}
-            <div class="form-page__switches">
-              {% include 'dev/components/switch/switch.twig' with {
-                id: 'notif-email',
-                label: notifEmailField.label|default('Notifications par e-mail'),
-                checked: notifEmailField.checked|default(true),
-                disabled: notifEmailField.disabled|default(false),
-                size: notifEmailField.size|default('md'),
-                labelOn: notifEmailField.labelOn|default('Active'),
-                labelOff: notifEmailField.labelOff|default('Desactive')
-              } %}
-              {% include 'dev/components/switch/switch.twig' with {
-                id: 'notif-sms',
-                label: notifSmsField.label|default('Notifications par SMS'),
-                checked: notifSmsField.checked|default(false),
-                disabled: notifSmsField.disabled|default(false),
-                size: notifSmsField.size|default('md'),
-                labelOn: notifSmsField.labelOn|default('Active'),
-                labelOff: notifSmsField.labelOff|default('Desactive')
-              } %}
-              {% include 'dev/components/switch/switch.twig' with {
-                id: 'newsletter',
-                label: newsletterField.label|default('Recevoir la newsletter'),
-                checked: newsletterField.checked|default(true),
-                disabled: newsletterField.disabled|default(false),
-                size: newsletterField.size|default('md'),
-                labelOn: newsletterField.labelOn|default('Active'),
-                labelOff: newsletterField.labelOff|default('Desactive')
+          <div class="grid grid--gap-xl" data-gf-component="grid">
+            <div class="grid-item grid--cols-12 grid--md-cols-6">
+              {% include 'dev/components/radio/radio.twig' with {
+                name: 'abonnement',
+                legend: subscriptionField.legend|default('Abonnement'),
+                disabled: subscriptionField.disabled|default(false),
+                hasError: subscriptionField.hasError|default(false),
+                inline: subscriptionField.inline|default(false),
+                errorMessage: subscriptionField.errorMessage|default('Veuillez choisir une option.'),
+                value: 'mensuel',
+                options: [
+                  { value: 'gratuit', label: 'Gratuit - fonctions de base' },
+                  { value: 'mensuel', label: 'Mensuel - 9 €/mois' },
+                  { value: 'annuel', label: 'Annuel - 79 €/an' }
+                ]
               } %}
             </div>
-          {% endset %}
-          {% include 'dev/components/grid/grid.twig' with {
-            cols: preferencesRow1Layout.cols|default('1'),
-            colsMd: preferencesRow1Layout.colsMd|default('2'),
-            gap: preferencesRow1Layout.gap|default('xl'),
-            align: preferencesRow1Layout.align|default('stretch'),
-            children: rowContent
-          } %}
+            <div class="grid-item grid--cols-12 grid--md-cols-6">
+              <div class="form-page__switches">
+                {% include 'dev/components/switch/switch.twig' with {
+                  id: 'notif-email',
+                  label: notifEmailField.label|default('Notifications par e-mail'),
+                  checked: notifEmailField.checked|default(true),
+                  disabled: notifEmailField.disabled|default(false),
+                  size: notifEmailField.size|default('md'),
+                  labelOn: notifEmailField.labelOn|default('Active'),
+                  labelOff: notifEmailField.labelOff|default('Desactive')
+                } %}
+                {% include 'dev/components/switch/switch.twig' with {
+                  id: 'notif-sms',
+                  label: notifSmsField.label|default('Notifications par SMS'),
+                  checked: notifSmsField.checked|default(false),
+                  disabled: notifSmsField.disabled|default(false),
+                  size: notifSmsField.size|default('md'),
+                  labelOn: notifSmsField.labelOn|default('Active'),
+                  labelOff: notifSmsField.labelOff|default('Desactive')
+                } %}
+                {% include 'dev/components/switch/switch.twig' with {
+                  id: 'newsletter',
+                  label: newsletterField.label|default('Recevoir la newsletter'),
+                  checked: newsletterField.checked|default(true),
+                  disabled: newsletterField.disabled|default(false),
+                  size: newsletterField.size|default('md'),
+                  labelOn: newsletterField.labelOn|default('Active'),
+                  labelOff: newsletterField.labelOff|default('Desactive')
+                } %}
+              </div>
+            </div>
+          </div>
         </section>
 
         <section class="form-page__section">

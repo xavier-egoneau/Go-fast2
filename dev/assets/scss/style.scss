@@ -9,8 +9,10 @@
 @use 'base/mixins';
 @use 'base/forms';
 
+// Layout système (ne pas modifier — couplé au Design Surface)
+@use 'layout/grid';
+
 // Components
-@use 'components/grid';
 @use 'components/button';
 @use 'components/input';
 @use 'components/select';

@@ -40,15 +40,20 @@ export function scaffoldProject(config, rootDir = ROOT) {
     'dev/pages',
     'dev/data',
     'dev/assets/scss/components',
+    'dev/assets/scss/layout',
     'dev/assets/icons/unitaires',
   ]
   dirs.forEach(d => ensureDir(path.join(rootDir, d)))
 
-  // 2. Copier les fichiers SCSS base depuis templates/ (si SCSS)
+  // 2. Copier les fichiers SCSS base + layout depuis templates/ (si SCSS)
   if (useScss) {
     copyDir(
       path.join(rootDir, 'templates/scss/base'),
       path.join(rootDir, 'dev/assets/scss/base')
+    )
+    copyDir(
+      path.join(rootDir, 'templates/scss/layout'),
+      path.join(rootDir, 'dev/assets/scss/layout')
     )
   }
 
@@ -65,6 +70,7 @@ export function scaffoldProject(config, rootDir = ROOT) {
   if (useScss) {
     styleContent += `// Base\n@use 'base/variables';\n@use 'base/reset';\n@use 'base/typography';\n@use 'base/mixins';\n\n`
     if (useTailwind) styleContent += `/* Tailwind */\n@import "tailwindcss";\n\n`
+    styleContent += `// Layout système (ne pas modifier — couplé au Design Surface)\n@use 'layout/grid';\n\n`
     styleContent += `// Components\n// @use 'components/mon-composant';\n`
   }
 

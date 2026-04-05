@@ -52,6 +52,18 @@
       "component": "grid",
       "mode": "single",
       "autoBind": true
+    },
+    "header-nav": {
+      "label": "header-nav",
+      "component": "header-nav",
+      "mode": "single",
+      "autoBind": true
+    },
+    "switch": {
+      "label": "switch",
+      "component": "switch",
+      "mode": "single",
+      "autoBind": true
     }
   },
   "families": {

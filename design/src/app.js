@@ -761,11 +761,13 @@ function updatePreviewComposableOverlay() {
 
   button.hidden = false
   button.textContent = buttonLabel
-  const viewportPadding = 12
-  const maxLeft = Math.max(viewportPadding, window.innerWidth - button.offsetWidth - viewportPadding)
-  const maxTop = Math.max(viewportPadding, window.innerHeight - button.offsetHeight - viewportPadding)
-  const nextLeft = Math.min(maxLeft, Math.max(viewportPadding, previewComposableTarget.x))
-  const nextTop = Math.min(maxTop, Math.max(viewportPadding, previewComposableTarget.y))
+  const viewportPadding = 8
+  // Centré horizontalement sur le composant, juste au-dessus de son bord haut
+  const centeredLeft = previewComposableTarget.x - button.offsetWidth / 2
+  const aboveTop = previewComposableTarget.y - button.offsetHeight - 6
+  const maxLeft = window.innerWidth - button.offsetWidth - viewportPadding
+  const nextLeft = Math.min(maxLeft, Math.max(viewportPadding, centeredLeft))
+  const nextTop = Math.max(viewportPadding, aboveTop)
   button.style.left = `${nextLeft}px`
   button.style.top = `${nextTop}px`
 }
@@ -1983,16 +1985,17 @@ function extractPreviewComposableTarget(frame, candidate, pointerEvent = null) {
   // Pour les composants auto-détectés, ignorer ceux qui correspondent au composant parent lui-même
   if (isAutoDetected && childComponent === item.ref) return null
 
+  // Les composants de layout sont gérés par leur propre overlay — pas par le bouton composable
+  const LAYOUT_ONLY_COMPONENTS = new Set(['grid'])
+  if (isAutoDetected && LAYOUT_ONLY_COMPONENTS.has(childComponent)) return null
+
   const frameRect = frame.getBoundingClientRect()
   const candidateRect = candidate.getBoundingClientRect()
   const scaleX = frame.clientWidth ? frameRect.width / frame.clientWidth : 1
   const scaleY = frame.clientHeight ? frameRect.height / frame.clientHeight : 1
-  const pointerX = pointerEvent
-    ? (frameRect.left + (pointerEvent.clientX * scaleX))
-    : (frameRect.left + (candidateRect.left * scaleX))
-  const pointerY = pointerEvent
-    ? (frameRect.top + (pointerEvent.clientY * scaleY))
-    : (frameRect.top + (candidateRect.top * scaleY))
+  // Ancre le bouton au centre-haut du composant (pas à la souris)
+  const anchorX = frameRect.left + (candidateRect.left + candidateRect.width / 2) * scaleX
+  const anchorY = frameRect.top + candidateRect.top * scaleY
 
   const closestGrid = candidate.parentElement?.closest?.('[data-gf-component="grid"]')
   const gridCellEl = closestGrid
@@ -2002,6 +2005,23 @@ function extractPreviewComposableTarget(frame, candidate, pointerEvent = null) {
     ? [...closestGrid.children].indexOf(gridCellEl)
     : null
   const gridTotalCells = closestGrid ? closestGrid.children.length : null
+  const allGridsInFrame = closestGrid
+    ? [...frame.contentDocument.querySelectorAll('[data-gf-component="grid"]')]
+    : []
+  const gridIndex = closestGrid ? allGridsInFrame.indexOf(closestGrid) : null
+  let gridColCount = null
+  if (closestGrid) {
+    try {
+      const computed = frame.contentWindow.getComputedStyle(closestGrid).gridTemplateColumns
+      // La grille est toujours repeat(12, 1fr) : computed = "Npx Npx ... x12"
+      if (computed && computed !== 'none' && !computed.includes('(')) {
+        const count = computed.trim().split(/\s+/).filter(Boolean).length
+        if (count > 0) gridColCount = count
+      }
+    } catch (_) {}
+    // fallback : la grille est toujours 12 colonnes
+    if (!gridColCount) gridColCount = 12
+  }
 
   return {
     itemId,
@@ -2011,12 +2031,14 @@ function extractPreviewComposableTarget(frame, candidate, pointerEvent = null) {
     label: isAutoDetected ? childComponent : (candidate.dataset.gfNodeLabel || childComponent),
     exposed: isAutoDetected ? false : (candidate.dataset.gfExposed !== 'false'),
     metaPath: `${parentEntry.path}.json`,
-    x: pointerX + 12,
-    y: pointerY + 12,
+    x: anchorX,
+    y: anchorY,
     width: candidateRect.width,
     height: candidateRect.height,
     gridCellIndex,
-    gridTotalCells
+    gridTotalCells,
+    gridColCount,
+    gridIndex
   }
 }
 
@@ -2121,21 +2143,40 @@ function bindPreviewComposableHoverEvents() {
   })
 }
 
+// Préfixes CSS par viewport
+const GRID_VIEWPORT_PREFIXES = { mobile: '', tablet: 'sm-', desktop: 'md-' }
+const GRID_VIEWPORTS = [
+  { key: 'mobile',  label: 'Mobile' },
+  { key: 'tablet',  label: 'Tablette' },
+  { key: 'desktop', label: 'Desktop' }
+]
+
 function applyGridCellStyles(itemId) {
   const item = getState().scene.items.find(i => i.id === itemId)
   if (!item) return
   const gridCells = item.gridCells || {}
   const frame = rootEl?.querySelector(`.ds-item[data-item-id="${CSS.escape(itemId)}"] .ds-item__frame`)
   if (!frame?.contentDocument) return
-  frame.contentDocument.querySelectorAll('[data-gf-component="grid"]').forEach(gridEl => {
-    ;[...gridEl.children].forEach((child, index) => {
-      const span = gridCells[index]?.span
-      child.style.gridColumn = span ? `span ${span}` : ''
+  frame.contentDocument.querySelectorAll('[data-gf-component="grid"]').forEach((gridEl, gridIndex) => {
+    ;[...gridEl.children].forEach((child, cellIndex) => {
+      const key = `${gridIndex}:${cellIndex}`
+      const entry = gridCells[key]
+      if (!entry) return
+      // Appliquer chaque breakpoint indépendamment
+      Object.entries(GRID_VIEWPORT_PREFIXES).forEach(([vp, prefix]) => {
+        const span = entry[vp]
+        const classPrefix = `grid--${prefix}cols-`
+        child.classList.forEach(cls => {
+          if (cls.startsWith(classPrefix)) child.classList.remove(cls)
+        })
+        if (span) child.classList.add(`${classPrefix}${span}`)
+      })
     })
   })
 }
 
-function updateGridCellSpan(itemId, cellIndex, span) {
+function updateGridCellSpan(itemId, gridIndex, cellIndex, span, viewport) {
+  const key = `${gridIndex}:${cellIndex}`
   setState(prev => ({
     ...prev,
     scene: {
@@ -2143,10 +2184,16 @@ function updateGridCellSpan(itemId, cellIndex, span) {
       items: prev.scene.items.map(item => {
         if (item.id !== itemId) return item
         const gridCells = { ...(item.gridCells || {}) }
+        const entry = { ...(gridCells[key] || {}) }
         if (!span || span === 'auto') {
-          delete gridCells[cellIndex]
+          delete entry[viewport]
         } else {
-          gridCells[cellIndex] = { span: parseInt(span, 10) }
+          entry[viewport] = parseInt(span, 10)
+        }
+        if (Object.keys(entry).length === 0) {
+          delete gridCells[key]
+        } else {
+          gridCells[key] = entry
         }
         return { ...item, gridCells }
       })
@@ -2252,22 +2299,26 @@ function renderComposablePopover() {
   const variantControls = Object.entries(childEntry.variants || {}).map(([key, ctrl]) => buildControl(key, ctrl, 'variants')).join('')
   const contentControls = Object.entries(childEntry.content || {}).map(([key, ctrl]) => buildControl(key, ctrl, 'content')).join('')
 
-  const currentSpan = gridContext !== null
-    ? (item.gridCells?.[gridContext.cellIndex]?.span ?? 'auto')
-    : null
-  const spanOptions = ['auto', 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-    .map(v => {
-      const label = v === 'auto' ? 'Auto' : `${v} / 12`
-      const selected = String(currentSpan) === String(v) ? ' selected' : ''
-      return `<option value="${v}"${selected}>${label}</option>`
+  const gridKey = gridContext !== null ? `${gridContext.gridIndex}:${gridContext.cellIndex}` : null
+  const gridEntry = gridKey !== null ? (item.gridCells?.[gridKey] || {}) : {}
+  const spanMax = gridContext?.colCount || 12
+  const spanValues = ['auto', ...Array.from({ length: spanMax }, (_, i) => i + 1)]
+  const buildSpanSelect = (vp) => {
+    const current = gridEntry[vp] ?? 'auto'
+    const options = spanValues.map(v => {
+      const lbl = v === 'auto' ? 'Auto' : `${v} / ${spanMax}`
+      return `<option value="${v}"${String(current) === String(v) ? ' selected' : ''}>${lbl}</option>`
     }).join('')
+    return `<select class="ds-field__select" data-action="grid-cell-span-change" data-item-id="${escapeAttr(itemId)}" data-grid-index="${gridContext.gridIndex}" data-cell-index="${gridContext.cellIndex}" data-viewport="${vp}">${options}</select>`
+  }
   const gridSection = gridContext !== null
     ? `<div class="ds-composable-popover__group">
         <h4 class="ds-composable-popover__group-title">Grille — cellule ${gridContext.cellIndex + 1} / ${gridContext.totalCells}</h4>
+        ${GRID_VIEWPORTS.map(({ key: vp, label }) => `
         <label class="ds-field">
-          <span class="ds-field__label">Colonnes</span>
-          <select class="ds-field__select" data-action="grid-cell-span-change" data-item-id="${escapeAttr(itemId)}" data-cell-index="${gridContext.cellIndex}">${spanOptions}</select>
-        </label>
+          <span class="ds-field__label">${label}</span>
+          ${buildSpanSelect(vp)}
+        </label>`).join('')}
        </div>`
     : ''
 
@@ -2305,7 +2356,13 @@ function renderComposablePopover() {
   })
   el.querySelectorAll('[data-action="grid-cell-span-change"]').forEach(select => {
     select.addEventListener('change', () => {
-      updateGridCellSpan(select.dataset.itemId, parseInt(select.dataset.cellIndex, 10), select.value)
+      updateGridCellSpan(
+        select.dataset.itemId,
+        parseInt(select.dataset.gridIndex, 10),
+        parseInt(select.dataset.cellIndex, 10),
+        select.value,
+        select.dataset.viewport
+      )
     })
   })
   el.querySelector('.ds-composable-popover__close')?.addEventListener('click', closeComposablePopover)
@@ -2318,7 +2375,7 @@ async function handlePreviewComposableEdit() {
   clearPreviewComposableTarget()
 
   const gridContext = (target.gridCellIndex !== null && target.gridCellIndex !== undefined)
-    ? { cellIndex: target.gridCellIndex, totalCells: target.gridTotalCells }
+    ? { cellIndex: target.gridCellIndex, totalCells: target.gridTotalCells, colCount: target.gridColCount, gridIndex: target.gridIndex }
     : null
 
   if (target.exposed && target.nodeId) {
@@ -2693,9 +2750,10 @@ function render() {
   bindEvents()
   ensurePreviewComposableOverlayElement()
   updatePreviewComposableOverlay()
-  restoreCanvasScroll(renderState)
   restoreActiveControl(renderState)
   restorePendingComposableDrawerFocus()
+  // Scroll restauré en dernier : focus() et scrollIntoView() ci-dessus peuvent le perturber
+  restoreCanvasScroll(renderState)
 }
 
 function escapeHtml(value) {
@@ -2736,6 +2794,13 @@ export async function renderApp(root) {
 
     const sceneFiles = await listSceneFiles()
     patchState({ registryLoaded: true, tokensLoaded, sceneFiles })
+    // Enregistré une seule fois (pas dans bindEvents pour éviter les doublons au re-render)
+    document.addEventListener('pointerdown', event => {
+      const overlayBtn = rootEl?.querySelector('[data-preview-composable-overlay]')
+      if (overlayBtn && overlayBtn.contains(event.target)) return
+      clearPreviewComposableTarget()
+    }, { capture: true })
+
     subscribe(render)
     subscribeAgentState(() => render())
     await loadSceneFromFile('default.scene.json', { keepWorkingScene: hasWorkingScene() })

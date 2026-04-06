@@ -5,6 +5,7 @@ const EMPTY_ACTION_JSON = JSON.stringify(createEmptyBrainOutput(), null, 2)
 let agentState = {
   open: false,
   providerId: 'manual-json',
+  running: false,
   input: '',
   promptPreview: '',
   actionJson: EMPTY_ACTION_JSON,

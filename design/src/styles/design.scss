@@ -770,3 +770,259 @@ button.ds-badge,
   letter-spacing: 0.06em;
   color: var(--ds-text-muted);
 }
+
+// ── Workshop layout override ───────────────────────────────────────────────
+.ds-layout--workshop {
+  display: flex !important;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+// ── Topbar modes toggle ────────────────────────────────────────────────────
+.ds-topbar__left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ds-topbar__modes {
+  display: flex;
+  gap: 4px;
+}
+
+.ds-topbar__mode-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ds-text-muted);
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.ds-topbar__mode-btn:hover { color: var(--ds-text); }
+.ds-topbar__mode-btn--active {
+  color: var(--ds-text);
+  background: var(--ds-panel-2);
+  border-color: var(--ds-line);
+}
+
+// ── Component Workshop ──────────────────────────────────────────────────────
+.ds-layout--workshop {
+  height: 100%;
+  overflow: hidden;
+}
+
+.ds-workshop {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--ds-bg);
+}
+
+.ds-workshop__meta-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--ds-line);
+  background: var(--ds-panel);
+  flex-wrap: wrap;
+}
+
+.ds-field--inline {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.ds-field--inline .ds-field__label {
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--ds-text-muted);
+}
+
+.ds-field--inline .ds-field__input,
+.ds-field--inline .ds-field__select {
+  min-width: 120px;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.ds-workshop__body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ds-workshop__left {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--ds-line);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ds-workshop__tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--ds-line);
+  padding: 0 8px;
+  flex-shrink: 0;
+}
+
+.ds-workshop__tab {
+  border: none;
+  background: transparent;
+  color: var(--ds-text-muted);
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s;
+}
+.ds-workshop__tab:hover { color: var(--ds-text); }
+.ds-workshop__tab--active {
+  color: var(--ds-text);
+  border-bottom-color: var(--ds-accent);
+}
+
+.ds-workshop__editor-pane {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.ds-workshop__editor-pane--hidden { display: none; }
+
+.ds-workshop__codemirror {
+  flex: 1;
+  overflow: hidden;
+  height: 100%;
+
+  .cm-editor {
+    height: 100%;
+    font-size: 13px;
+  }
+}
+
+.ds-workshop__right {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ds-workshop__preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ds-line);
+  flex-shrink: 0;
+}
+
+.ds-workshop__preview-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ds-text-muted);
+}
+
+.ds-workshop__preview-frame {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: #f1f5f9;
+}
+
+.ds-workshop__error {
+  padding: 8px 12px;
+  background: rgba(248, 113, 113, 0.12);
+  color: #f87171;
+  font-size: 12px;
+  border-top: 1px solid rgba(248, 113, 113, 0.3);
+}
+
+.ds-workshop__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-top: 1px solid var(--ds-line);
+  background: var(--ds-panel);
+  flex-shrink: 0;
+}
+
+.ds-btn--sm {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+// ── Workshop agent pane ─────────────────────────────────────────────────────
+.ds-workshop__agent-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.ds-workshop__agent-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ds-text-muted);
+  line-height: 1.5;
+}
+
+.ds-workshop__agent-textarea {
+  flex: 1;
+  min-height: 140px;
+  resize: vertical;
+  background: var(--ds-panel-2);
+  border: 1px solid var(--ds-line);
+  border-radius: 8px;
+  color: var(--ds-text);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 10px 12px;
+  outline: none;
+  transition: border-color .15s;
+
+  &:focus { border-color: var(--ds-accent); }
+  &::placeholder { color: var(--ds-text-muted); }
+}
+
+.ds-workshop__agent-btn {
+  align-self: flex-end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ds-workshop__spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: ds-spin 0.7s linear infinite;
+}
+
+@keyframes ds-spin {
+  to { transform: rotate(360deg); }
+}

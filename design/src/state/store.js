@@ -18,6 +18,7 @@ function createInitialState() {
     query: '',
     zoom: 1,
     selectedItemId: null,
+    workshopMode: false,
     history: [],
     historyIndex: -1,
     sceneFiles: [],

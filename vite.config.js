@@ -557,6 +557,251 @@ function goFastPlugin() {
         })
       })
 
+      // ── Workshop : rendu Twig via fichier temp (supporte {% include %}) ──────
+      server.middlewares.use('/__design_api/workshop/preview', async (req, res, next) => {
+        if (req.method !== 'POST') return next()
+        let body = ''
+        req.on('data', chunk => { body += chunk })
+        req.on('end', async () => {
+          let tempTwig = null
+          try {
+            const { twig = '', params = {} } = JSON.parse(body || '{}')
+            let rendered = ''
+            try {
+              // Écrire dans le projet pour que le loader Twig custom résolve les {% include %}
+              const tmpDir = path.join(ROOT, '.workshop-tmp')
+              fs.mkdirSync(tmpDir, { recursive: true })
+              tempTwig = path.join(tmpDir, '_preview.twig')
+              fs.writeFileSync(tempTwig, twig, 'utf8')
+              rendered = await renderTwig(tempTwig, params)
+            } catch (twigErr) {
+              rendered = `<pre style="color:red;padding:1rem">Twig error:\n${twigErr.message}</pre>`
+            }
+            const fullHtml = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="${config.styleEntry || '/dev/assets/scss/style.scss'}">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background-color: #f1f5f9; display: flex; justify-content: center; align-items: flex-start; padding: 3rem 2rem; }
+  </style>
+</head>
+<body>${rendered}
+</body>
+</html>`
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ ok: true, html: fullHtml }))
+          } catch (error) {
+            res.statusCode = 500
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ error: error.message }))
+          } finally {
+            if (tempTwig && fs.existsSync(tempTwig)) fs.unlinkSync(tempTwig)
+          }
+        })
+      })
+
+      // ── Workshop : génère Twig + SCSS + meta via agent ─────────────────────
+      server.middlewares.use('/__design_api/workshop/agent', async (req, res, next) => {
+        if (req.method !== 'POST') return next()
+        let body = ''
+        req.on('data', chunk => { body += chunk })
+        req.on('end', async () => {
+          try {
+            const { intent = '', name = '', level = 'atom', category = '' } = JSON.parse(body || '{}')
+            if (!intent.trim()) throw new Error('intent requis')
+
+            // Lire le contenu complet de tous les composants existants
+            const componentsDir = path.join(ROOT, 'dev', 'components')
+            const componentEntries = []
+            if (fs.existsSync(componentsDir)) {
+              for (const slug of fs.readdirSync(componentsDir)) {
+                const twigPath = path.join(componentsDir, slug, `${slug}.twig`)
+                const jsonPath = path.join(componentsDir, slug, `${slug}.json`)
+                const scssPath = path.join(componentsDir, slug, `${slug}.scss`)
+                const twigContent = fs.existsSync(twigPath) ? fs.readFileSync(twigPath, 'utf8') : null
+                const jsonContent = fs.existsSync(jsonPath) ? fs.readFileSync(jsonPath, 'utf8') : null
+                const scssContent = fs.existsSync(scssPath) ? fs.readFileSync(scssPath, 'utf8') : null
+                if (twigContent) {
+                  componentEntries.push({ slug, twigPath: `dev/components/${slug}/${slug}.twig`, twigContent, jsonContent, scssContent })
+                }
+              }
+            }
+
+            // Lire les variables SCSS du design system
+            const variablesPath = path.join(ROOT, 'dev', 'assets', 'scss', 'base', '_variables.scss')
+            const scssVariables = fs.existsSync(variablesPath) ? fs.readFileSync(variablesPath, 'utf8') : ''
+
+            const componentsContext = componentEntries.map(e => `
+--- COMPONENT: ${e.slug} (include path: '${e.twigPath}') ---
+[meta.json]
+${e.jsonContent || 'n/a'}
+[twig]
+${e.twigContent}
+${e.scssContent ? `[scss]\n${e.scssContent}` : ''}
+`.trim()).join('\n\n')
+
+            const prompt = `=== COMPONENT WORKSHOP — JSON CODE GENERATION ===
+
+OUTPUT REQUIREMENT (read this first):
+Your response must contain ONLY a single valid JSON object — no markdown, no code fences, no explanation.
+
+DESIGN SYSTEM SCSS VARIABLES (use these, never hardcode values):
+${scssVariables}
+
+EXISTING COMPONENTS (study their Twig, BEM classes, SCSS patterns and reuse them):
+${componentsContext || 'none'}
+
+COMPONENT TO CREATE:
+- Intent: ${intent}
+- Name (slug): ${name || 'my-component'}
+- Level: ${level}
+- Category: ${category || 'General'}
+
+RETURN FORMAT (JSON only):
+{
+  "twig": "<complete twig template as string>",
+  "scss": "<complete SCSS for this component as string>",
+  "meta": {
+    "variants": {
+      "variantKey": { "label": "...", "type": "select|checkbox", "default": "...", "options": ["..."] }
+    },
+    "content": {
+      "contentKey": { "label": "...", "type": "text|color|number", "default": "..." }
+    }
+  }
+}
+
+RULES:
+- Copy the exact BEM naming style and SCSS patterns from the existing components above
+- All Twig variables must use |default() — copy the pattern from existing components
+- SCSS: use $variable-name tokens only, BEM selectors, @use '../base/variables' as * at top
+- meta.variants and meta.content: only keys actually used in the twig template
+- {% include %} paths MUST use the full path shown in each component header above, e.g. {% include 'dev/components/button/button.twig' with { ... } only %}
+- If you reuse a component with {% include %}, do not redeclare its SCSS
+- data-gf-component attribute on the root element is mandatory
+`
+
+            const codexBin = resolveCodexBin()
+            let result
+
+            if (codexBin) {
+              const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'workshop-agent-'))
+              const outputPath = path.join(tempDir, 'last-message.json')
+              try {
+                const spawnResult = await spawnCommand(codexBin, [
+                  'exec',
+                  '--skip-git-repo-check',
+                  '--sandbox', 'read-only',
+                  '--ephemeral',
+                  '--output-last-message', outputPath,
+                  '-'
+                ], { cwd: ROOT, input: `${prompt}\n`, timeoutMs: 120000 })
+
+                if (spawnResult.code !== 0) throw new Error(spawnResult.stderr.trim() || `Codex exited with code ${spawnResult.code}`)
+                const rawOutput = readCodexOutputFile(outputPath)
+                result = extractJsonFromText(rawOutput)
+              } finally {
+                fs.rmSync(tempDir, { recursive: true, force: true })
+              }
+            } else {
+              throw new Error('Aucun provider IA disponible. Configure Codex CLI pour utiliser l\'agent workshop.')
+            }
+
+            if (!result.twig) throw new Error('L\'agent n\'a pas retourné de template Twig')
+
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ ok: true, twig: result.twig, scss: result.scss || '', meta: result.meta || {} }))
+          } catch (error) {
+            res.statusCode = 500
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ ok: false, error: error.message }))
+          }
+        })
+      })
+
+      // ── Workshop : sauvegarde un nouveau composant sur disque ───────────────
+      server.middlewares.use('/__design_api/workshop/save', async (req, res, next) => {
+        if (req.method !== 'POST') return next()
+        let body = ''
+        req.on('data', chunk => { body += chunk })
+        req.on('end', async () => {
+          try {
+            const { name, level, category, description, twig, scss, meta } = JSON.parse(body || '{}')
+
+            if (!name || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(name)) {
+              throw new Error('Le nom doit être un slug valide (ex: accordion-toggle)')
+            }
+            if (!['atom', 'molecule', 'organism'].includes(level)) {
+              throw new Error('Niveau invalide')
+            }
+
+            const componentDir = path.join(ROOT, 'dev', 'components', name)
+            if (fs.existsSync(componentDir)) {
+              throw new Error(`Le composant "${name}" existe déjà dans dev/components/`)
+            }
+
+            // Construire le JSON du composant
+            const metaJson = {
+              name: name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+              level,
+              category: category || 'General',
+              description: description || '',
+              ...(meta && typeof meta === 'object' ? meta : {})
+            }
+
+            // Créer les fichiers
+            fs.mkdirSync(componentDir, { recursive: true })
+            fs.writeFileSync(path.join(componentDir, `${name}.twig`), twig || '', 'utf8')
+            fs.writeFileSync(path.join(componentDir, `${name}.json`), JSON.stringify(metaJson, null, 2), 'utf8')
+
+            // SCSS component file
+            const scssDir = path.join(ROOT, 'dev', 'assets', 'scss', 'components')
+            fs.mkdirSync(scssDir, { recursive: true })
+            const scssContent = scss || `.${name} {\n  // styles\n}\n`
+            fs.writeFileSync(path.join(scssDir, `_${name}.scss`), scssContent, 'utf8')
+
+            // Injecter @use dans style.scss
+            const stylePath = path.join(ROOT, 'dev', 'assets', 'scss', 'style.scss')
+            if (fs.existsSync(stylePath)) {
+              let styleContent = fs.readFileSync(stylePath, 'utf8')
+              const useImport = `@use 'components/${name}';`
+              if (!styleContent.includes(useImport)) {
+                // Trouver la dernière ligne @use 'components/...' et insérer après
+                const lines = styleContent.split('\n')
+                let lastComponentUseIdx = -1
+                for (let i = lines.length - 1; i >= 0; i--) {
+                  if (lines[i].startsWith("@use 'components/")) {
+                    lastComponentUseIdx = i
+                    break
+                  }
+                }
+                if (lastComponentUseIdx >= 0) {
+                  lines.splice(lastComponentUseIdx + 1, 0, useImport)
+                } else {
+                  lines.push(useImport)
+                }
+                fs.writeFileSync(stylePath, lines.join('\n'), 'utf8')
+              }
+            }
+
+            // Régénérer showcase.json
+            const { generateShowcase } = await import('./scripts/generate-showcase.js')
+            await generateShowcase()
+            server.ws.send({ type: 'custom', event: 'gofast:update' })
+
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ ok: true, id: name }))
+          } catch (error) {
+            res.statusCode = 400
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ ok: false, error: error.message }))
+          }
+        })
+      })
+
       // Génère showcase.json + sprite icônes au démarrage
       import('./scripts/generate-showcase.js').then(({ generateShowcase }) => generateShowcase())
       import('./scripts/generate-icons.js').then(({ generateIcons }) => generateIcons())

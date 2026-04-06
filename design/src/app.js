@@ -30,6 +30,9 @@ import {
 } from './state/store.js'
 import { getAgentState, patchAgentState, subscribeAgentState } from './state/agent-store.js'
 import { renderAgentPanel } from './ui/agent-panel.js'
+import { renderWorkshop } from './workshop/workshop-view.js'
+import { bindWorkshopEvents } from './workshop/workshop-events.js'
+import { getWorkshopState } from './workshop/workshop-store.js'
 
 let rootEl = null
 let dragState = null
@@ -981,6 +984,7 @@ function handleAgentFillTemplate() {
 }
 
 async function handleAgentSubmit() {
+  patchAgentState({ running: true, runtimeError: '' })
   try {
     await loadRegistry()
     try {
@@ -1023,10 +1027,11 @@ async function handleAgentSubmit() {
     const previewScene = applyActionSetToScene(state.scene, validation.normalized, getEntryById)
     patchAgentState({
       ...nextPatch,
+      running: false,
       previewScene
     })
   } catch (error) {
-    patchAgentState({ runtimeError: error.message || 'Runtime error', feedbackDismissed: false })
+    patchAgentState({ running: false, runtimeError: error.message || 'Runtime error', feedbackDismissed: false })
   }
   render()
 }
@@ -1590,19 +1595,23 @@ function renderInspector() {
 }
 
 function renderTopbar() {
-  const { scene, history, historyIndex, sceneFiles, activeSceneFile } = getState()
+  const { scene, history, historyIndex, sceneFiles, activeSceneFile, workshopMode } = getState()
   const agent = getAgentState()
   const viewport = getViewportConfig(scene.viewport || 'desktop')
-  const showSceneSelector = (sceneFiles || []).length > 1
+  const showSceneSelector = !workshopMode && (sceneFiles || []).length > 1
   const zoomPercent = Math.round(getState().zoom * 100)
   return `
     <header class="ds-topbar">
-      <div>
-        <div class="ds-topbar__title">Design Surface</div>
-        <div class="ds-topbar__meta">${escapeHtml(scene.name)} · ${scene.items.length} item(s) · ${(scene.notes || []).length} note(s) · viewport ${escapeHtml(viewport.label)} (${escapeHtml(viewport.breakpointValue || '')}, ${escapeHtml(viewport.breakpoint || '')})</div>
+      <div class="ds-topbar__left">
+        <div class="ds-topbar__modes">
+          <button class="ds-topbar__mode-btn${!workshopMode ? ' ds-topbar__mode-btn--active' : ''}" data-action="mode-canvas">Design Surface</button>
+          <button class="ds-topbar__mode-btn${workshopMode ? ' ds-topbar__mode-btn--active' : ''}" data-action="mode-workshop">+ Créer un composant</button>
+        </div>
+        ${!workshopMode ? `<div class="ds-topbar__meta">${escapeHtml(scene.name)} · ${scene.items.length} item(s) · ${(scene.notes || []).length} note(s) · viewport ${escapeHtml(viewport.label)} (${escapeHtml(viewport.breakpointValue || '')}, ${escapeHtml(viewport.breakpoint || '')})</div>` : ''}
       </div>
       <div class="ds-topbar__actions">
         ${showSceneSelector ? `<select class="ds-field__select" data-action="scene-file" style="width: 180px;">${(sceneFiles || []).map(file => `<option value="${escapeAttr(file.file)}"${file.file === activeSceneFile ? ' selected' : ''}>${escapeHtml(file.name)}</option>`).join('')}</select>` : ''}
+        ${!workshopMode ? `
         <div class="ds-zoom-controls">
           <button class="ds-btn" data-action="zoom-out" title="Zoom arrière">−</button>
           <button class="ds-btn" data-action="zoom-reset" title="Réinitialiser le zoom">${zoomPercent}%</button>
@@ -1614,13 +1623,18 @@ function renderTopbar() {
         </div>
         <button class="ds-btn" data-action="organize-canvas">Organize canvas</button>
         <button class="ds-btn ${agent.open ? 'ds-btn--active' : ''}" data-action="toggle-agent">Agent</button>
+        ` : ''}
       </div>
     </header>
   `
 }
 
 function renderLayout() {
+  const { workshopMode } = getState()
   const agent = getAgentState()
+  if (workshopMode) {
+    return `<div class="ds-app">${renderTopbar()}<div class="ds-layout ds-layout--workshop">${renderWorkshop(getWorkshopState())}</div></div>`
+  }
   const content = `${renderInspectorWrapped()}${renderCanvas()}${renderAgentPanel({ selectionHint: getAgentSelectionHint() })}`
   return `<div class="ds-app">${renderTopbar()}<div class="ds-layout ds-layout--no-nav${agent.open ? ' ds-layout--with-agent' : ''}">${content}</div></div>`
 }
@@ -2577,6 +2591,8 @@ function bindEvents() {
   rootEl.querySelectorAll('[data-resize-handle]').forEach(handle => handle.addEventListener('pointerdown', event => { event.preventDefault(); event.stopPropagation(); startResize(handle.dataset.resizeHandle, event) }))
   rootEl.querySelectorAll('[data-lane-resize-handle]').forEach(handle => handle.addEventListener('pointerdown', event => { event.preventDefault(); event.stopPropagation(); startLaneResize(handle.dataset.laneResizeHandle, event) }))
   bindSelectionDependentEvents()
+  rootEl.querySelector('[data-action="mode-canvas"]')?.addEventListener('click', () => patchState({ workshopMode: false }))
+  rootEl.querySelector('[data-action="mode-workshop"]')?.addEventListener('click', () => patchState({ workshopMode: true }))
   rootEl.querySelector('[data-action="scene-file"]')?.addEventListener('change', event => loadSceneFromFile(event.target.value))
   rootEl.querySelector('[data-action="zoom-out"]')?.addEventListener('click', () => shiftZoom(-0.1))
   rootEl.querySelector('[data-action="zoom-in"]')?.addEventListener('click', () => shiftZoom(0.1))
@@ -2777,6 +2793,9 @@ function render() {
   rootEl.innerHTML = renderLayout()
   restorePersistentFrames(renderState)
   bindEvents()
+  if (getState().workshopMode) {
+    bindWorkshopEvents(rootEl)
+  }
   ensurePreviewComposableOverlayElement()
   updatePreviewComposableOverlay()
   restoreActiveControl(renderState)

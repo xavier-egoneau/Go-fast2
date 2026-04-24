@@ -1,626 +1,817 @@
 /**
- * showcase.js — Logique principale du showcase Go-fast
- * Gère : chargement de showcase.json, navigation, contrôles dynamiques, re-render
+ * showcase.js — Go-fast Design Surface
+ * SPA : machine d'états big picture ↔ focus, panneau agent, inspecteur.
  */
 
 const SHOWCASE_JSON = '/dev/data/showcase.json'
 
-// ─── Stress test ──────────────────────────────────────────────────────────────
+// ─── Icônes SVG inline ────────────────────────────────────────────────────────
 
-const STRESS_MODES = [
-  {
-    id: 'normal',
-    label: 'Normal',
-    description: 'Valeurs par défaut'
-  },
-  {
-    id: 'long',
-    label: 'Long',
-    description: 'Texte de 200+ caractères'
-  },
-  {
-    id: 'empty',
-    label: 'Vide',
-    description: 'Contenu vide'
-  },
-  {
-    id: 'overflow',
-    label: 'Overflow',
-    description: 'Texte sans espace (débordement)'
-  }
+const ICONS = {
+  edit: `<svg class="gf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
+  trash: `<svg class="gf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
+  comment: `<svg class="gf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+  close: `<svg class="gf-icon gf-icon--xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+}
+
+// ─── Zoom ─────────────────────────────────────────────────────────────────────
+
+let zoomLevel = 1
+const ZOOM_STEP = 0.1
+const ZOOM_MIN  = 0.25
+const ZOOM_MAX  = 2
+
+function setZoom(next) {
+  const canvas = document.getElementById('gf-bigpicture')
+  const levels = document.getElementById('gf-levels')
+  if (!canvas || !levels) return
+
+  const cx = canvas.scrollLeft + canvas.clientWidth  / 2
+  const cy = canvas.scrollTop  + canvas.clientHeight / 2
+  const prev = zoomLevel
+
+  zoomLevel = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next))
+  levels.style.transform       = `scale(${zoomLevel})`
+  levels.style.transformOrigin = 'top left'
+
+  canvas.scrollLeft = cx * (zoomLevel / prev) - canvas.clientWidth  / 2
+  canvas.scrollTop  = cy * (zoomLevel / prev) - canvas.clientHeight / 2
+
+  const el = document.getElementById('gf-zoom-value')
+  if (el) el.textContent = Math.round(zoomLevel * 100) + '%'
+}
+
+function initZoomControls() {
+  document.getElementById('gf-zoom-in')?.addEventListener('click',  () => setZoom(zoomLevel + ZOOM_STEP))
+  document.getElementById('gf-zoom-out')?.addEventListener('click', () => setZoom(zoomLevel - ZOOM_STEP))
+
+  const canvas = document.getElementById('gf-bigpicture')
+  canvas?.addEventListener('wheel', e => {
+    if (!e.ctrlKey && !e.metaKey) return
+    e.preventDefault()
+    setZoom(zoomLevel + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP))
+  }, { passive: false })
+}
+
+// ─── Drag to pan ──────────────────────────────────────────────────────────────
+
+function initCanvasDrag() {
+  const canvas = document.getElementById('gf-bigpicture')
+  if (!canvas) return
+
+  let dragging = false, startX = 0, startY = 0, scrollL = 0, scrollT = 0
+
+  canvas.addEventListener('mousedown', e => {
+    if (e.target.closest('.gf-card')) return
+    dragging = true
+    startX   = e.pageX
+    startY   = e.pageY
+    scrollL  = canvas.scrollLeft
+    scrollT  = canvas.scrollTop
+    canvas.classList.add('is-dragging')
+  })
+
+  window.addEventListener('mousemove', e => {
+    if (!dragging) return
+    canvas.scrollLeft = scrollL - (e.pageX - startX)
+    canvas.scrollTop  = scrollT - (e.pageY - startY)
+  })
+
+  window.addEventListener('mouseup', () => {
+    if (!dragging) return
+    dragging = false
+    canvas.classList.remove('is-dragging')
+  })
+}
+
+// ─── Niveaux Atomic Design ────────────────────────────────────────────────────
+
+const LEVELS = [
+  { id: 'atom',     label: 'ATOMS' },
+  { id: 'molecule', label: 'MOLECULES' },
+  { id: 'organism', label: 'ORGANISMS' },
+  { id: 'template', label: 'TEMPLATES & PAGES' },
 ]
 
-const STRESS_LONG_TEXT = 'Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat duis aute irure dolor'
+// ─── État global ──────────────────────────────────────────────────────────────
 
-const STRESS_OVERFLOW_TEXT = 'Loremipsumdolorsitametconsecteturadipiscingelitseddoeiusmodtemporincididuntutlaboreetdoloremagnaaliquautenimadminimveniamquisnostrudexercitationullamco'
-
-let stressModeIndex = 0
-
-function getStressValue(ctrlType) {
-  const mode = STRESS_MODES[stressModeIndex]
-  if (mode.id === 'normal' || ctrlType !== 'text') return null
-  if (mode.id === 'long') return STRESS_LONG_TEXT
-  if (mode.id === 'empty') return ''
-  if (mode.id === 'overflow') return STRESS_OVERFLOW_TEXT
-  return null
-}
-
-function applyStressToControls(item) {
-  if (!item) return
-  const allControls = { ...(item.variants || {}), ...(item.content || {}) }
-  Object.entries(allControls).forEach(([key, ctrl]) => {
-    const stressVal = getStressValue(ctrl.type)
-    if (stressVal !== null) {
-      state.controlValues[key] = stressVal
-      // Sync l'input dans le DOM si présent
-      const input = document.getElementById(`gf-ctrl-${key}`)
-      if (input) input.value = stressVal
-    }
-  })
-}
-
-function resetControlsToDefaults(item) {
-  if (!item) return
-  const allControls = { ...(item.variants || {}), ...(item.content || {}) }
-  Object.entries(allControls).forEach(([key, ctrl]) => {
-    if (ctrl.type === 'text') {
-      state.controlValues[key] = ctrl.default ?? ''
-      const input = document.getElementById(`gf-ctrl-${key}`)
-      if (input) input.value = ctrl.default ?? ''
-    }
-  })
-}
-
-function updateStressModeUI() {
-  const mode = STRESS_MODES[stressModeIndex]
-  const btn = document.getElementById('gf-toggle-stress')
-  if (btn) {
-    btn.classList.toggle('gf-btn-icon--active', mode.id !== 'normal')
-    btn.setAttribute('aria-label', `Stress test : ${mode.label}`)
-    btn.setAttribute('title', `Stress test : ${mode.label}`)
-  }
-}
-
-function initStressTest(item) {
-  const toggleBtn = document.getElementById('gf-toggle-stress')
-
-  // Ne montrer le bouton que si l'item a des champs text
-  const hasTextFields = item && Object.values({ ...(item.variants || {}), ...(item.content || {}) })
-    .some(ctrl => ctrl.type === 'text')
-
-  if (!hasTextFields) {
-    if (toggleBtn) toggleBtn.hidden = true
-    return
-  }
-
-  toggleBtn?.addEventListener('click', () => {
-    stressModeIndex = (stressModeIndex + 1) % STRESS_MODES.length
-    updateStressModeUI()
-    if (stressModeIndex === 0) {
-      resetControlsToDefaults(state.activeItem)
-    } else {
-      applyStressToControls(state.activeItem)
-    }
-    renderPreview()
-  })
-
-  updateStressModeUI()
-}
-
-// ─── État global ─────────────────────────────────────────────────────────────
-
-let state = {
+const state = {
+  view: 'bigpicture',       // 'bigpicture' | 'focus'
   components: [],
   pages: [],
-  activeFilter: 'all',
   activeItem: null,
-  controlValues: {}
+  activeType: 'component',  // 'component' | 'page'
+  rightPanel: 'variants',   // 'variants' | 'comments'
+  controlValues: {},
+  comments: {},             // id → [{ author, date, body }]
+  agentOpen: true,
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 async function init() {
-  const isIndexPage = document.getElementById('gf-nav') !== null
-  const isPreviewPage = document.getElementById('gf-controls-form') !== null
-
   try {
     const res = await fetch(SHOWCASE_JSON)
     if (!res.ok) throw new Error(`Impossible de charger ${SHOWCASE_JSON}`)
     const data = await res.json()
     state.components = data.components || []
-    state.pages = data.pages || []
+    state.pages      = data.pages      || []
   } catch (e) {
-    console.error('[go-fast showcase]', e)
-    showError(e.message)
+    showGlobalError(e.message)
     return
   }
 
-  if (isIndexPage) {
-    initIndex()
-  } else if (isPreviewPage) {
-    initPreviewPage()
-  }
+  renderBigPicture()
+  updateSceneInfo()
+  bindTopBar()
+  bindInspectorTabs()
+  bindAgentPanel()
+  bindHMR()
 }
 
-// ─── Page index ───────────────────────────────────────────────────────────────
+// ─── Big picture ──────────────────────────────────────────────────────────────
 
-function initIndex() {
-  renderNav()
-  renderStats()
+function renderBigPicture() {
+  const levels = document.getElementById('gf-levels')
+  if (!levels) return
 
-  // Filtres
-  document.querySelectorAll('.gf-filter-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      state.activeFilter = btn.dataset.filter
-      document.querySelectorAll('.gf-filter-btn').forEach(b => b.classList.remove('gf-filter-btn--active'))
-      btn.classList.add('gf-filter-btn--active')
-      renderNav()
-    })
-  })
+  levels.innerHTML = LEVELS.map(level => {
+    const items = level.id === 'template'
+      ? [
+          ...state.components.filter(c => c.level === 'template'),
+          ...state.pages.map(p => ({ ...p, _isPage: true })),
+        ]
+      : state.components.filter(c => c.level === level.id)
 
-  // Recherche
-  const search = document.getElementById('gf-search')
-  if (search) {
-    search.addEventListener('input', debounce(renderNav, 150))
-  }
+    if (items.length === 0) return ''
 
-  // Pages
-  if (state.pages.length > 0) {
-    renderPagesNav()
-    const pagesSection = document.getElementById('gf-pages-section')
-    if (pagesSection) pagesSection.hidden = false
-  }
-}
-
-function renderNav() {
-  const nav = document.getElementById('gf-nav')
-  if (!nav) return
-
-  const query = (document.getElementById('gf-search')?.value || '').toLowerCase()
-
-  const filtered = state.components.filter(c => {
-    const matchFilter = state.activeFilter === 'all' || c.level === state.activeFilter
-    const matchSearch = !query || c.name.toLowerCase().includes(query) || c.category.toLowerCase().includes(query)
-    return matchFilter && matchSearch
-  })
-
-  if (filtered.length === 0) {
-    nav.innerHTML = '<p class="gf-nav__empty">Aucun composant trouvé.</p>'
-    return
-  }
-
-  // Grouper par catégorie
-  const byCategory = filtered.reduce((acc, c) => {
-    const cat = c.category || 'Général'
-    if (!acc[cat]) acc[cat] = []
-    acc[cat].push(c)
-    return acc
-  }, {})
-
-  nav.innerHTML = Object.entries(byCategory).map(([cat, items]) => `
-    <div class="gf-nav__group">
-      <h2 class="gf-nav__category">${cat}</h2>
-      <ul class="gf-nav__list">
-        ${items.map(c => `
-          <li class="gf-nav__item">
-            <a href="/app/templates/page-showcase.html?id=${c.id}" class="gf-nav__link">
-              <span class="gf-badge gf-badge--${c.level}">${c.level}</span>
-              <span class="gf-nav__name">${c.name}</span>
-            </a>
-          </li>
-        `).join('')}
-      </ul>
-    </div>
-  `).join('')
-}
-
-function renderPagesNav() {
-  const nav = document.getElementById('gf-pages-nav')
-  if (!nav) return
-  nav.innerHTML = `
-    <ul class="gf-nav__list">
-      ${state.pages.map(p => `
-        <li class="gf-nav__item">
-          <a href="/app/templates/page-showcase.html?type=page&id=${p.id}" class="gf-nav__link gf-nav__link--page">
-            <span class="gf-nav__name">${p.name}</span>
-          </a>
-        </li>
-      `).join('')}
-    </ul>
-  `
-}
-
-function renderStats() {
-  const el = document.getElementById('gf-stats')
-  if (!el) return
-  const counts = state.components.reduce((acc, c) => {
-    acc[c.level] = (acc[c.level] || 0) + 1
-    return acc
-  }, {})
-  el.innerHTML = Object.entries(counts).map(([level, count]) =>
-    `<span class="gf-stat"><strong>${count}</strong> ${level}${count > 1 ? 's' : ''}</span>`
-  ).join('')
-}
-
-// ─── Page preview isolée ──────────────────────────────────────────────────────
-
-function initPreviewPage() {
-  const params = new URLSearchParams(window.location.search)
-  const id = params.get('id')
-  const type = params.get('type') || 'component'
-  if (!id) return
-
-  const item = type === 'page'
-    ? state.pages.find(p => p.id === id)
-    : state.components.find(c => c.id === id)
-
-  if (!item) {
-    showError(`${type === 'page' ? 'Page' : 'Composant'} "${id}" introuvable dans showcase.json`)
-    return
-  }
-
-  state.activeItem = item
-  state.controlValues = getDefaultValues(item)
-
-  syncPreviewShell(item, type)
-  renderControls(item)
-  renderPreview()
-  initCopyCode()
-  initStressTest(item)
-
-  document.getElementById('gf-toggle-code')
-    ?.addEventListener('click', toggleCodeView)
-
-  // Toggle panneau de contrôles
-  const toggleControls = document.getElementById('gf-toggle-controls')
-  if (toggleControls) {
-    toggleControls.addEventListener('click', () => {
-      const panel = document.getElementById('gf-controls')
-      const expanded = toggleControls.getAttribute('aria-expanded') === 'true'
-      toggleControls.setAttribute('aria-expanded', String(!expanded))
-      if (panel) panel.hidden = expanded
-    })
-  }
-}
-
-function getDefaultValues(item) {
-  const values = {}
-  if (item.variants) {
-    Object.entries(item.variants).forEach(([key, ctrl]) => {
-      values[key] = ctrl.default
-    })
-  }
-  if (item.content) {
-    Object.entries(item.content).forEach(([key, ctrl]) => {
-      values[key] = ctrl.default
-    })
-  }
-  return values
-}
-
-function syncPreviewShell(item, type) {
-  document.title = `${item.name} — Go-fast`
-
-  const badge = document.getElementById('gf-item-badge')
-  const title = document.getElementById('gf-item-title')
-  const category = document.getElementById('gf-item-category')
-  const controlsLabel = document.getElementById('gf-controls-label')
-  const previewLabel = document.getElementById('gf-preview-label')
-
-  if (badge) {
-    badge.textContent = type === 'page' ? 'page' : (item.level || 'atom')
-    badge.className = `gf-badge gf-badge--${type === 'page' ? 'template' : (item.level || 'atom')}`
-  }
-  if (title) title.textContent = item.name || (type === 'page' ? 'Page' : 'Composant')
-  if (category) category.textContent = item.category || ''
-  if (controlsLabel) {
-    controlsLabel.textContent = type === 'page' ? 'Contrôles de la page' : 'Contrôles du composant'
-  }
-  if (previewLabel) {
-    previewLabel.setAttribute('aria-label', type === 'page' ? 'Aperçu de la page' : 'Aperçu du composant')
-  }
-}
-
-function renderControls(item) {
-  const form = document.getElementById('gf-controls-form')
-  const description = document.getElementById('gf-controls-description')
-  if (!form) return
-
-  if (description) {
-    description.textContent = item.description || ''
-    description.hidden = !item.description
-  }
-
-  const variants = item.variants || {}
-  const content = item.content || {}
-  const hasVariants = Object.keys(variants).length > 0
-  const hasContent = Object.keys(content).length > 0
-
-  if (!hasVariants && !hasContent) {
-    form.innerHTML = '<p class="gf-controls__empty">Aucun contrôle disponible pour cet élément.</p>'
-    return
-  }
-
-  const renderFieldset = (label, controls) => `
-    <fieldset class="gf-fieldset">
-      <legend class="gf-fieldset__legend">${label}</legend>
-      <div class="gf-fieldset__body">
-        ${Object.entries(controls).map(([key, ctrl]) => renderControl(key, ctrl)).join('')}
+    const grid = items.length > 3
+    return `
+      <div class="gf-level-col">
+        <h2 class="gf-level-col__title">${level.label}</h2>
+        <div class="gf-level-col__cards${grid ? ' gf-level-col__cards--grid' : ''}">
+          ${items.map(item => renderCard(item, item._isPage ? 'page' : 'component')).join('')}
+        </div>
       </div>
-    </fieldset>
+    `
+  }).join('')
+
+  lazyLoadCardFrames()
+  bindCardActions()
+}
+
+function renderCard(item, type) {
+  const level = type === 'page' ? 'template' : (item.level || 'atom')
+  // atom/molecule : _layout=card (padding 1.25rem + full width, auto-height)
+  // organism/page : _layout=full (scaled, hauteur fixe)
+  const cardLayout = (level === 'atom' || level === 'molecule') ? 'card' : 'full'
+  const frameSrc = `/${item.path}.html?_layout=${cardLayout}`
+
+  return `
+    <div class="gf-card"
+         data-id="${item.id}"
+         data-type="${type}"
+         data-level="${level}"
+         tabindex="0"
+         role="button"
+         aria-label="Ouvrir ${item.name}">
+      <div class="gf-card__preview">
+        <iframe
+          class="gf-card__frame"
+          data-src="${frameSrc}"
+          title="${item.name}"
+          aria-hidden="true"
+          tabindex="-1"
+        ></iframe>
+      </div>
+      <div class="gf-card__footer">
+        <div class="gf-card__meta">
+          <span class="gf-badge gf-badge--${level}">${type === 'page' ? 'page' : level}</span>
+          <span class="gf-card__name">${item.name}</span>
+        </div>
+        <div class="gf-card__actions" aria-label="Actions sur ${item.name}">
+          <button class="gf-card__action" data-action="edit" title="Modifier" aria-label="Modifier ${item.name}">${ICONS.edit}</button>
+          <button class="gf-card__action" data-action="comments" title="Commentaires" aria-label="Commentaires de ${item.name}">${ICONS.comment}</button>
+          <button class="gf-card__action gf-card__action--danger" data-action="delete" title="Supprimer" aria-label="Supprimer ${item.name}">${ICONS.trash}</button>
+        </div>
+      </div>
+    </div>
+  `
+}
+
+function lazyLoadCardFrames() {
+  const frames = document.querySelectorAll('.gf-card__frame[data-src]')
+  if (!frames.length) return
+
+  const load = frame => {
+    frame.src = frame.dataset.src
+    delete frame.dataset.src
+
+    // Auto-height pour atom/molecule (pas de scaling)
+    const card = frame.closest('.gf-card')
+    const level = card?.dataset.level
+    if (level === 'atom' || level === 'molecule') {
+      frame.addEventListener('load', () => {
+        try {
+          const doc     = frame.contentDocument
+          const h       = doc?.documentElement?.scrollHeight || doc?.body?.scrollHeight
+          if (h && h > 20) {
+            frame.style.height           = h + 'px'
+            frame.parentElement.style.height = h + 'px'
+          }
+        } catch (_) {}
+      }, { once: true })
+    }
+  }
+
+  if ('IntersectionObserver' in window) {
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) { load(e.target); obs.unobserve(e.target) } })
+    }, { rootMargin: '120px' })
+    frames.forEach(f => obs.observe(f))
+  } else {
+    frames.forEach(load)
+  }
+}
+
+function bindCardActions() {
+  document.querySelectorAll('.gf-card').forEach(card => {
+    card.querySelectorAll('.gf-card__action').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation()
+        const { action } = btn.dataset
+        const item = findItem(card.dataset.id, card.dataset.type)
+        if (!item) return
+        if (action === 'edit')     openFocusById(card.dataset.id, card.dataset.type)
+        if (action === 'comments') openFocusThenComments(item, card.dataset.type)
+        if (action === 'delete')   showDeleteDialog(item, card.dataset.type)
+      })
+    })
+  })
+}
+
+// ─── Navigation big picture ↔ focus ──────────────────────────────────────────
+
+function openFocusById(id, type) {
+  const item = findItem(id, type)
+  if (!item) return
+  openFocus(item, type)
+}
+
+function openFocus(item, type = 'component') {
+  state.activeItem    = item
+  state.activeType    = type
+  state.controlValues = getDefaultValues(item)
+  state.view          = 'focus'
+
+  document.body.dataset.view = 'focus'
+  document.getElementById('gf-bigpicture').hidden = true
+  document.getElementById('gf-focus').hidden      = false
+
+  document.getElementById('gf-scene-info').hidden = true
+  document.getElementById('gf-tabs').hidden        = false
+  renderTabs(item)
+
+  renderPreview()
+  setRightPanel('variants')
+  renderInspector(item)
+  setAgentContext(item)
+}
+
+function openFocusThenComments(item, type) {
+  openFocus(item, type)
+  setRightPanel('comments')
+}
+
+function openBigPicture() {
+  state.activeItem = null
+  state.view       = 'bigpicture'
+
+  document.body.dataset.view = 'bigpicture'
+  document.getElementById('gf-bigpicture').hidden = false
+  document.getElementById('gf-focus').hidden      = true
+
+  document.getElementById('gf-scene-info').hidden = false
+  document.getElementById('gf-tabs').hidden        = true
+
+  clearInspector()
+  clearAgentContext()
+}
+
+// ─── Tabs (mode focus) ────────────────────────────────────────────────────────
+
+function renderTabs(item) {
+  const tabs = document.getElementById('gf-tabs')
+
+  tabs.innerHTML = `
+    <button class="gf-tab" id="gf-tab-bigpicture" type="button" aria-label="Retour vue d'ensemble">
+      Design Surface
+    </button>
+    <div class="gf-tab gf-tab--active" role="tab" aria-selected="true">
+      <span>${item.name}</span>
+      <button class="gf-tab__close" id="gf-tab-close" type="button" aria-label="Fermer ${item.name}">${ICONS.close}</button>
+    </div>
   `
 
-  form.innerHTML = [
-    hasVariants ? renderFieldset('Variantes', variants) : '',
-    hasContent  ? renderFieldset('Contenu',   content)  : ''
-  ].join('')
-
-  form.addEventListener('change', handleControlChange)
-  form.addEventListener('input', handleControlChange)
+  document.getElementById('gf-tab-bigpicture')?.addEventListener('click', openBigPicture)
+  document.getElementById('gf-tab-close')?.addEventListener('click', openBigPicture)
 }
 
-function renderControl(key, ctrl) {
-  const id = `gf-ctrl-${key}`
-  const value = state.controlValues[key]
+// ─── Topbar ───────────────────────────────────────────────────────────────────
 
-  switch (ctrl.type) {
-    case 'select':
-      return `
-        <div class="gf-control">
-          <label class="gf-control__label" for="${id}">${ctrl.label}</label>
-          <select class="gf-control__select" id="${id}" name="${key}">
-            ${(ctrl.options || []).map(opt =>
-              `<option value="${opt}"${opt === value ? ' selected' : ''}>${opt}</option>`
-            ).join('')}
-          </select>
-        </div>
-      `
-    case 'checkbox':
-      return `
-        <div class="gf-control gf-control--checkbox">
-          <label class="gf-control__label" for="${id}">
-            <input class="gf-control__checkbox" type="checkbox" id="${id}" name="${key}"${value ? ' checked' : ''}>
-            ${ctrl.label}
-          </label>
-        </div>
-      `
-    case 'color':
-      return `
-        <div class="gf-control">
-          <label class="gf-control__label" for="${id}">${ctrl.label}</label>
-          <input class="gf-control__color" type="color" id="${id}" name="${key}" value="${value || '#000000'}">
-        </div>
-      `
-    case 'number':
-      return `
-        <div class="gf-control">
-          <label class="gf-control__label" for="${id}">${ctrl.label}</label>
-          <input class="gf-control__input" type="number" id="${id}" name="${key}" value="${value ?? 0}">
-        </div>
-      `
-    case 'text':
-    default:
-      return `
-        <div class="gf-control">
-          <label class="gf-control__label" for="${id}">${ctrl.label}</label>
-          <input class="gf-control__input" type="text" id="${id}" name="${key}" value="${value ?? ''}">
-        </div>
-      `
-  }
+function bindTopBar() {
+  document.getElementById('gf-scene-tab')?.addEventListener('click', () => {
+    if (state.view === 'focus') openBigPicture()
+  })
+
+  document.getElementById('gf-agent-toggle')?.addEventListener('click', toggleAgent)
 }
 
-function handleControlChange(e) {
-  const input = e.target
-  if (!input.name) return
-  const value = input.type === 'checkbox' ? input.checked : input.value
-  state.controlValues[input.name] = value
-  // Ferme le code panel si ouvert — le rendu va changer
-  const panel = document.getElementById('gf-code-panel')
-  const btn   = document.getElementById('gf-toggle-code')
-  const frame = document.getElementById('gf-preview-frame')
-  if (panel && !panel.hidden) {
-    panel.hidden = true
-    if (frame) frame.style.display = ''
-    btn?.setAttribute('aria-expanded', 'false')
-    btn?.classList.remove('gf-btn-icon--active')
-  }
-  renderPreview()
+function updateSceneInfo() {
+  const el = document.getElementById('gf-scene-info')
+  if (!el) return
+  const total = state.components.length + state.pages.length
+  const notes = 0
+  el.textContent = `Default scene · ${total} item(s) · ${notes} note(s) · viewport Desktop`
 }
 
-// ─── iframe preview ───────────────────────────────────────────────────────────
-
+// ─── Preview iframe ───────────────────────────────────────────────────────────
 
 function renderPreview() {
-  const frame = document.getElementById('gf-preview-frame')
+  const frame   = document.getElementById('gf-preview-frame')
   const errorEl = document.getElementById('gf-preview-error')
   if (!frame || !state.activeItem) return
 
-  const item = state.activeItem
+  const item   = state.activeItem
   const params = new URLSearchParams()
+  Object.entries(state.controlValues).forEach(([k, v]) => params.set(k, String(v)))
 
-  Object.entries(state.controlValues).forEach(([key, val]) => {
-    params.set(key, String(val))
-  })
+  const layout = (['organism', 'template', 'page'].includes(item.level)) ? 'full' : 'centered'
+  params.set('_layout', layout)
 
   if (errorEl) errorEl.hidden = true
 
-  // _layout : indique au middleware quel style de centrage appliquer au body wrapper
-  const layout = (item.level === 'organism' || item.level === 'template') ? 'full' : 'centered'
-  params.set('_layout', layout)
-
-  const url = `/${item.path}.html?${params.toString()}`
+  const url = `/${item.path}.html?${params}`
   frame.src = url
 
-  // Lien "ouvrir dans un nouvel onglet"
+  frame.onload = () => {
+    updateViewportSize(frame)
+    checkFrameError(frame, errorEl)
+  }
+
+  // "Ouvrir dans un nouvel onglet" si le bouton est là
   const newTabBtn = document.getElementById('gf-open-new-tab')
   if (newTabBtn) newTabBtn.href = url
 
-  // Indicateur viewport + gestion d'erreur au chargement
-  frame.onload = () => {
-    updateViewportSize(frame)
-    checkFrameError(frame)
-  }
-
-  // ResizeObserver : met à jour la taille affichée quand la fenêtre change
-  if (!renderPreview._resizeObserver) {
-    renderPreview._resizeObserver = new ResizeObserver(() => {
+  if (!renderPreview._obs) {
+    renderPreview._obs = new ResizeObserver(() => {
       const f = document.getElementById('gf-preview-frame')
       if (f) updateViewportSize(f)
     })
-    renderPreview._resizeObserver.observe(frame)
+    renderPreview._obs.observe(frame)
   }
 }
-
-// ─── Code source ──────────────────────────────────────────────────────────────
-
-function formatHTML(html) {
-  const INDENT = '  '
-  const voidTags = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr'])
-  let depth = 0
-  let result = ''
-
-  // Sépare les tokens sur des lignes distinctes
-  const lines = html
-    .trim()
-    .replace(/></g, '>\n<')
-    .replace(/(<[^/!][^>]*[^/]>)([^\n<])/g, '$1\n$2')
-    .split('\n')
-    .map(l => l.trim())
-    .filter(Boolean)
-
-  for (const line of lines) {
-    const isClose  = /^<\//.test(line)
-    const isOpen   = /^<[^/!]/.test(line)
-    const isSelf   = /\/>$/.test(line)
-    const tagMatch = line.match(/^<([a-zA-Z][a-zA-Z0-9-]*)/)
-    const tag      = tagMatch?.[1]?.toLowerCase()
-    const isVoid   = tag && voidTags.has(tag)
-    const selfClose = isSelf || isVoid
-
-    if (isClose) depth = Math.max(0, depth - 1)
-
-    result += INDENT.repeat(depth) + line + '\n'
-
-    if (isOpen && !selfClose) {
-      // Ne pas indenter si la balise se ferme sur la même ligne
-      const closeTag = tag ? `</${tag}` : null
-      const closesOnSameLine = closeTag && line.includes(closeTag)
-      if (!closesOnSameLine) depth++
-    }
-  }
-  return result.trim()
-}
-
-async function toggleCodeView() {
-  const frame    = document.getElementById('gf-preview-frame')
-  const panel    = document.getElementById('gf-code-panel')
-  const codeEl   = document.getElementById('gf-code-content')
-  const btn      = document.getElementById('gf-toggle-code')
-  if (!frame || !panel || !codeEl) return
-
-  const isOpen = !panel.hidden
-
-  if (isOpen) {
-    panel.hidden = true
-    frame.style.display = ''
-    btn?.setAttribute('aria-expanded', 'false')
-    btn?.classList.remove('gf-btn-icon--active')
-    return
-  }
-
-  const raw = frame.contentDocument?.body?.innerHTML || ''
-  const formatted = formatHTML(raw)
-
-  codeEl.textContent = formatted
-  window.Prism?.highlightElement(codeEl)
-
-  frame.style.display = 'none'
-  panel.hidden = false
-  btn?.setAttribute('aria-expanded', 'true')
-  btn?.classList.add('gf-btn-icon--active')
-}
-
-function initCopyCode() {
-  const btn = document.getElementById('gf-copy-code')
-  if (!btn) return
-  btn.addEventListener('click', async () => {
-    const code = document.getElementById('gf-code-content')?.textContent || ''
-    await navigator.clipboard.writeText(code)
-    btn.classList.add('gf-code-panel__copy--copied')
-    setTimeout(() => btn.classList.remove('gf-code-panel__copy--copied'), 1500)
-  })
-}
-
-// ─── Viewport + erreur iframe ─────────────────────────────────────────────────
 
 function updateViewportSize(frame) {
   const el = document.getElementById('gf-viewport-size')
   if (!el) return
-  const w = frame.offsetWidth
-  const h = frame.offsetHeight
-  el.textContent = `${w} × ${h}`
+  el.textContent = `${frame.offsetWidth} × ${frame.offsetHeight}`
 }
 
-function checkFrameError(frame) {
-  const errorEl = document.getElementById('gf-preview-error')
+function checkFrameError(frame, errorEl) {
   if (!errorEl) return
   try {
     const meta = frame.contentDocument?.querySelector('meta[name="gf-status"]')
     if (meta?.content === 'error') {
       const pre = frame.contentDocument.querySelector('pre')
-      errorEl.textContent = pre?.textContent || 'Erreur de rendu'
+      errorEl.textContent = pre?.textContent || 'Erreur de rendu Twig'
       errorEl.hidden = false
       frame.style.display = 'none'
     } else {
       errorEl.hidden = true
       frame.style.display = ''
     }
-  } catch (e) {}
+  } catch (_) {}
+}
+
+// ─── Inspecteur (panneau droit) ───────────────────────────────────────────────
+
+function bindInspectorTabs() {
+  document.querySelectorAll('.gf-itab').forEach(btn => {
+    btn.addEventListener('click', () => setRightPanel(btn.dataset.panel))
+  })
+}
+
+function setRightPanel(panel) {
+  state.rightPanel = panel
+
+  document.querySelectorAll('.gf-itab').forEach(btn => {
+    const active = btn.dataset.panel === panel
+    btn.classList.toggle('gf-itab--active', active)
+    btn.setAttribute('aria-selected', String(active))
+  })
+
+  if (panel === 'variants') renderInspector(state.activeItem)
+  if (panel === 'comments') renderComments()
+}
+
+function renderInspector(item) {
+  const body = document.getElementById('gf-inspector-body')
+  if (!body) return
+
+  if (!item) { clearInspector(); return }
+
+  const variants   = item.variants || {}
+  const content    = item.content  || {}
+  const hasV = Object.keys(variants).length > 0
+  const hasC = Object.keys(content).length  > 0
+
+  body.innerHTML = `
+    <div class="gf-insp-instance">
+      <p class="gf-insp-instance__name">${item.name}</p>
+      <div class="gf-insp-instance__meta">
+        <span class="gf-badge gf-badge--${item.level || 'atom'}">${state.activeType === 'page' ? 'page' : (item.level || 'atom')}</span>
+        ${item.category ? `<span style="font-size:0.75rem;color:var(--gf-text-muted)">${item.category}</span>` : ''}
+      </div>
+    </div>
+    ${hasV ? renderInspSection('VARIANTES', variants) : ''}
+    ${hasC ? renderInspSection('CONTENU',   content)  : ''}
+    <div class="gf-insp-actions">
+      <button class="gf-insp-btn gf-insp-btn--ghost" id="gf-open-newtab" type="button">
+        Ouvrir dans un onglet
+      </button>
+    </div>
+  `
+
+  body.addEventListener('change', handleControlChange)
+  body.addEventListener('input',  handleControlChange)
+
+  document.getElementById('gf-open-newtab')?.addEventListener('click', () => {
+    if (state.activeItem) window.open(`/${state.activeItem.path}.html`, '_blank', 'noopener')
+  })
+}
+
+function renderInspSection(label, controls) {
+  return `
+    <div class="gf-insp-section">
+      <h3 class="gf-insp-section__title">${label}</h3>
+      ${Object.entries(controls).map(([key, ctrl]) => renderField(key, ctrl)).join('')}
+    </div>
+  `
+}
+
+function renderField(key, ctrl) {
+  const id    = `gf-ctrl-${key}`
+  const value = state.controlValues[key]
+
+  if (ctrl.type === 'array') return '' // les arrays ne sont pas éditables ici
+
+  if (ctrl.type === 'select') return `
+    <div class="gf-field">
+      <label class="gf-field__label" for="${id}">${ctrl.label}</label>
+      <select class="gf-field__select" id="${id}" name="${key}" data-ctrl="${key}">
+        ${(ctrl.options || []).map(opt =>
+          `<option value="${opt}"${opt === value ? ' selected' : ''}>${opt}</option>`
+        ).join('')}
+      </select>
+    </div>
+  `
+
+  if (ctrl.type === 'checkbox') return `
+    <div class="gf-field gf-field--inline">
+      <label class="gf-field__label" for="${id}">${ctrl.label}</label>
+      <input class="gf-field__checkbox" type="checkbox" id="${id}" name="${key}" data-ctrl="${key}"${value ? ' checked' : ''}>
+    </div>
+  `
+
+  if (ctrl.type === 'color') return `
+    <div class="gf-field gf-field--inline">
+      <label class="gf-field__label" for="${id}">${ctrl.label}</label>
+      <input class="gf-field__color" type="color" id="${id}" name="${key}" data-ctrl="${key}" value="${value || '#000000'}">
+    </div>
+  `
+
+  if (ctrl.type === 'number') return `
+    <div class="gf-field">
+      <label class="gf-field__label" for="${id}">${ctrl.label}</label>
+      <input class="gf-field__input" type="number" id="${id}" name="${key}" data-ctrl="${key}" value="${value ?? 0}">
+    </div>
+  `
+
+  return `
+    <div class="gf-field">
+      <label class="gf-field__label" for="${id}">${ctrl.label}</label>
+      <input class="gf-field__input" type="text" id="${id}" name="${key}" data-ctrl="${key}" value="${value ?? ''}">
+    </div>
+  `
+}
+
+function handleControlChange(e) {
+  const input = e.target.closest('[data-ctrl]')
+  if (!input) return
+  const key   = input.dataset.ctrl
+  const value = input.type === 'checkbox' ? input.checked : input.value
+  state.controlValues[key] = value
+  closeCodePanelIfOpen()
+  renderPreview()
+}
+
+function clearInspector() {
+  const body = document.getElementById('gf-inspector-body')
+  if (!body) return
+  body.innerHTML = `
+    <div class="gf-inspector__empty">
+      <svg class="gf-icon gf-icon--lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+      <p>Sélectionne un composant pour voir ses variantes.</p>
+    </div>
+  `
+}
+
+// ─── Comments ─────────────────────────────────────────────────────────────────
+
+function renderComments() {
+  const body = document.getElementById('gf-inspector-body')
+  if (!body || !state.activeItem) return
+
+  const id       = state.activeItem.id
+  const comments = state.comments[id] || []
+
+  body.innerHTML = `
+    <div class="gf-comments">
+      <div class="gf-comments__list">
+        ${comments.length === 0
+          ? `<p class="gf-comments__empty">Aucun commentaire pour l'instant.</p>`
+          : comments.map(c => `
+              <div class="gf-comment">
+                <div class="gf-comment__header">
+                  <span class="gf-comment__author">${c.author}</span>
+                  <span class="gf-comment__date">${c.date}</span>
+                </div>
+                <p class="gf-comment__body">${c.body}</p>
+              </div>
+            `).join('')
+        }
+      </div>
+      <div class="gf-comments__compose">
+        <textarea
+          class="gf-comments__textarea"
+          id="gf-comment-input"
+          placeholder="Ajouter un commentaire…"
+          rows="2"
+        ></textarea>
+        <button class="gf-comments__submit" id="gf-comment-submit" type="button">Envoyer</button>
+      </div>
+    </div>
+  `
+
+  document.getElementById('gf-comment-submit')?.addEventListener('click', () => {
+    const input = document.getElementById('gf-comment-input')
+    const body  = input?.value.trim()
+    if (!body) return
+
+    if (!state.comments[id]) state.comments[id] = []
+    state.comments[id].push({
+      author: 'Moi',
+      date: new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
+      body,
+    })
+    renderComments()
+  })
+}
+
+// ─── Code source ──────────────────────────────────────────────────────────────
+
+function bindCodePanel() {
+  document.getElementById('gf-toggle-code')?.addEventListener('click', toggleCodeView)
+  document.getElementById('gf-copy-code')?.addEventListener('click', copyCode)
+}
+
+async function toggleCodeView() {
+  const frame  = document.getElementById('gf-preview-frame')
+  const panel  = document.getElementById('gf-code-panel')
+  const btn    = document.getElementById('gf-toggle-code')
+  if (!frame || !panel) return
+
+  const open = !panel.hidden
+  if (open) {
+    panel.hidden = true
+    frame.style.display = ''
+    btn?.setAttribute('aria-pressed', 'false')
+    return
+  }
+
+  const raw       = frame.contentDocument?.body?.innerHTML || ''
+  const formatted = formatHTML(raw)
+  const codeEl    = document.getElementById('gf-code-content')
+  if (codeEl) {
+    codeEl.textContent = formatted
+    window.Prism?.highlightElement(codeEl)
+  }
+  frame.style.display = 'none'
+  panel.hidden = false
+  btn?.setAttribute('aria-pressed', 'true')
+}
+
+function closeCodePanelIfOpen() {
+  const panel = document.getElementById('gf-code-panel')
+  const frame = document.getElementById('gf-preview-frame')
+  const btn   = document.getElementById('gf-toggle-code')
+  if (panel && !panel.hidden) {
+    panel.hidden = true
+    if (frame) frame.style.display = ''
+    btn?.setAttribute('aria-pressed', 'false')
+  }
+}
+
+async function copyCode() {
+  const code = document.getElementById('gf-code-content')?.textContent || ''
+  await navigator.clipboard.writeText(code)
+  const btn = document.getElementById('gf-copy-code')
+  if (!btn) return
+  btn.classList.add('gf-code-panel__copy--copied')
+  setTimeout(() => btn.classList.remove('gf-code-panel__copy--copied'), 1500)
+}
+
+function formatHTML(html) {
+  const INDENT  = '  '
+  const VOIDS   = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr'])
+  let depth = 0, result = ''
+
+  const lines = html.trim()
+    .replace(/></g, '>\n<')
+    .replace(/(<[^/!][^>]*[^/]>)([^\n<])/g, '$1\n$2')
+    .split('\n').map(l => l.trim()).filter(Boolean)
+
+  for (const line of lines) {
+    const isClose  = /^<\//.test(line)
+    const isOpen   = /^<[^/!]/.test(line)
+    const isSelf   = /\/>$/.test(line)
+    const tag      = line.match(/^<([a-zA-Z][a-zA-Z0-9-]*)/)?.[1]?.toLowerCase()
+    const selfClose = isSelf || VOIDS.has(tag)
+
+    if (isClose) depth = Math.max(0, depth - 1)
+    result += INDENT.repeat(depth) + line + '\n'
+    if (isOpen && !selfClose && !(tag && line.includes(`</${tag}`))) depth++
+  }
+  return result.trim()
+}
+
+// ─── Agent panel ──────────────────────────────────────────────────────────────
+
+function bindAgentPanel() {
+  document.getElementById('gf-agent-send')?.addEventListener('click', sendAgentMessage)
+  document.getElementById('gf-agent-input')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendAgentMessage()
+  })
+}
+
+function sendAgentMessage() {
+  const input = document.getElementById('gf-agent-input')
+  const text  = input?.value.trim()
+  if (!text) return
+
+  appendAgentMessage('user', text)
+  if (input) input.value = ''
+
+  // Placeholder : réponse simulée (à remplacer par l'appel API réel)
+  setTimeout(() => {
+    appendAgentMessage('agent', `Compris. Je vais travailler sur : "${text}". (Connecte un modèle dans .env pour activer l'agent.)`)
+  }, 600)
+}
+
+function appendAgentMessage(role, content) {
+  const history = document.getElementById('gf-agent-history')
+  if (!history) return
+
+  const empty = history.querySelector('.gf-agent__empty')
+  if (empty) empty.remove()
+
+  const msg = document.createElement('div')
+  msg.className = `gf-agent-msg gf-agent-msg--${role}`
+  msg.innerHTML = `
+    <span class="gf-agent-msg__role">${role === 'user' ? 'Vous' : 'Agent'}</span>
+    <p class="gf-agent-msg__content">${content}</p>
+  `
+  history.appendChild(msg)
+  history.scrollTop = history.scrollHeight
+}
+
+function toggleAgent() {
+  state.agentOpen = !state.agentOpen
+  document.body.dataset.agent = state.agentOpen ? 'open' : 'closed'
+  const btn = document.getElementById('gf-agent-toggle')
+  btn?.setAttribute('aria-pressed', String(state.agentOpen))
+}
+
+function setAgentContext(item) {
+  const ctx    = document.getElementById('gf-agent-context')
+  const value  = document.getElementById('gf-context-value')
+  if (!ctx) return
+  ctx.hidden     = false
+  if (value) value.textContent = `${item.name} · ${state.activeType === 'page' ? 'page' : (item.level || 'atom')}`
+}
+
+function clearAgentContext() {
+  const ctx = document.getElementById('gf-agent-context')
+  if (ctx) ctx.hidden = true
+}
+
+// ─── Suppression ──────────────────────────────────────────────────────────────
+
+let _pendingDelete = null
+
+function showDeleteDialog(item, type) {
+  _pendingDelete = { item, type }
+  const dialog = document.getElementById('gf-delete-dialog')
+  const body   = document.getElementById('gf-dialog-body')
+  if (!dialog) return
+  if (body) body.textContent = `"${item.name}" sera définitivement supprimé. Cette action est irréversible.`
+  dialog.hidden = false
+  document.getElementById('gf-dialog-confirm')?.focus()
+}
+
+function hideDeleteDialog() {
+  _pendingDelete = null
+  const dialog = document.getElementById('gf-delete-dialog')
+  if (dialog) dialog.hidden = true
+}
+
+function bindDeleteDialog() {
+  document.getElementById('gf-dialog-cancel')?.addEventListener('click', hideDeleteDialog)
+  document.getElementById('gf-dialog-backdrop')?.addEventListener('click', hideDeleteDialog)
+  document.getElementById('gf-dialog-confirm')?.addEventListener('click', () => {
+    if (!_pendingDelete) return
+    // La suppression réelle est gérée via une commande IA (/delete)
+    // Ici on retire seulement de l'état local pour feedback immédiat
+    const { item, type } = _pendingDelete
+    if (type === 'page') {
+      state.pages = state.pages.filter(p => p.id !== item.id)
+    } else {
+      state.components = state.components.filter(c => c.id !== item.id)
+    }
+    hideDeleteDialog()
+    renderBigPicture()
+    updateSceneInfo()
+  })
 }
 
 // ─── Utilitaires ──────────────────────────────────────────────────────────────
 
-function showError(message) {
-  const content = document.getElementById('gf-content') || document.body
-  const el = document.createElement('div')
-  el.className = 'gf-error'
-  el.innerHTML = `<strong>Erreur Go-fast</strong><br>${message}`
-  content.prepend(el)
+function findItem(id, type) {
+  return type === 'page'
+    ? state.pages.find(p => p.id === id)
+    : state.components.find(c => c.id === id)
 }
 
-function debounce(fn, delay) {
-  let timer
-  return (...args) => {
-    clearTimeout(timer)
-    timer = setTimeout(() => fn(...args), delay)
-  }
+function getDefaultValues(item) {
+  const vals = {}
+  const all  = { ...(item.variants || {}), ...(item.content || {}) }
+  Object.entries(all).forEach(([k, ctrl]) => {
+    if (ctrl.type !== 'array') vals[k] = ctrl.default
+  })
+  return vals
 }
 
-// ─── HMR : recharge l'iframe ou le nav quand un composant change ──────────────
+function showGlobalError(msg) {
+  const el  = document.createElement('div')
+  el.className = 'gf-error-msg'
+  el.innerHTML = `<strong>Erreur Go-fast</strong><br>${msg}`
+  document.getElementById('gf-surface')?.prepend(el)
+}
 
-if (import.meta.hot) {
+// ─── HMR ──────────────────────────────────────────────────────────────────────
+
+function bindHMR() {
+  if (!import.meta.hot) return
+
   import.meta.hot.on('gofast:update', async () => {
-    const frame = document.getElementById('gf-preview-frame')
-    if (frame) {
-      // Page preview : recharge l'iframe
-      if (frame.src) frame.src = frame.src
-    } else {
-      // Page index : re-fetch showcase.json et re-render
-      try {
-        const res = await fetch(SHOWCASE_JSON + '?t=' + Date.now())
-        if (res.ok) {
-          const data = await res.json()
-          state.components = data.components || []
-          state.pages = data.pages || []
-          renderNav()
-          renderStats()
-          if (state.pages.length > 0) renderPagesNav()
-        }
-      } catch (_) {}
-    }
+    try {
+      const res = await fetch(SHOWCASE_JSON + '?t=' + Date.now())
+      if (!res.ok) return
+      const data   = await res.json()
+      state.components = data.components || []
+      state.pages      = data.pages      || []
+      updateSceneInfo()
+
+      if (state.view === 'bigpicture') {
+        renderBigPicture()
+      } else {
+        const frame = document.getElementById('gf-preview-frame')
+        if (frame?.src) frame.src = frame.src
+      }
+    } catch (_) {}
   })
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', init)
+document.addEventListener('DOMContentLoaded', () => {
+  init()
+  bindCodePanel()
+  bindDeleteDialog()
+  initCanvasDrag()
+  initZoomControls()
+})

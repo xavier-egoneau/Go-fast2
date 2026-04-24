@@ -914,9 +914,18 @@ RULES:
       padding: 3rem 2rem;
     }
     body.gf-layout--full {
-      padding: 2rem 0;
+      padding: 1rem 0;
     }
     body.gf-layout--full > * {
+      width: 100%;
+    }
+    body.gf-layout--card {
+      min-height: 0;
+      padding: 1.25rem;
+      background-color: #ffffff;
+      overflow: hidden;
+    }
+    body.gf-layout--card > * {
       width: 100%;
     }
   </style>

@@ -10,6 +10,17 @@ import { listAgentProviders } from './design/src/core/agent-providers.js'
 import { applyPreviewPayloadToTwigData, decodePreviewPayload, PREVIEW_PAYLOAD_QUERY_KEY, resolvePreviewComposableData } from './design/src/core/preview-payload.js'
 
 const ROOT = process.cwd()
+
+// Charger .env dans process.env — Vite ne l'injecte pas côté middleware
+;(function loadDotEnv() {
+  const envFile = path.join(ROOT, '.env')
+  if (!fs.existsSync(envFile)) return
+  for (const line of fs.readFileSync(envFile, 'utf8').split('\n')) {
+    const m = line.trim().match(/^([^#][^=]*)=(.+)$/)
+    if (m) process.env[m[1].trim()] ??= m[2].trim()
+  }
+})()
+
 const config = JSON.parse(fs.readFileSync('./gofast.config.json', 'utf8'))
 function spawnCommand(command, args, options = {}) {
   const {
@@ -132,6 +143,34 @@ async function getRuntimeProviders() {
     return provider
   }))
   return providers
+}
+
+async function callProviderAPI(messages, system = '', maxTokens = 2048) {
+  const provider = process.env.AI_PROVIDER
+  const apiKey   = process.env.PROVIDER_API_KEY
+  const baseUrl  = process.env.PROVIDER_URL
+  const model    = process.env.AI_MODEL
+  if (!provider || !apiKey) throw new Error('Provider non configuré — vérifie AI_PROVIDER et PROVIDER_API_KEY dans .env')
+  if (provider === 'claude') {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: model || 'claude-sonnet-4-6', max_tokens: maxTokens, system, messages })
+    })
+    if (!r.ok) { const e = await r.json(); throw new Error(e.error?.message || `Anthropic ${r.status}`) }
+    return (await r.json()).content[0].text
+  }
+  if (provider === 'ollama') {
+    const url = (baseUrl || 'http://localhost:11434').replace(/\/$/, '')
+    const r = await fetch(`${url}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: model || 'llama3', stream: false, messages: [{ role: 'system', content: system }, ...messages] })
+    })
+    if (!r.ok) throw new Error(`Ollama ${r.status}: ${await r.text()}`)
+    return (await r.json()).message.content
+  }
+  throw new Error(`AI_PROVIDER inconnu : "${provider}". Valeurs : claude, ollama`)
 }
 
 function extractJsonFromText(text) {
@@ -355,6 +394,158 @@ function exposeChildPartInMetaFile(relativeMetaPath, payload = {}) {
     absoluteMetaPath,
     nodeId
   }
+}
+
+// ── CSS Editor : parse SCSS BEM structure ──────────────────────────────────
+function parseComponentScssBemMap(content, componentName) {
+  const bemMap = {}
+  const selectorStack = []
+  const propsStack = []
+
+  for (const rawLine of content.split('\n')) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('//') || line.startsWith('/*') || line.startsWith('*') || line.startsWith('@')) continue
+
+    if (line.includes('{')) {
+      const selectorRaw = line.slice(0, line.indexOf('{')).trim()
+      let selector
+
+      if (selectorRaw.startsWith('&')) {
+        const parent = selectorStack.length > 0 ? selectorStack[selectorStack.length - 1] : componentName
+        const expanded = parent + selectorRaw.slice(1)
+        // Skip pseudo-selectors (:hover, :focus-visible)
+        selector = expanded.includes(':') ? '__skip__' : expanded
+      } else if (selectorRaw.startsWith('.')) {
+        selector = selectorRaw.slice(1)
+      } else if (selectorRaw === '') {
+        selector = selectorStack.length > 0 ? selectorStack[selectorStack.length - 1] : componentName
+      } else {
+        // Combinators, pseudo, etc. — skip for BEM map
+        selector = selectorRaw.includes(':') || /[>+~]/.test(selectorRaw) ? '__skip__' : selectorRaw
+      }
+
+      selectorStack.push(selector)
+      propsStack.push({})
+
+      // Handle single-line rule: selector { prop: val; }
+      if (line.includes('}')) {
+        const sel = selectorStack.pop()
+        const props = propsStack.pop()
+        if (sel && sel !== '__skip__' && Object.keys(props).length > 0) {
+          bemMap[sel] = { ...(bemMap[sel] || {}), ...props }
+        }
+      }
+      continue
+    }
+
+    if (line === '}' || line.startsWith('}')) {
+      if (selectorStack.length > 0) {
+        const sel = selectorStack.pop()
+        const props = propsStack.pop()
+        if (sel && sel !== '__skip__' && Object.keys(props).length > 0) {
+          bemMap[sel] = { ...(bemMap[sel] || {}), ...props }
+        }
+      }
+      continue
+    }
+
+    // Property declaration
+    if (line.includes(':') && propsStack.length > 0 && selectorStack[selectorStack.length - 1] !== '__skip__') {
+      const colonIdx = line.indexOf(':')
+      const prop = line.slice(0, colonIdx).trim()
+      const value = line.slice(colonIdx + 1).replace(/;.*$/, '').trim()
+      if (prop && value && /^[a-z-]+$/.test(prop)) {
+        propsStack[propsStack.length - 1][prop] = value
+      }
+    }
+  }
+
+  return bemMap
+}
+
+function patchScssBemProperty(content, componentName, selector, property, newValue) {
+  const lines = content.split('\n')
+  const selectorStack = []
+  let targetDepth = -1
+  let currentDepth = 0
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i]
+    const line = rawLine.trim()
+    if (!line || line.startsWith('//') || line.startsWith('/*') || line.startsWith('*') || line.startsWith('@')) continue
+
+    if (line.includes('{')) {
+      const selectorRaw = line.slice(0, line.indexOf('{')).trim()
+      let resolved
+
+      if (selectorRaw.startsWith('&')) {
+        const parent = selectorStack.length > 0 ? selectorStack[selectorStack.length - 1] : componentName
+        resolved = parent + selectorRaw.slice(1)
+      } else if (selectorRaw.startsWith('.')) {
+        resolved = selectorRaw.slice(1)
+      } else {
+        resolved = selectorRaw || (selectorStack.length > 0 ? selectorStack[selectorStack.length - 1] : componentName)
+      }
+
+      selectorStack.push(resolved)
+      currentDepth++
+
+      if (resolved === selector) targetDepth = currentDepth
+
+      if (line.includes('}')) {
+        if (currentDepth === targetDepth) targetDepth = -1
+        selectorStack.pop()
+        currentDepth--
+      }
+      continue
+    }
+
+    if (line === '}' || line.startsWith('}')) {
+      if (currentDepth === targetDepth) targetDepth = -1
+      selectorStack.pop()
+      currentDepth--
+      continue
+    }
+
+    if (targetDepth !== -1 && currentDepth === targetDepth && line.includes(':')) {
+      const colonIdx = line.indexOf(':')
+      const prop = line.slice(0, colonIdx).trim()
+      if (prop === property) {
+        const indent = rawLine.match(/^(\s*)/)[1]
+        const hasSemi = rawLine.includes(';')
+        lines[i] = `${indent}${property}: ${newValue}${hasSemi ? ';' : ''}`
+        return lines.join('\n')
+      }
+    }
+  }
+
+  throw new Error(`Propriété "${property}" introuvable dans le sélecteur "${selector}" de ${componentName}`)
+}
+
+function addScssBemVariant(content, variantName, patches) {
+  const lines = content.split('\n')
+  let depth = 0
+  let rootEnd = -1
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+    if (!line || line.startsWith('//') || line.startsWith('@')) continue
+    if (line.includes('{') && !line.includes('}')) depth++
+    if (line === '}' || line.startsWith('}')) {
+      depth--
+      if (depth === 0) { rootEnd = i; break }
+    }
+  }
+
+  if (rootEnd === -1) throw new Error(`Impossible de trouver la fermeture du bloc racine`)
+
+  const propsLines = Object.entries(patches)
+    .map(([prop, val]) => `    ${prop}: ${val};`)
+    .join('\n')
+
+  const variantBlock = `\n  &--${variantName} {\n${propsLines}\n  }`
+  lines.splice(rootEnd, 0, variantBlock)
+  return lines.join('\n')
 }
 
 // Plugin principal : routage .html → .twig + génération showcase.json
@@ -802,6 +993,98 @@ RULES:
         })
       })
 
+      // ── CSS Editor : lecture BEM map ───────────────────────────────────────
+      server.middlewares.use('/__design_api/css-editor/read', (req, res, next) => {
+        if (req.method !== 'GET') return next()
+        const url = new URL(req.url, 'http://localhost')
+        const component = url.searchParams.get('component')
+        if (!component || !/^[a-z0-9-]+$/.test(component)) {
+          res.statusCode = 400
+          return res.end(JSON.stringify({ error: 'component requis (slug valide)' }))
+        }
+        try {
+          const scssPath = path.join(ROOT, 'dev', 'assets', 'scss', 'components', `_${component}.scss`)
+          if (!fs.existsSync(scssPath)) throw new Error(`Fichier SCSS introuvable : _${component}.scss`)
+          const content = fs.readFileSync(scssPath, 'utf8')
+          const bemMap = parseComponentScssBemMap(content, component)
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({ ok: true, component, bemMap, scssPath: `dev/assets/scss/components/_${component}.scss` }))
+        } catch (error) {
+          res.statusCode = 404
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({ ok: false, error: error.message }))
+        }
+      })
+
+      // ── CSS Editor : patch propriété dans le SCSS ──────────────────────────
+      server.middlewares.use('/__design_api/css-editor/patch', (req, res, next) => {
+        if (req.method !== 'POST') return next()
+        let body = ''
+        req.on('data', c => { body += c })
+        req.on('end', () => {
+          try {
+            const { component, selector, property, value } = JSON.parse(body || '{}')
+            if (!component || !selector || !property || value === undefined) throw new Error('component, selector, property, value requis')
+            const scssPath = path.join(ROOT, 'dev', 'assets', 'scss', 'components', `_${component}.scss`)
+            if (!fs.existsSync(scssPath)) throw new Error(`_${component}.scss introuvable`)
+            let content = fs.readFileSync(scssPath, 'utf8')
+            content = patchScssBemProperty(content, component, selector, property, value)
+            fs.writeFileSync(scssPath, content, 'utf8')
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ ok: true }))
+          } catch (error) {
+            res.statusCode = 400
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ error: error.message }))
+          }
+        })
+      })
+
+      // ── CSS Editor : créer un modifier BEM (variante) ──────────────────────
+      server.middlewares.use('/__design_api/css-editor/variant', (req, res, next) => {
+        if (req.method !== 'POST') return next()
+        let body = ''
+        req.on('data', c => { body += c })
+        req.on('end', async () => {
+          try {
+            const { component, variantName, patches } = JSON.parse(body || '{}')
+            if (!component || !variantName || !patches) throw new Error('component, variantName, patches requis')
+            if (!/^[a-z0-9-]+$/.test(variantName)) throw new Error('variantName doit être un slug valide')
+
+            const scssPath = path.join(ROOT, 'dev', 'assets', 'scss', 'components', `_${component}.scss`)
+            if (!fs.existsSync(scssPath)) throw new Error(`_${component}.scss introuvable`)
+            let scssContent = fs.readFileSync(scssPath, 'utf8')
+            scssContent = addScssBemVariant(scssContent, variantName, patches)
+            fs.writeFileSync(scssPath, scssContent, 'utf8')
+
+            // Ajouter la variante dans le JSON du composant
+            const jsonPath = path.join(ROOT, 'dev', 'components', component, `${component}.json`)
+            if (fs.existsSync(jsonPath)) {
+              const meta = JSON.parse(fs.readFileSync(jsonPath, 'utf8'))
+              meta.variants = meta.variants || {}
+              if (!meta.variants.type) {
+                meta.variants.type = { label: 'Type', type: 'select', default: 'default', options: [] }
+              }
+              const opts = meta.variants.type.options || []
+              if (!opts.includes(variantName)) opts.push(variantName)
+              meta.variants.type.options = opts
+              fs.writeFileSync(jsonPath, JSON.stringify(meta, null, 2), 'utf8')
+
+              const { generateShowcase } = await import('./scripts/generate-showcase.js')
+              await generateShowcase()
+            }
+
+            server.ws.send({ type: 'custom', event: 'gofast:update' })
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ ok: true, variantName }))
+          } catch (error) {
+            res.statusCode = 400
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ error: error.message }))
+          }
+        })
+      })
+
       // Génère showcase.json + sprite icônes au démarrage
       import('./scripts/generate-showcase.js').then(({ generateShowcase }) => generateShowcase())
       import('./scripts/generate-icons.js').then(({ generateIcons }) => generateIcons())
@@ -845,6 +1128,208 @@ RULES:
           const { generateIcons } = await import('./scripts/generate-icons.js')
           await generateIcons()
         }
+      })
+
+      // ── Tokens design system ───────────────────────────────────────────────
+      const VARIABLES_PATH = path.join(ROOT, 'dev', 'assets', 'scss', 'base', '_variables.scss')
+
+      const GOOGLE_FONTS_CURATED = [
+        // Sans-serif
+        'Inter','Roboto','Open Sans','Lato','Montserrat','Poppins','Nunito','DM Sans',
+        'Source Sans 3','Raleway','Ubuntu','Rubik','Outfit','Plus Jakarta Sans','Figtree',
+        'Manrope','Noto Sans','Work Sans','Karla','Mulish','Jost','Barlow','Space Grotesk',
+        // Serif
+        'Playfair Display','Merriweather','Lora','Source Serif 4','EB Garamond',
+        'Cormorant Garamond','Libre Baskerville','Crimson Text','Fraunces','DM Serif Display',
+        // Monospace
+        'Fira Code','JetBrains Mono','Source Code Pro','Roboto Mono','IBM Plex Mono',
+        'Space Mono','Inconsolata','DM Mono',
+        // Display
+        'Syne','Unbounded','Archivo','Cabinet Grotesk',
+      ].sort()
+
+      function parseScssVariables(content) {
+        const result = {}
+        for (const line of content.split('\n')) {
+          const m = line.match(/^\$([a-z0-9-]+):\s*(.+?)(?:\s*;|\s*\/\/)/)
+          if (m) result[m[1]] = m[2].trim().replace(/;$/, '').trim()
+        }
+        return result
+      }
+
+      function groupTokens(vars) {
+        const pick = (prefix) => Object.fromEntries(
+          Object.entries(vars).filter(([k]) => k.startsWith(prefix))
+            .map(([k, v]) => [k.replace(prefix, ''), v])
+        )
+        return {
+          colors:      pick('color-'),
+          fonts:       pick('font-family-'),
+          fontSizes:   pick('font-size-'),
+          fontWeights: pick('font-weight-'),
+          lineHeights: pick('line-height-'),
+          spacing:     pick('spacing-'),
+          radius:      pick('radius-'),
+          shadows:     pick('shadow-'),
+          transitions: pick('transition-'),
+        }
+      }
+
+      function updateScssVariable(content, varName, newValue) {
+        const escaped = varName.replace(/-/g, '\\-')
+        const regex   = new RegExp(`(\\$${escaped}:\\s*)([^;]+)(;)`)
+        if (!regex.test(content)) throw new Error(`$${varName} non trouvée dans _variables.scss`)
+        return content.replace(regex, `$1${newValue}$3`)
+      }
+
+      server.middlewares.use('/api/tokens', (req, res, next) => {
+        if (req.method === 'GET') {
+          try {
+            const content = fs.existsSync(VARIABLES_PATH) ? fs.readFileSync(VARIABLES_PATH, 'utf8') : ''
+            const tokens  = groupTokens(parseScssVariables(content))
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ ok: true, tokens, fonts: GOOGLE_FONTS_CURATED }))
+          } catch (e) {
+            res.statusCode = 500
+            res.end(JSON.stringify({ error: e.message }))
+          }
+          return
+        }
+
+        if (req.method === 'PATCH') {
+          let body = ''
+          req.on('data', c => { body += c })
+          req.on('end', () => {
+            try {
+              const { name, value } = JSON.parse(body || '{}')
+              if (!name || value === undefined) throw new Error('name et value requis')
+              let content = fs.readFileSync(VARIABLES_PATH, 'utf8')
+              content = updateScssVariable(content, name, value)
+              fs.writeFileSync(VARIABLES_PATH, content, 'utf8')
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({ ok: true }))
+            } catch (e) {
+              res.statusCode = 400
+              res.end(JSON.stringify({ error: e.message }))
+            }
+          })
+          return
+        }
+
+        next()
+      })
+
+      // ── Agent panel : config + chat ────────────────────────────────────────
+      server.middlewares.use('/api/config', (req, res, next) => {
+        if (req.method !== 'GET') return next()
+        const provider = process.env.AI_PROVIDER || null
+        const model    = process.env.AI_MODEL
+          || (provider === 'claude'  ? 'claude-sonnet-4-6' : null)
+          || (provider === 'ollama'  ? 'llama3' : null)
+          || 'non configuré'
+        const ready = !!(provider && process.env.PROVIDER_API_KEY)
+        res.setHeader('Content-Type', 'application/json')
+        res.end(JSON.stringify({ provider, model, ready }))
+      })
+
+      server.middlewares.use('/api/chat', (req, res, next) => {
+        if (req.method !== 'POST') return next()
+        let body = ''
+        req.on('data', chunk => { body += chunk })
+        req.on('end', async () => {
+          try {
+            const { messages = [], context = '' } = JSON.parse(body || '{}')
+            const scssVariables = fs.existsSync(VARIABLES_PATH)
+              ? fs.readFileSync(VARIABLES_PATH, 'utf8') : ''
+            const system = `Tu es un agent de design pour Go-fast v2 (Atomic Design, Twig + SCSS + JSON).
+INSTRUCTION CRITIQUE : réponds UNIQUEMENT avec un objet JSON valide. Zéro texte avant ou après.
+
+Détecte l'intention et réponds avec l'une de ces actions :
+- Créer un composant → {"action":"create","name":"nom-kebab","level":"atom|molecule|organism","category":"Forms|Navigation|Layout|Content|Feedback","intent":"description précise et complète"}
+- Besoin de précision → {"action":"clarify","message":"ta question courte"}
+- Réponse générale → {"action":"chat","message":"ta réponse"}
+${context ? `\nComposant/page sélectionné : ${context}` : ''}
+
+VARIABLES SCSS DU DESIGN SYSTEM — utilise uniquement ces tokens, jamais de valeurs hardcodées :
+${scssVariables}`
+            const raw = await callProviderAPI(messages, system, 512)
+            const parsed = extractJsonFromText(raw)
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify(parsed))
+          } catch (e) {
+            res.statusCode = 500
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ error: e.message }))
+          }
+        })
+      })
+
+      server.middlewares.use('/api/generate', (req, res, next) => {
+        if (req.method !== 'POST') return next()
+        let body = ''
+        req.on('data', chunk => { body += chunk })
+        req.on('end', async () => {
+          try {
+            const { name, level, category, intent } = JSON.parse(body || '{}')
+            if (!intent) throw new Error('intent requis')
+
+            const componentsDir = path.join(ROOT, 'dev', 'components')
+            const componentEntries = []
+            if (fs.existsSync(componentsDir)) {
+              for (const slug of fs.readdirSync(componentsDir)) {
+                const twigPath = path.join(componentsDir, slug, `${slug}.twig`)
+                const jsonPath = path.join(componentsDir, slug, `${slug}.json`)
+                const twigContent = fs.existsSync(twigPath) ? fs.readFileSync(twigPath, 'utf8') : null
+                const jsonContent = fs.existsSync(jsonPath) ? fs.readFileSync(jsonPath, 'utf8') : null
+                if (twigContent) componentEntries.push({ slug, twigContent, jsonContent })
+              }
+            }
+            const variablesPath = path.join(ROOT, 'dev', 'assets', 'scss', 'base', '_variables.scss')
+            const scssVariables = fs.existsSync(variablesPath) ? fs.readFileSync(variablesPath, 'utf8') : ''
+
+            const system = `Tu es un expert Atomic Design Go-fast v2. Génère du code de composant.
+INSTRUCTION CRITIQUE : réponds UNIQUEMENT avec un objet JSON valide. Zéro texte avant ou après.`
+
+            const prompt = `COMPOSANT À CRÉER :
+- Intent : ${intent}
+- Nom (slug) : ${name || 'my-component'}
+- Niveau : ${level || 'atom'}
+- Catégorie : ${category || 'General'}
+
+VARIABLES SCSS DU DESIGN SYSTEM (utilise uniquement ces variables, jamais de valeurs hardcodées) :
+${scssVariables}
+
+COMPOSANTS EXISTANTS (étudie leurs patterns Twig/BEM/SCSS et réutilise-les) :
+${componentEntries.map(e => `--- ${e.slug} ---\n[json] ${e.jsonContent || 'n/a'}\n[twig] ${e.twigContent}`).join('\n\n')}
+
+FORMAT DE RÉPONSE (JSON uniquement) :
+{
+  "twig": "<template twig complet>",
+  "scss": "<SCSS complet avec @use '../base/variables' as * en tête>",
+  "meta": {
+    "variants": { "clé": { "label": "...", "type": "select|checkbox", "default": "...", "options": ["..."] } },
+    "content":  { "clé": { "label": "...", "type": "text|number|color", "default": "..." } }
+  }
+}
+
+RÈGLES ABSOLUES :
+- |default() obligatoire sur chaque variable Twig
+- BEM strict (.block__element--modifier)
+- SCSS : @use '../base/variables' as * en première ligne, zéro valeur hardcodée
+- Include : {% include 'dev/components/[slug]/[slug].twig' with { ... } %}
+- data-gf-component="${name || 'my-component'}" sur l'élément racine`
+
+            const raw = await callProviderAPI([{ role: 'user', content: prompt }], system, 4096)
+            const result = extractJsonFromText(raw)
+            if (!result.twig) throw new Error('Le modèle n\'a pas retourné de template Twig')
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ ok: true, twig: result.twig, scss: result.scss || '', meta: result.meta || {} }))
+          } catch (e) {
+            res.statusCode = 500
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ ok: false, error: e.message }))
+          }
+        })
       })
 
       // Middleware : intercepte les requêtes .html → rend le .twig correspondant

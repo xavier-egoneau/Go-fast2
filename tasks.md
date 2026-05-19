@@ -8,21 +8,8 @@ Suite à la critique du projet, 6 points à corriger.
 
 ## Tâches
 
-- [ ] **Refactorer la gestion de `dev/` dans `.gitignore`**
-  - Supprimer `dev/` du `.gitignore` racine
-  - Créer `dev/.gitignore` avec `*` + `!.gitignore` (ignore le contenu, garde le dossier tracké)
 
-- [ ] **Corriger la typo `task.md` → `tasks.md` dans `.gitignore`**
+- [ ] avoir un select sur chaque value css contenant une variable ($) et lister les variables possibles
+- [ ] mettre en place une connection humaine quand le .env est vide
+- [ ] cliquer sur un composant/pages créé un contexte sur ce coposant/page et permet a l'agent de savoir que on parle de ce composant présisément.
 
-- [ ] **Réinitialiser `gofast.config.json`**
-  - Retirer le nom "test", remettre à l'état template vierge
-
-- [ ] **Ajouter `orbit/dist/` et `orbit/node_modules/` dans `.gitignore` et `.claudeignore`**
-
-- [ ] **Ajouter une entrée auto-référente dans `docs/impact-map.md`**
-  - "Si tu modifies impact-map.md → mettre à jour CLAUDE.md si le lien change"
-
-- [ ] **Clarifier `add-tool.md` vs `setup-agentic`**
-  - `/add-tool` écrit uniquement dans `.claude/commands/`
-  - La sync vers `.github/` et `.codex/` se fait via `npm run setup-agentic`
-  - Retirer la logique de création multi-cibles de `add-tool.md`

@@ -1,7 +1,7 @@
 import { loadRegistry, getEntryById, getDefaultParams, listEntries, listComposableBindings, resolveComposableParentParamKey } from './core/registry.js'
 import { buildRenderUrl } from './core/render-url.js'
 import { applyComposablePatchToItem, applyFlatParamsPatchToItem, createStructuredStates, getRenderableItemParams, normalizeSceneItemState } from './core/composable-state.js'
-import { loadTokens, getTokenSummaryForEntry, getTokenById } from './core/tokens.js'
+import { loadTokens, getTokens, getTokenSummaryForEntry, getTokenById } from './core/tokens.js'
 import { listSceneFiles, loadSceneFile } from './core/scene-file.js'
 import { saveSceneFile, deleteSceneFile } from './core/scene-api.js'
 import { diffScenes } from './core/diff.js'
@@ -33,6 +33,8 @@ import { renderAgentPanel } from './ui/agent-panel.js'
 import { renderWorkshop } from './workshop/workshop-view.js'
 import { bindWorkshopEvents } from './workshop/workshop-events.js'
 import { getWorkshopState } from './workshop/workshop-store.js'
+import { getCssEditorState, patchCssEditorState, resetCssEditor, buildTokenMap, resolveTokenValue, subscribeCssEditor } from './core/css-editor-state.js'
+import { renderCssEditorPanel } from './ui/css-editor-panel.js'
 
 let rootEl = null
 let dragState = null
@@ -57,6 +59,7 @@ let gridCellOverlayState = null
 // Scroll canvas mémorisé en dehors du cycle render pour éviter les race conditions
 let canvasScrollMemory = { left: 0, top: 0 }
 let gridCellClearTimeout = null
+let cssEditorIframeCleanup = null
 
 const VIEWPORT_SPECS = {
   mobile: { label: 'Mobile', breakpointId: 'breakpoint-sm', fallbackWidth: 640, height: 844 },
@@ -610,6 +613,11 @@ function selectItem(itemId) {
   const state = getState()
   if (activeComposableDrawer?.itemId && activeComposableDrawer.itemId !== itemId) {
     activeComposableDrawer = null
+  }
+  // Désactiver l'éditeur CSS si on sélectionne un autre item
+  const cssEditor = getCssEditorState()
+  if (cssEditor.active && cssEditor.itemId !== itemId) {
+    deactivateCssEditor()
   }
   state.selectedItemId = itemId
   refreshSelectionUI()
@@ -1290,7 +1298,7 @@ function renderCanvas() {
               <section class="ds-item ${selectedItemId === item.id ? 'ds-item--selected' : ''}" data-item-id="${item.id}" style="left:${item.x}px;top:${item.y}px;width:${item.width}px;height:${item.height}px;">
                 <div class="ds-item__toolbar" data-drag-handle="${item.id}">
                   <div><div class="ds-item__title">${escapeHtml(item.label || entry.name)}</div><div class="ds-item__meta">${escapeHtml(item.viewport || 'desktop')} · ${escapeHtml(entry.kind)} · ${escapeHtml(entry.level || '')}</div></div>
-                  <div class="ds-item__toolbar-actions"><button class="ds-badge ds-badge--button" data-action="add-note-to-item" data-item-id="${item.id}">note</button><a class="ds-badge" href="${escapeAttr(url)}" target="_blank" rel="noreferrer">ouvrir</a></div>
+                  <div class="ds-item__toolbar-actions"><button class="ds-badge ds-badge--button" data-action="add-note-to-item" data-item-id="${item.id}">note</button><a class="ds-badge" href="${escapeAttr(url)}" target="_blank" rel="noreferrer">ouvrir</a>${entry.kind === 'component' ? `<button class="ds-badge ds-badge--button${getCssEditorState().active && getCssEditorState().itemId === item.id ? ' ds-badge--active' : ''}" data-action="css-editor-toggle" data-item-id="${item.id}">Edit CSS</button>` : ''}</div>
                 </div>
                 <iframe class="ds-item__frame" src="${escapeAttr(url)}" title="${escapeAttr(item.label || entry.name)}" style="height: calc(100% - 41px);"></iframe>
                 <div class="ds-item__resize" data-resize-handle="${item.id}" title="Redimensionner"></div>
@@ -1542,6 +1550,12 @@ function renderInspector() {
         <div class="ds-panel__body"><p class="ds-muted">Aucun élément sélectionné.</p>${renderDiffPanel()}</div>
       </aside>
     `
+  }
+
+  const cssEditor = getCssEditorState()
+  if (cssEditor.active && cssEditor.itemId === item.id) {
+    const entry = getEntryById(item.ref, item.kind)
+    return renderCssEditorPanel(entry?.name || item.ref, entry?.level || item.kind)
   }
 
   const entry = getEntryById(item.ref, item.kind)
@@ -2559,6 +2573,276 @@ function bindSelectionDependentEvents() {
   })
 }
 
+// ── CSS Editor ────────────────────────────────────────────────────────────────
+
+async function activateCssEditor(itemId) {
+  const scene = getRenderedScene()
+  const item = scene.items.find(i => i.id === itemId)
+  if (!item) { console.warn('[css-editor] item not found in scene:', itemId); return }
+
+  patchCssEditorState({ active: true, itemId, loading: true, error: null, selectedSelector: null, breadcrumb: [], pendingChanges: {} })
+
+  try {
+    const res = await fetch(`/__design_api/css-editor/read?component=${encodeURIComponent(item.ref)}`)
+    const data = await res.json()
+    if (!data.ok) throw new Error(data.error)
+    console.log('[css-editor] bemMap loaded for', item.ref, '— selectors:', Object.keys(data.bemMap))
+    patchCssEditorState({ component: { name: item.ref, scssPath: data.scssPath }, bemMap: data.bemMap, loading: false })
+  } catch (error) {
+    console.error('[css-editor] load error:', error.message)
+    patchCssEditorState({ loading: false, error: error.message })
+  }
+
+  setupCssEditorIframeListener(itemId)
+}
+
+function deactivateCssEditor() {
+  teardownCssEditorIframeListener()
+  resetCssEditor()
+}
+
+function setupCssEditorIframeListener(itemId) {
+  teardownCssEditorIframeListener()
+  if (!rootEl) return
+
+  const attach = () => {
+    const iframe = rootEl.querySelector(`.ds-item[data-item-id="${itemId}"] .ds-item__frame`)
+    if (!iframe) { console.warn('[css-editor] iframe not found for item', itemId); return }
+
+    const doc = (() => { try { return iframe.contentDocument } catch { return null } })()
+    if (!doc || doc.readyState === 'loading') {
+      iframe.addEventListener('load', attach, { once: true })
+      return
+    }
+
+    console.log('[css-editor] iframe listener attached, readyState:', doc.readyState)
+    const handleClick = (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      handleCssEditorElementClick(e.target, iframe)
+    }
+
+    doc.addEventListener('click', handleClick, true)
+    cssEditorIframeCleanup = () => {
+      try { doc.removeEventListener('click', handleClick, true) } catch {}
+      removeCssEditorHighlight(iframe)
+    }
+  }
+
+  attach()
+}
+
+function teardownCssEditorIframeListener() {
+  if (cssEditorIframeCleanup) {
+    cssEditorIframeCleanup()
+    cssEditorIframeCleanup = null
+  }
+}
+
+function handleCssEditorElementClick(target, iframe) {
+  const { bemMap, selectedEl } = getCssEditorState()
+  const blockNames = Object.keys(bemMap)
+  if (!blockNames.length) return
+
+  let el = target
+
+  // Si on clique sur l'élément déjà sélectionné → remonter au parent
+  if (el === selectedEl) {
+    el = el.parentElement
+    if (!el || el === iframe.contentDocument.body) return
+  }
+
+  // Trouver le BEM class le plus précis sur l'élément ou un ancêtre proche
+  const findBemClass = (node) => {
+    while (node && node !== iframe.contentDocument.body) {
+      const match = [...(node.classList || [])].find(cls =>
+        blockNames.some(name => cls === name || cls.startsWith(name + '__') || cls.startsWith(name + '--'))
+      )
+      if (match) return { el: node, cls: match }
+      node = node.parentElement
+    }
+    return null
+  }
+
+  const found = findBemClass(el)
+  if (!found) { console.log('[css-editor] no BEM class found on', el.tagName, el.className); return }
+
+  // Breadcrumb : chemin depuis le root jusqu'à l'élément sélectionné
+  const breadcrumb = []
+  let ancestor = found.el.parentElement
+  while (ancestor && ancestor !== iframe.contentDocument.body) {
+    const match = [...(ancestor.classList || [])].find(cls =>
+      blockNames.some(name => cls === name || cls.startsWith(name + '__') || cls.startsWith(name + '--'))
+    )
+    if (match) breadcrumb.unshift(match)
+    ancestor = ancestor.parentElement
+  }
+  breadcrumb.push(found.cls)
+
+  // Réinitialiser les pending changes au changement de sélecteur
+  const prev = getCssEditorState().selectedSelector
+  patchCssEditorState({
+    selectedSelector: found.cls,
+    breadcrumb,
+    selectedEl: found.el,
+    pendingChanges: prev === found.cls ? getCssEditorState().pendingChanges : {}
+  })
+
+  highlightCssEditorElement(iframe, found.el)
+}
+
+function highlightCssEditorElement(iframe, el) {
+  try {
+    const doc = iframe.contentDocument
+    doc.querySelectorAll('.gf-css-editor-selected').forEach(node => node.classList.remove('gf-css-editor-selected'))
+
+    let style = doc.getElementById('gf-css-editor-highlight-style')
+    if (!style) {
+      style = doc.createElement('style')
+      style.id = 'gf-css-editor-highlight-style'
+      style.textContent = '.gf-css-editor-selected{outline:2px solid #3b82f6!important;outline-offset:2px!important;}'
+      doc.head.appendChild(style)
+    }
+
+    el.classList.add('gf-css-editor-selected')
+  } catch {}
+}
+
+function removeCssEditorHighlight(iframe) {
+  try {
+    const doc = iframe.contentDocument
+    doc.querySelectorAll('.gf-css-editor-selected').forEach(node => node.classList.remove('gf-css-editor-selected'))
+    doc.getElementById('gf-css-editor-highlight-style')?.remove()
+    doc.getElementById('gf-css-editor-preview')?.remove()
+  } catch {}
+}
+
+function applyLivePreview(itemId, selector, pendingChanges) {
+  if (!rootEl) return
+  const iframe = rootEl.querySelector(`.ds-item[data-item-id="${itemId}"] .ds-item__frame`)
+  if (!iframe) return
+
+  try {
+    const doc = iframe.contentDocument
+    const tokenMap = buildTokenMap(getTokens())
+
+    const cssProps = Object.entries(pendingChanges)
+      .map(([prop, val]) => `${prop}: ${resolveTokenValue(val, tokenMap)};`)
+      .join(' ')
+
+    let previewStyle = doc.getElementById('gf-css-editor-preview')
+    if (!previewStyle) {
+      previewStyle = doc.createElement('style')
+      previewStyle.id = 'gf-css-editor-preview'
+      doc.head.appendChild(previewStyle)
+    }
+    previewStyle.textContent = cssProps ? `.${selector} { ${cssProps} }` : ''
+  } catch {}
+}
+
+async function applyCssEditorPatch() {
+  const { component, selectedSelector, pendingChanges } = getCssEditorState()
+  if (!component || !selectedSelector || !Object.keys(pendingChanges).length) return
+
+  patchCssEditorState({ loading: true, error: null })
+  try {
+    for (const [property, value] of Object.entries(pendingChanges)) {
+      const res = await fetch('/__design_api/css-editor/patch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ component: component.name, selector: selectedSelector, property, value })
+      })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error)
+    }
+    // Recharger le BEM map après patch
+    const res = await fetch(`/__design_api/css-editor/read?component=${encodeURIComponent(component.name)}`)
+    const data = await res.json()
+    patchCssEditorState({ bemMap: data.bemMap, pendingChanges: {}, loading: false })
+  } catch (error) {
+    patchCssEditorState({ loading: false, error: error.message })
+  }
+}
+
+async function applyCssEditorVariant(variantName) {
+  const { component, selectedSelector, pendingChanges } = getCssEditorState()
+  if (!component || !variantName || !Object.keys(pendingChanges).length) return
+
+  patchCssEditorState({ loading: true, error: null })
+  try {
+    const res = await fetch('/__design_api/css-editor/variant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ component: component.name, variantName, patches: pendingChanges })
+    })
+    const data = await res.json()
+    if (!data.ok) throw new Error(data.error)
+
+    const reloadRes = await fetch(`/__design_api/css-editor/read?component=${encodeURIComponent(component.name)}`)
+    const reloadData = await reloadRes.json()
+    patchCssEditorState({ bemMap: reloadData.bemMap, pendingChanges: {}, variantMode: false, variantName: '', loading: false })
+  } catch (error) {
+    patchCssEditorState({ loading: false, error: error.message })
+  }
+}
+
+// ── Fin CSS Editor ─────────────────────────────────────────────────────────────
+
+function bindCssEditorPanelEvents() {
+  rootEl.querySelector('[data-action="css-editor-close"]')?.addEventListener('click', () => deactivateCssEditor())
+
+  rootEl.querySelectorAll('[data-action="css-editor-breadcrumb"]').forEach(btn => btn.addEventListener('click', () => {
+    patchCssEditorState({ selectedSelector: btn.dataset.selector, pendingChanges: {} })
+  }))
+
+  rootEl.querySelectorAll('[data-action="css-editor-prop-change"]').forEach(input => {
+    const handler = () => {
+      const prop = input.dataset.prop
+      const value = input.value
+      const { itemId, selectedSelector, pendingChanges } = getCssEditorState()
+      const next = { ...pendingChanges, [prop]: value }
+      patchCssEditorState({ pendingChanges: next })
+      applyLivePreview(itemId, selectedSelector, next)
+    }
+    input.addEventListener(input.tagName === 'SELECT' ? 'change' : 'input', handler)
+  })
+
+  rootEl.querySelector('[data-action="css-editor-toggle-add"]')?.addEventListener('click', () => {
+    patchCssEditorState({ addingProp: !getCssEditorState().addingProp })
+  })
+
+  rootEl.querySelector('[data-action="css-editor-add-prop"]')?.addEventListener('click', () => {
+    const select = rootEl.querySelector('[data-css-editor="new-prop"]')
+    const prop = select?.value
+    if (!prop) return
+    const { bemMap, selectedSelector, pendingChanges } = getCssEditorState()
+    const existing = bemMap[selectedSelector] || {}
+    if (prop in existing || prop in pendingChanges) return
+    patchCssEditorState({ pendingChanges: { ...pendingChanges, [prop]: '' }, addingProp: false })
+  })
+
+  rootEl.querySelector('[data-action="css-editor-apply"]')?.addEventListener('click', () => applyCssEditorPatch())
+
+  rootEl.querySelector('[data-action="css-editor-variant-start"]')?.addEventListener('click', () => {
+    patchCssEditorState({ variantMode: true, variantName: '' })
+  })
+
+  rootEl.querySelector('[data-action="css-editor-variant-cancel"]')?.addEventListener('click', () => {
+    patchCssEditorState({ variantMode: false, variantName: '' })
+  })
+
+  rootEl.querySelector('[data-action="css-editor-variant-confirm"]')?.addEventListener('click', () => {
+    const input = rootEl.querySelector('[data-css-editor="variant-name"]')
+    const name = input?.value?.trim()
+    if (!name) return
+    applyCssEditorVariant(name)
+  })
+
+  rootEl.querySelector('[data-css-editor="variant-name"]')?.addEventListener('input', event => {
+    patchCssEditorState({ variantName: event.target.value })
+  })
+}
+
 function bindEvents() {
   rootEl.addEventListener('click', event => {
     if (Date.now() <= suppressNextClickUntil) {
@@ -2570,6 +2854,28 @@ function bindEvents() {
     event.stopPropagation()
     addNote(button.dataset.itemId)
   }))
+
+  // CSS Editor events
+  rootEl.querySelectorAll('[data-action="css-editor-toggle"]').forEach(button => button.addEventListener('click', event => {
+    event.stopPropagation()
+    const itemId = button.dataset.itemId
+    const { active, itemId: currentItemId } = getCssEditorState()
+    if (active && currentItemId === itemId) {
+      deactivateCssEditor()
+    } else {
+      selectItem(itemId)
+      activateCssEditor(itemId)
+    }
+  }))
+
+  bindCssEditorPanelEvents()
+
+  // Reconfigurer le listener iframe si l'éditeur est actif après un re-render
+  const { active: cssEditorActive, itemId: cssEditorItemId } = getCssEditorState()
+  if (cssEditorActive && cssEditorItemId) {
+    setupCssEditorIframeListener(cssEditorItemId)
+  }
+
   rootEl.querySelectorAll('.ds-item__toolbar-actions button, .ds-item__toolbar-actions a').forEach(control => {
     control.addEventListener('pointerdown', event => event.stopPropagation())
   })
@@ -2857,6 +3163,18 @@ export async function renderApp(root) {
 
     subscribe(render)
     subscribeAgentState(() => render())
+    subscribeCssEditor(() => {
+      if (!rootEl) return
+      try {
+        const inspectorHost = rootEl.querySelector('[data-ui-region="inspector"]')
+        if (!inspectorHost) return
+        inspectorHost.outerHTML = renderInspectorWrapped()
+        bindSelectionDependentEvents()
+        bindCssEditorPanelEvents()
+      } catch (e) {
+        console.error('[css-editor]', e)
+      }
+    })
     await loadSceneFromFile('default.scene.json', { keepWorkingScene: hasWorkingScene() })
     if (!hasWorkingScene()) {
       const hydrated = hydrateSceneWithRegistry(getState().scene, { preserveExistingLayout: false })

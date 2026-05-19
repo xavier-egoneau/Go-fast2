@@ -153,6 +153,12 @@
             </svg>
             A11y
           </button>
+          <button class="gf-focus-tool" id="gf-toggle-css-editor" type="button" aria-label="Éditeur CSS" aria-pressed="false">
+            <svg class="gf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+            Edit CSS
+          </button>
           <span class="gf-viewport-size" id="gf-viewport-size" aria-live="polite"></span>
         </div>
 
@@ -181,6 +187,31 @@
 
         <div class="gf-a11y-panel" id="gf-a11y-panel" hidden aria-label="Résultats accessibilité" aria-live="polite"></div>
 
+        <div class="gf-css-editor" id="gf-css-editor" hidden aria-label="Éditeur CSS">
+          <div class="gf-css-editor__breadcrumb" id="gf-css-editor-breadcrumb" hidden></div>
+          <div class="gf-css-editor__hint" id="gf-css-editor-hint">Clique sur un élément pour inspecter ses propriétés CSS.</div>
+          <div class="gf-css-editor__props" id="gf-css-editor-props" hidden></div>
+          <button class="gf-css-editor__add-btn" id="gf-css-editor-toggle-add">+ Ajouter une propriété</button>
+          <div class="gf-css-editor__add-row" id="gf-css-editor-add" hidden>
+            <select class="gf-css-editor__add-select" id="gf-css-editor-new-prop">
+              <option value="">— choisir —</option>
+            </select>
+            <button class="gf-focus-tool" id="gf-css-editor-add-confirm">Ajouter</button>
+            <button class="gf-focus-tool" id="gf-css-editor-add-cancel">Annuler</button>
+          </div>
+          <div class="gf-css-editor__footer" id="gf-css-editor-footer" hidden>
+            <button class="gf-css-editor__action gf-css-editor__action--primary" id="gf-css-editor-apply">Appliquer au composant</button>
+            <button class="gf-css-editor__action" id="gf-css-editor-variant-start">Créer une variante</button>
+          </div>
+          <div class="gf-css-editor__variant-form" id="gf-css-editor-variant-form" hidden>
+            <input class="gf-css-editor__variant-input" id="gf-css-editor-variant-name" type="text" placeholder="ex: compact">
+            <div class="gf-css-editor__variant-actions">
+              <button class="gf-css-editor__action gf-css-editor__action--primary" id="gf-css-editor-variant-confirm">Créer &amp; Sauvegarder</button>
+              <button class="gf-css-editor__action" id="gf-css-editor-variant-cancel">Annuler</button>
+            </div>
+          </div>
+        </div>
+
       </div>
 
     </main>
@@ -191,6 +222,7 @@
       <div class="gf-inspector__tabs" role="tablist" aria-label="Onglets inspecteur">
         <button class="gf-itab gf-itab--active" data-panel="variants" role="tab" aria-selected="true" type="button">Variantes</button>
         <button class="gf-itab" data-panel="comments" role="tab" aria-selected="false" type="button">Commentaires</button>
+        <button class="gf-itab" data-panel="tokens" role="tab" aria-selected="false" type="button">Tokens</button>
       </div>
 
       <div class="gf-inspector__body" id="gf-inspector-body" role="tabpanel">

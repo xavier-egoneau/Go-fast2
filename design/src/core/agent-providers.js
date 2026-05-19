@@ -28,6 +28,26 @@ const DEFAULT_PROVIDERS = [
     connected: false,
     authRequired: false,
     reason: 'Bridge not implemented yet'
+  },
+  {
+    id: 'claude-api',
+    label: 'Claude API',
+    description: 'Direct Anthropic API via ANTHROPIC_API_KEY dans .env.',
+    mode: 'api',
+    available: false,
+    connected: false,
+    authRequired: true,
+    reason: 'ANTHROPIC_API_KEY manquante'
+  },
+  {
+    id: 'ollama',
+    label: 'Ollama',
+    description: 'Modèle local via Ollama (OLLAMA_URL + AI_MODEL dans .env).',
+    mode: 'api',
+    available: false,
+    connected: false,
+    authRequired: false,
+    reason: 'OLLAMA_URL non configurée'
   }
 ]
 

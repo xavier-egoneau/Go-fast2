@@ -14,6 +14,11 @@ function pushWarning(collection, message) {
   collection.push(message)
 }
 
+function pushString(collection, message) {
+  if (!message || collection.includes(message)) return
+  collection.push(message)
+}
+
 function pushUnresolved(collection, item) {
   if (!item?.type || !item?.message) return
   if (collection.some(existing => existing.type === item.type && existing.message === item.message)) return
@@ -81,6 +86,7 @@ function inferSceneTargetId(intent, context) {
 export function auditBrainOutput(payload, { intent = '', context = null } = {}) {
   const output = normalizeBrainOutput(payload)
   const warnings = [...output.warnings]
+  const risks = [...output.risks]
   const unresolved = [...output.unresolved]
   const registrySet = buildRegistrySet(context)
   const selectedItemId = getSelectedItemId(context)
@@ -112,6 +118,7 @@ export function auditBrainOutput(payload, { intent = '', context = null } = {}) 
           kind: action.kind || null
         }
       })
+      pushString(risks, 'The proposal depends on a component or page that is not available in the registry.')
     }
   }
 
@@ -125,16 +132,27 @@ export function auditBrainOutput(payload, { intent = '', context = null } = {}) 
 
   if (hasNonEmptyIntent(intent) && output.actions.length === 0 && !requiresNewComponent) {
     pushWarning(warnings, 'No applicable scene action was produced. The request may exceed current scene-action capabilities.')
+    pushString(risks, 'The designer may see no visible change because the brain produced no scene action.')
   }
 
   if (output.actions.some(action => action.type === 'add-note') && !intentSuggestsAnnotation(intent)) {
     pushWarning(warnings, 'This proposal adds a canvas note, which is an annotation and not a production component change.')
+    pushString(risks, 'A canvas note can explain an idea but does not improve the production component or page.')
+  }
+
+  if (output.confidence === 'low' && unresolved.length === 0) {
+    pushUnresolved(unresolved, {
+      type: 'low-confidence',
+      message: 'The brain marked this proposal as low confidence without explaining what remains unresolved.',
+      detail: null
+    })
   }
 
   return {
     ...output,
     actions,
     warnings,
+    risks,
     unresolved,
     requiresNewComponent
   }

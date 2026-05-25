@@ -7,8 +7,22 @@ describe('brain contract', () => {
     expect(createEmptyBrainOutput()).toEqual({
       summary: '',
       actions: [],
+      diagnosis: {
+        intent: '',
+        currentState: '',
+        constraints: []
+      },
+      strategy: {
+        approach: '',
+        steps: []
+      },
+      previewNotes: [],
+      reuseEvidence: [],
       warnings: [],
+      risks: [],
       requiresNewComponent: false,
+      implementationPlan: [],
+      confidence: 'medium',
       unresolved: []
     })
   })
@@ -47,14 +61,33 @@ describe('brain contract', () => {
         { type: 'add-note', x: 10, y: 20, text: 'Hello' },
         { type: 'unknown-action' }
       ],
+      previewNotes: ['CTA becomes clearer', 42],
+      reuseEvidence: ['component:button'],
       warnings: ['warning', 42],
+      risks: ['Needs visual review'],
       requiresNewComponent: 1,
+      implementationPlan: ['Expose a new hero variant'],
+      confidence: 'LOW',
       unresolved: ['missing include']
     })).toEqual({
       summary: 'Test',
       actions: [{ type: 'add-note', x: 10, y: 20, text: 'Hello' }],
+      diagnosis: {
+        intent: '',
+        currentState: '',
+        constraints: []
+      },
+      strategy: {
+        approach: '',
+        steps: []
+      },
+      previewNotes: ['CTA becomes clearer', '42'],
+      reuseEvidence: ['component:button'],
       warnings: ['warning', '42'],
+      risks: ['Needs visual review'],
       requiresNewComponent: true,
+      implementationPlan: ['Expose a new hero variant'],
+      confidence: 'low',
       unresolved: [{ type: 'generic', message: 'missing include' }]
     })
   })

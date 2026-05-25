@@ -1,14 +1,41 @@
 import { ACTION_TYPES, createEmptyActionSet } from './action-schema.js'
 
-export const BRAIN_OUTPUT_KEYS = ['summary', 'actions', 'warnings', 'requiresNewComponent', 'unresolved']
+export const BRAIN_OUTPUT_KEYS = [
+  'summary',
+  'diagnosis',
+  'strategy',
+  'actions',
+  'previewNotes',
+  'reuseEvidence',
+  'warnings',
+  'risks',
+  'requiresNewComponent',
+  'implementationPlan',
+  'confidence',
+  'unresolved'
+]
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
-function normalizeWarnings(value) {
+function normalizeStringArray(value) {
   if (!Array.isArray(value)) return []
   return value.map(item => String(item)).filter(Boolean)
+}
+
+function normalizeWarnings(value) {
+  return normalizeStringArray(value)
+}
+
+function normalizeObject(value, fallback = {}) {
+  if (!isPlainObject(value)) return { ...fallback }
+  return { ...fallback, ...value }
+}
+
+function normalizeConfidence(value) {
+  const confidence = String(value || 'medium').toLowerCase()
+  return ['high', 'medium', 'low'].includes(confidence) ? confidence : 'medium'
 }
 
 function normalizeUnresolved(value) {
@@ -37,8 +64,22 @@ function normalizeAction(action) {
 export function createEmptyBrainOutput() {
   return {
     ...createEmptyActionSet(),
+    diagnosis: {
+      intent: '',
+      currentState: '',
+      constraints: []
+    },
+    strategy: {
+      approach: '',
+      steps: []
+    },
+    previewNotes: [],
+    reuseEvidence: [],
     warnings: [],
+    risks: [],
     requiresNewComponent: false,
+    implementationPlan: [],
+    confidence: 'medium',
     unresolved: []
   }
 }
@@ -54,9 +95,23 @@ export function normalizeBrainOutput(payload) {
 
   return {
     summary: String(payload.summary || ''),
+    diagnosis: normalizeObject(payload.diagnosis, {
+      intent: '',
+      currentState: '',
+      constraints: []
+    }),
+    strategy: normalizeObject(payload.strategy, {
+      approach: '',
+      steps: []
+    }),
     actions,
+    previewNotes: normalizeStringArray(payload.previewNotes),
+    reuseEvidence: normalizeStringArray(payload.reuseEvidence),
     warnings: normalizeWarnings(payload.warnings),
+    risks: normalizeStringArray(payload.risks),
     requiresNewComponent: Boolean(payload.requiresNewComponent),
+    implementationPlan: normalizeStringArray(payload.implementationPlan),
+    confidence: normalizeConfidence(payload.confidence),
     unresolved: normalizeUnresolved(payload.unresolved)
   }
 }

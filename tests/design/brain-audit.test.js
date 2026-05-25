@@ -29,6 +29,7 @@ describe('auditBrainOutput', () => {
     expect(result.requiresNewComponent).toBe(true)
     expect(result.warnings.some(message => message.includes('premium-hero'))).toBe(true)
     expect(result.unresolved.some(item => item.type === 'missing-registry-ref')).toBe(true)
+    expect(result.risks.some(message => message.includes('not available in the registry'))).toBe(true)
   })
 
   it('warns when the brain returns no actionable scene change for a non-empty intent', () => {
@@ -48,6 +49,7 @@ describe('auditBrainOutput', () => {
     })
 
     expect(result.warnings).toContain('No applicable scene action was produced. The request may exceed current scene-action capabilities.')
+    expect(result.risks.some(message => message.includes('no visible change'))).toBe(true)
   })
 
   it('warns when a note is used as an annotation fallback for a non-note intent', () => {
@@ -72,6 +74,7 @@ describe('auditBrainOutput', () => {
     })
 
     expect(result.warnings.some(message => message.includes('canvas note'))).toBe(true)
+    expect(result.risks.some(message => message.includes('does not improve the production component'))).toBe(true)
   })
 
   it('injects the selected item targetId when a selected-item action omits it', () => {
@@ -187,5 +190,26 @@ describe('auditBrainOutput', () => {
     })
 
     expect(result.actions[0].targetId).toBe('item-header-nav')
+  })
+
+  it('keeps low-confidence proposals actionable by adding an unresolved explanation', () => {
+    const result = auditBrainOutput({
+      summary: 'Maybe update the layout',
+      actions: [],
+      warnings: [],
+      previewNotes: [],
+      reuseEvidence: [],
+      risks: [],
+      requiresNewComponent: false,
+      implementationPlan: [],
+      confidence: 'low',
+      unresolved: []
+    }, {
+      intent: 'Make this page closer to Claude Design',
+      context: { system: { registry: [] } }
+    })
+
+    expect(result.unresolved.some(item => item.type === 'low-confidence')).toBe(true)
+    expect(result.risks.length).toBeGreaterThan(0)
   })
 })

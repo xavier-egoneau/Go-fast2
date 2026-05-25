@@ -977,10 +977,32 @@ function resetAgentFeedback() {
     requiresNewComponent: false,
     unresolved: [],
     previewScene: null,
+    ...clearAgentProposalFields(),
     feedbackDismissed: false,
     promptPreview: buildAgentPromptPreview(),
     selectionHint: getAgentSelectionHint()
   })
+}
+
+
+function pickAgentProposalFields(output = {}) {
+  return {
+    lastPreviewNotes: output.previewNotes || [],
+    lastReuseEvidence: output.reuseEvidence || [],
+    lastRisks: output.risks || [],
+    lastImplementationPlan: output.implementationPlan || [],
+    lastConfidence: output.confidence || 'medium'
+  }
+}
+
+function clearAgentProposalFields() {
+  return {
+    lastPreviewNotes: [],
+    lastReuseEvidence: [],
+    lastRisks: [],
+    lastImplementationPlan: [],
+    lastConfidence: 'medium'
+  }
 }
 
 function handleAgentFillTemplate() {
@@ -1010,15 +1032,17 @@ async function handleAgentSubmit() {
       manualJson: agent.actionJson
     })
     const validation = validateActionSet(output, state, getEntryById)
+    const normalizedOutput = validation.normalized || output
     const nextPatch = {
       promptPreview,
-      actionJson: stringifyAgentJson(output),
+      actionJson: stringifyAgentJson(normalizedOutput),
       runtimeError: '',
       validationErrors: validation.errors,
-      lastSummary: output.summary || '',
-      lastWarnings: output.warnings || [],
-      requiresNewComponent: output.requiresNewComponent || false,
-      unresolved: output.unresolved || [],
+      lastSummary: normalizedOutput.summary || '',
+      lastWarnings: normalizedOutput.warnings || [],
+      requiresNewComponent: normalizedOutput.requiresNewComponent || false,
+      unresolved: normalizedOutput.unresolved || [],
+      ...pickAgentProposalFields(normalizedOutput),
       feedbackDismissed: false,
       selectionHint: getAgentSelectionHint()
     }
@@ -1026,6 +1050,7 @@ async function handleAgentSubmit() {
     if (!validation.valid) {
       patchAgentState({
         ...nextPatch,
+        running: false,
         previewScene: null
       })
       render()
@@ -1057,6 +1082,7 @@ function handleAgentValidate() {
       lastWarnings: result.normalized?.warnings || [],
       requiresNewComponent: result.normalized?.requiresNewComponent || false,
       unresolved: result.normalized?.unresolved || [],
+      ...pickAgentProposalFields(result.normalized),
       previewScene: null,
       feedbackDismissed: false,
       promptPreview: buildAgentPromptPreview()
@@ -1068,6 +1094,7 @@ function handleAgentValidate() {
       lastWarnings: [],
       requiresNewComponent: false,
       unresolved: [],
+      ...clearAgentProposalFields(),
       previewScene: null,
       feedbackDismissed: false,
       promptPreview: buildAgentPromptPreview()
@@ -1095,6 +1122,7 @@ function handleAgentPreview() {
       lastWarnings: result.normalized.warnings || [],
       requiresNewComponent: result.normalized.requiresNewComponent || false,
       unresolved: result.normalized.unresolved || [],
+      ...pickAgentProposalFields(result.normalized),
       previewScene,
       feedbackDismissed: false,
       promptPreview: buildAgentPromptPreview()
@@ -1107,6 +1135,7 @@ function handleAgentPreview() {
       lastWarnings: [],
       requiresNewComponent: false,
       unresolved: [],
+      ...clearAgentProposalFields(),
       previewScene: null,
       promptPreview: buildAgentPromptPreview()
     })
@@ -1129,6 +1158,7 @@ function handleAgentApply() {
     lastWarnings: [],
     requiresNewComponent: false,
     unresolved: [],
+    ...clearAgentProposalFields(),
     feedbackDismissed: false
   })
   render()
@@ -1141,7 +1171,8 @@ function handleAgentClearPreview() {
     runtimeError: '',
     lastWarnings: [],
     requiresNewComponent: false,
-    unresolved: []
+    unresolved: [],
+    ...clearAgentProposalFields()
   })
   render()
 }

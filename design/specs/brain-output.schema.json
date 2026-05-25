@@ -14,33 +14,248 @@
     "summary": {
       "type": "string"
     },
+    "diagnosis": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "intent": { "type": "string" },
+        "currentState": { "type": "string" },
+        "constraints": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "strategy": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "approach": { "type": "string" },
+        "steps": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
     "actions": {
       "type": "array",
       "items": {
-        "type": "object"
+        "oneOf": [
+          { "$ref": "#/$defs/updateParamsAction" },
+          { "$ref": "#/$defs/updatePartParamsAction" },
+          { "$ref": "#/$defs/updateCollectionParamsAction" },
+          { "$ref": "#/$defs/updateFamilyParamsAction" },
+          { "$ref": "#/$defs/updateInstanceParamsAction" },
+          { "$ref": "#/$defs/updateLayoutGroupParamsAction" },
+          { "$ref": "#/$defs/updateItemAction" },
+          { "$ref": "#/$defs/duplicateItemAction" },
+          { "$ref": "#/$defs/addItemAction" },
+          { "$ref": "#/$defs/removeItemAction" },
+          { "$ref": "#/$defs/addNoteAction" }
+        ]
       }
+    },
+    "previewNotes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "reuseEvidence": {
+      "type": "array",
+      "items": { "type": "string" }
     },
     "warnings": {
       "type": "array",
-      "items": {
-        "type": "string"
-      }
+      "items": { "type": "string" }
+    },
+    "risks": {
+      "type": "array",
+      "items": { "type": "string" }
     },
     "requiresNewComponent": {
       "type": "boolean"
+    },
+    "implementationPlan": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"]
     },
     "unresolved": {
       "type": "array",
       "items": {
         "anyOf": [
-          {
-            "type": "string"
-          },
+          { "type": "string" },
           {
             "type": "object",
-            "additionalProperties": true
+            "required": ["type", "message"],
+            "additionalProperties": true,
+            "properties": {
+              "type": { "type": "string" },
+              "message": { "type": "string" },
+              "detail": true
+            }
           }
         ]
+      }
+    }
+  },
+  "$defs": {
+    "patch": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "targetedPatchAction": {
+      "type": "object",
+      "required": ["type", "targetId", "patch"],
+      "additionalProperties": true,
+      "properties": {
+        "targetId": { "type": "string" },
+        "patch": { "$ref": "#/$defs/patch" }
+      }
+    },
+    "updateParamsAction": {
+      "allOf": [
+        { "$ref": "#/$defs/targetedPatchAction" },
+        { "properties": { "type": { "const": "update-params" } } }
+      ]
+    },
+    "updatePartParamsAction": {
+      "allOf": [
+        { "$ref": "#/$defs/targetedPatchAction" },
+        {
+          "required": ["partId"],
+          "properties": {
+            "type": { "const": "update-part-params" },
+            "partId": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "updateCollectionParamsAction": {
+      "allOf": [
+        { "$ref": "#/$defs/targetedPatchAction" },
+        {
+          "required": ["collectionId"],
+          "properties": {
+            "type": { "const": "update-collection-params" },
+            "collectionId": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "updateFamilyParamsAction": {
+      "allOf": [
+        { "$ref": "#/$defs/targetedPatchAction" },
+        {
+          "required": ["familyId"],
+          "properties": {
+            "type": { "const": "update-family-params" },
+            "familyId": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "updateInstanceParamsAction": {
+      "allOf": [
+        { "$ref": "#/$defs/targetedPatchAction" },
+        {
+          "required": ["instanceId"],
+          "properties": {
+            "type": { "const": "update-instance-params" },
+            "instanceId": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "updateLayoutGroupParamsAction": {
+      "allOf": [
+        { "$ref": "#/$defs/targetedPatchAction" },
+        {
+          "required": ["layoutGroupId"],
+          "properties": {
+            "type": { "const": "update-layout-group-params" },
+            "layoutGroupId": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "updateItemAction": {
+      "type": "object",
+      "required": ["type", "targetId", "patch"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "update-item" },
+        "targetId": { "type": "string" },
+        "patch": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "width": { "type": "number" },
+            "height": { "type": "number" },
+            "viewport": { "type": "string" },
+            "label": { "type": "string" }
+          }
+        }
+      }
+    },
+    "duplicateItemAction": {
+      "type": "object",
+      "required": ["type", "targetId", "newId"],
+      "additionalProperties": true,
+      "properties": {
+        "type": { "const": "duplicate-item" },
+        "targetId": { "type": "string" },
+        "newId": { "type": "string" },
+        "offset": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+          }
+        }
+      }
+    },
+    "addItemAction": {
+      "type": "object",
+      "required": ["type", "kind", "ref"],
+      "additionalProperties": true,
+      "properties": {
+        "type": { "const": "add-item" },
+        "kind": { "enum": ["component", "page"] },
+        "ref": { "type": "string" },
+        "id": { "type": "string" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" },
+        "viewport": { "type": "string" },
+        "params": { "$ref": "#/$defs/patch" }
+      }
+    },
+    "removeItemAction": {
+      "type": "object",
+      "required": ["type", "targetId"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "remove-item" },
+        "targetId": { "type": "string" }
+      }
+    },
+    "addNoteAction": {
+      "type": "object",
+      "required": ["type", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "add-note" },
+        "id": { "type": "string" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "text": { "type": "string" }
       }
     }
   }
